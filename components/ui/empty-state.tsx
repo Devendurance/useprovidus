@@ -29,17 +29,17 @@ export function EmptyState({
     >
       {icon ? (
         <div
-          className="flex h-12 w-12 items-center justify-center rounded-[10px] border-ledger bg-receipt-field text-provident-green shadow-base"
+          className="flex h-12 w-12 items-center justify-center rounded-[8px] border-[1.5px] border-ink bg-sage text-success"
           aria-hidden
         >
           {icon}
         </div>
       ) : null}
       <div className="space-y-2">
-        <h2 className="font-display text-xl font-semibold tracking-tight text-ledger-stone sm:text-2xl">
+        <h2 className="font-ui text-xl font-semibold tracking-tight text-ink sm:text-2xl">
           {title}
         </h2>
-        <p className="max-w-md text-receipt-grey leading-relaxed">{description}</p>
+        <p className="max-w-md text-ink/70 leading-relaxed">{description}</p>
       </div>
       {action ? <div className="mt-1 flex flex-wrap gap-3">{action}</div> : null}
     </Card>

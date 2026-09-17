@@ -43,23 +43,23 @@ export function RouteStepper({
             <li key={step.id} className="flex items-center gap-2 sm:gap-3">
               <div
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold tracking-tight",
+                  "inline-flex items-center gap-2 rounded-[8px] border-2 px-3 py-1.5 text-xs font-semibold tracking-tight",
                   active &&
-                    "border-ledger bg-ledger-stone text-receipt-field shadow-base",
+                    "border-2 border-ink bg-ink text-cream",
                   done &&
-                    "border-provident-green bg-provident-green/10 text-deep-provision",
+                    "border-success bg-success/10 text-[#1D5736]",
                   !active &&
                     !done &&
-                    "border-ledger-edge bg-clear-paper text-receipt-grey",
+                    "border-sage-line bg-cream text-receipt-grey",
                 )}
                 aria-current={active ? "step" : undefined}
               >
                 <span
                   className={cn(
                     "flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold",
-                    active && "bg-receipt-field text-ledger-stone",
-                    done && "bg-provident-green text-white",
-                    !active && !done && "bg-ledger-edge text-receipt-grey",
+                    active && "bg-cream text-ink",
+                    done && "bg-success text-white",
+                    !active && !done && "bg-sage-line text-receipt-grey",
                   )}
                   aria-hidden
                 >
@@ -69,7 +69,7 @@ export function RouteStepper({
               </div>
               {index < steps.length - 1 ? (
                 <span
-                  className="hidden h-px w-4 bg-ledger-edge sm:block sm:w-6"
+                  className="hidden h-px w-4 bg-sage-line sm:block sm:w-6"
                   aria-hidden
                 />
               ) : null}

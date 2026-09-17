@@ -1,35 +1,91 @@
 @import "tailwindcss";
 
 :root {
-  /* Providus — The Value Ledger */
-  --ledger-stone: #18211f;
-  --receipt-field: #f5f6f1;
-  --clear-paper: #ffffff;
-  --provident-green: #3f7560;
-  --deep-provision: #285542;
-  --quote-blue: #4c6a9e;
-  --rate-amber: #b77a2b;
-  --loss-red: #b54642;
-  --receipt-grey: #68716d;
-  --ledger-edge: #dde1da;
+  /* Providus — a warm, retro-futurist route desk. */
+  --sage: #cbd2c4;
+  --cream: #f5f2ea;
+  --ink: #1a1a1a;
+  --sage-deep: #aeb8aa;
+  --sage-line: #a9b3a6;
 
-  --background: var(--receipt-field);
-  --foreground: var(--ledger-stone);
+  /* Application statuses are deliberately separate from hero indicator lights. */
+  --success: #276645;
+  --success-surface: #e4eee7;
+  --warning: #825500;
+  --warning-surface: #f8efd9;
+  --error: #a33a35;
+  --error-surface: #f9e6e4;
+  --focus: #245d78;
 
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 24px;
-  --radius-arch: 120px;
+  /* Illustration-only colors. Keep these out of general UI messaging. */
+  --metal-light: #c7c3d1;
+  --metal-shadow: #9b96a8;
+  --lcd: #1f3d3a;
+  --lcd-text: #6fcf97;
+  --coin-gold: #e8b84b;
+  --mug-rose: #d68f87;
+  --indicator-blue: #4a90d9;
+  --indicator-orange: #f2a93b;
+  --indicator-green: #6fcf97;
 
-  --shadow-base: 3px 3px 0px var(--ledger-stone);
-  --shadow-elevated: 4px 4px 0px var(--ledger-stone);
-  --shadow-prominent: 8px 8px 0px var(--ledger-stone);
-  --shadow-none: 0px 0px 0px var(--ledger-stone);
+  /* Backward-compatible names used by existing route code. */
+  --ledger-stone: var(--ink);
+  --receipt-field: var(--sage);
+  --clear-paper: var(--cream);
+  --provident-green: var(--success);
+  --deep-provision: #1f5138;
+  --quote-blue: var(--focus);
+  --rate-amber: var(--warning);
+  --loss-red: var(--error);
+  --receipt-grey: #4d5752;
+  --ledger-edge: var(--sage-line);
+
+  --background: var(--sage);
+  --foreground: var(--ink);
+
+  --radius-sm: 8px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-arch: 80px;
+
+  /* UI stays flat except for the signature CTA sticker. */
+  --shadow-sticker: 7px 7px 0 var(--ink);
+  --shadow-base: none;
+  --shadow-elevated: none;
+  --shadow-prominent: none;
+  --shadow-none: none;
+
+  /* One visible page below the sticky header; sections can grow beyond it. */
+  --site-header-height: 81px;
+  --viewport-content-height: calc(100svh - var(--site-header-height));
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-sage: var(--sage);
+  --color-cream: var(--cream);
+  --color-ink: var(--ink);
+  --color-sage-deep: var(--sage-deep);
+  --color-sage-line: var(--sage-line);
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-error: var(--error);
+  --color-error-surface: var(--error-surface);
+  --color-focus: var(--focus);
+  --color-metal-light: var(--metal-light);
+  --color-metal-shadow: var(--metal-shadow);
+  --color-lcd: var(--lcd);
+  --color-lcd-text: var(--lcd-text);
+  --color-coin-gold: var(--coin-gold);
+  --color-mug-rose: var(--mug-rose);
+  --color-indicator-blue: var(--indicator-blue);
+  --color-indicator-orange: var(--indicator-orange);
+  --color-indicator-green: var(--indicator-green);
+
+  /* Existing route classes remain valid while adopting the new roles. */
   --color-ledger-stone: var(--ledger-stone);
   --color-receipt-field: var(--receipt-field);
   --color-clear-paper: var(--clear-paper);
@@ -41,47 +97,51 @@
   --color-receipt-grey: var(--receipt-grey);
   --color-ledger-edge: var(--ledger-edge);
 
-  --font-sans: var(--font-inter);
-  --font-display: var(--font-dm-sans);
-  --font-mono: var(--font-ibm-plex-mono);
+  --font-sans: var(--font-georama);
+  --font-ui: var(--font-georama);
+  --font-display: var(--font-georama);
+  --font-brand: var(--font-baloo);
+  --font-hero: var(--font-baloo);
+  --font-screen: var(--font-vt323);
+  --font-mono: var(--font-georama);
 
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 24px;
-  --radius-arch: 120px;
+  --radius-sm: 8px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-arch: 80px;
 
-  --shadow-base: 3px 3px 0px #18211f;
-  --shadow-elevated: 4px 4px 0px #18211f;
-  --shadow-prominent: 8px 8px 0px #18211f;
+  --shadow-sticker: 7px 7px 0 var(--ink);
+  --shadow-base: none;
+  --shadow-elevated: none;
+  --shadow-prominent: none;
 }
 
 @layer base {
-  * {
-    border-color: var(--ledger-edge);
+  *,
+  *::before,
+  *::after {
+    border-color: var(--sage-line);
   }
 
   html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    html {
-      scroll-behavior: auto;
-    }
-
     *,
     *::before,
     *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 
   body {
     background: var(--background);
     color: var(--foreground);
-    font-family: var(--font-inter), Inter, Arial, sans-serif;
+    font-family: var(--font-georama), "Georama", Arial, sans-serif;
     font-size: 16px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
@@ -89,29 +149,53 @@
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--provident-green) 28%, transparent);
-    color: var(--ledger-stone);
+    background: color-mix(in srgb, var(--ink) 18%, transparent);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
   }
 }
 
 @layer utilities {
-  .font-display {
-    font-family: var(--font-dm-sans), "DM Sans", Inter, Arial, sans-serif;
+  /* Baloo is intentionally limited to the wordmark and the landing hero. */
+  .font-brand,
+  .font-hero {
+    font-family: var(--font-baloo), "Baloo 2", "Nunito", sans-serif;
   }
 
+  /* Existing font-display markup is interior UI, so it must stay Georama. */
+  .font-ui,
+  .font-display {
+    font-family: var(--font-georama), "Georama", Arial, sans-serif;
+  }
+
+  .font-screen {
+    font-family: var(--font-vt323), "VT323", ui-monospace, monospace;
+  }
+
+  /* The proof label is utility text, never the LCD display font. */
   .font-proof {
-    font-family: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: 0.01em;
+    font-family: var(--font-georama), "Georama", Arial, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     line-height: 1.45;
   }
 
   .container-providus {
     width: 100%;
-    max-width: 1280px;
+    max-width: 1200px;
     margin-inline: auto;
     padding-inline: 1rem;
+  }
+
+  .viewport-section {
+    min-height: var(--viewport-content-height);
+    display: flex;
+    align-items: center;
   }
 
   @media (min-width: 640px) {
@@ -126,36 +210,58 @@
     }
   }
 
-  .shadow-base {
-    box-shadow: var(--shadow-base);
+  .container-providus-home {
+    max-width: 1440px;
   }
 
-  .shadow-elevated {
-    box-shadow: var(--shadow-elevated);
+  .landing-hero-frame {
+    width: 100%;
+    max-width: 1440px;
   }
 
-  .shadow-prominent {
-    box-shadow: var(--shadow-prominent);
+  @media (min-width: 1280px) {
+    .container-providus-home,
+    .landing-hero-frame {
+      width: calc(100% - 96px);
+    }
   }
 
+  .shadow-sticker {
+    box-shadow: var(--shadow-sticker);
+  }
+
+  /* Legacy shadows intentionally resolve flat as the UI chrome is flat. */
+  .shadow-base,
+  .shadow-elevated,
+  .shadow-prominent,
   .shadow-press {
-    box-shadow: var(--shadow-none);
+    box-shadow: none;
   }
 
   .outline-ledger {
-    outline: 2.5px solid var(--ledger-stone);
+    outline: 2px solid var(--ink);
     outline-offset: 0;
   }
 
   .border-ledger {
-    border: 2px solid var(--ledger-stone);
+    border: 1.5px solid var(--ink);
   }
 
   .border-ledger-thick {
-    border: 2.5px solid var(--ledger-stone);
+    border: 2px solid var(--ink);
   }
 
   .text-balance {
     text-wrap: balance;
+  }
+
+  .sunburst {
+    background-image: repeating-conic-gradient(
+      from 0deg at 72% 50%,
+      color-mix(in srgb, var(--sage-line) 42%, transparent) 0deg 1deg,
+      transparent 1deg 12deg
+    );
+    background-size: 150% 190%;
+    background-position: 75% 50%;
   }
 }

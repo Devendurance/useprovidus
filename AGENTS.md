@@ -1,5 +1,10 @@
 # CRITICAL RULES - MUST FOLLOW
 
+-Auto-log meaningful rules to the project’s AGENTS.md
+-Auto commit and pus after every meaningful checkpoint.
+-Auto-clean temporary files and build clutter
+-Keep the repo in recoverable state
+
 ## RESPONSES
 
 - Keep responses concise and to the point - unless the user asks otherwise
@@ -13,11 +18,12 @@
 
 ## CHANGE / EDIT MODE
 
-- Never implement features yourself when possible - use sub-agents!
-- Identify changes from the plan that can be implemented in parallel, and use sub-agents to implement the features efficiently
-- When using sub-agents to implement features, act as a coordinator only
+- CRITICAL SPEED RULES: Do not and Never spawn a subagent. Execute all file modifications, multi-file architectural migrations, syntax fixes, and local terminal commands inline.
+
+
 - Use the best model for the task - premium models for complex tasks (like coding) and mid-tier models for simpler tasks, like documentation
 - After completing features (large or small), always run commands like lint, type check and next build to check code quality
+
 
 ## DATABASE SCHEMA CHANGES
 

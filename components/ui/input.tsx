@@ -23,7 +23,7 @@ export function Input({
       {label ? (
         <label
           htmlFor={id}
-          className="text-sm font-semibold tracking-tight text-ledger-stone"
+          className="text-sm font-semibold tracking-tight text-ink"
         >
           {label}
         </label>
@@ -32,25 +32,25 @@ export function Input({
         <input
           id={id}
           className={cn(
-            "h-12 w-full rounded-[10px] border-ledger bg-clear-paper px-4 text-base text-ledger-stone placeholder:text-receipt-grey/80 shadow-base transition-[box-shadow,transform] duration-100 focus:outline-none focus:shadow-elevated focus:translate-x-px focus:translate-y-px disabled:cursor-not-allowed disabled:bg-ledger-edge/40 disabled:opacity-70",
+            "h-11 w-full rounded-[8px] border-[1.5px] border-ink bg-cream px-4 text-base text-ink placeholder:text-ink/45 transition-[border-color,background-color] duration-100 focus:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 disabled:cursor-not-allowed disabled:bg-sage-line/40 disabled:opacity-70",
             suffix && "pr-16",
-            error && "border-loss-red",
+            error && "border-error bg-error-surface/30 focus-visible:border-error focus-visible:ring-error/30",
             className,
           )}
           {...props}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center font-proof text-receipt-grey">
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center font-proof text-ink/65">
             {suffix}
           </span>
         ) : null}
       </div>
       {error ? (
-        <p className="text-sm text-loss-red" role="alert">
+        <p className="text-sm text-error" role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p className="text-sm text-receipt-grey">{hint}</p>
+        <p className="text-sm text-ink/65">{hint}</p>
       ) : null}
     </div>
   );

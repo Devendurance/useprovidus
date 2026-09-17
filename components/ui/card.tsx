@@ -10,11 +10,11 @@ export type CardProps = HTMLAttributes<HTMLDivElement> & {
 
 const variantClasses: Record<CardVariant, string> = {
   standard:
-    "bg-receipt-field border-ledger rounded-[14px] p-6 shadow-elevated",
-  surface: "bg-clear-paper border-ledger rounded-[14px] p-6 shadow-elevated",
+    "bg-cream border-[1.5px] border-ink rounded-[8px] p-6 shadow-none",
+  surface: "bg-cream border-[1.5px] border-ink rounded-[8px] p-6 shadow-none",
   verdict:
-    "bg-clear-paper border-ledger-thick rounded-[14px] p-6 shadow-prominent",
-  flat: "bg-clear-paper border border-ledger-edge rounded-[14px] p-6",
+    "bg-cream border-2 border-ink rounded-[8px] p-6 shadow-none",
+  flat: "bg-cream border-[1.5px] border-ink rounded-[8px] p-6 shadow-none",
 };
 
 export function Card({
@@ -38,7 +38,7 @@ export function CardTitle({
   return (
     <h3
       className={cn(
-        "font-display text-xl font-semibold tracking-tight text-ledger-stone sm:text-[1.25rem]",
+        "font-ui text-xl font-semibold tracking-tight text-ink sm:text-[1.25rem]",
         className,
       )}
       {...props}
@@ -54,7 +54,7 @@ export function CardDescription({
   ...props
 }: HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn("mt-2 text-receipt-grey leading-relaxed", className)} {...props}>
+    <p className={cn("mt-2 text-ink/70 leading-relaxed", className)} {...props}>
       {children}
     </p>
   );

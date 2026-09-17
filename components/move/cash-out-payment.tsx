@@ -76,7 +76,7 @@ export function CashOutPayment({
 
   return (
     <Card variant="verdict">
-      <p className="font-proof text-receipt-grey">Paycrest order · payment</p>
+      <p className="font-sans text-receipt-grey">Paycrest order · payment</p>
       <CardTitle className="mt-1">Deposit USDC on Celo</CardTitle>
       <CardDescription className="mt-2">
         Send the exact total to Paycrest before expiry. This confirms the Celo
@@ -86,7 +86,7 @@ export function CashOutPayment({
       <dl className="mt-5 grid gap-3 sm:grid-cols-2 text-sm">
         <div>
           <dt className="text-xs text-receipt-grey">Order ID</dt>
-          <dd className="font-proof text-[12px]">
+          <dd className="font-sans text-[12px]">
             {order.id.length > 16
               ? `${order.id.slice(0, 8)}…${order.id.slice(-6)}`
               : order.id}
@@ -98,26 +98,26 @@ export function CashOutPayment({
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Requested USDC</dt>
-          <dd className="font-proof tabular-nums">{order.amount}</dd>
+          <dd className="font-sans tabular-nums">{order.amount}</dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Sender fee</dt>
-          <dd className="font-proof tabular-nums">{order.senderFee}</dd>
+          <dd className="font-sans tabular-nums">{order.senderFee}</dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Transaction fee</dt>
-          <dd className="font-proof tabular-nums">{order.transactionFee}</dd>
+          <dd className="font-sans tabular-nums">{order.transactionFee}</dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Total USDC to send</dt>
-          <dd className="font-display text-xl font-semibold tabular-nums text-provident-green">
+          <dd className="font-sans text-xl font-semibold tabular-nums text-success">
             {formatDecimalForDisplay(order.totalUsdcToSend)}
           </dd>
         </div>
         {order.rate ? (
           <div>
             <dt className="text-xs text-receipt-grey">Returned rate</dt>
-            <dd className="font-proof tabular-nums">{order.rate}</dd>
+            <dd className="font-sans tabular-nums">{order.rate}</dd>
           </div>
         ) : null}
         <div>
@@ -128,21 +128,21 @@ export function CashOutPayment({
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Paying wallet</dt>
-          <dd className="font-proof text-[12px]">
+          <dd className="font-sans text-[12px]">
             {walletAddress ? truncateAddress(walletAddress) : "—"}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">USDC balance</dt>
-          <dd className="font-proof tabular-nums">{usdcBalanceDisplay ?? "—"}</dd>
+          <dd className="font-sans tabular-nums">{usdcBalanceDisplay ?? "—"}</dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Receive address</dt>
-          <dd className="flex items-center gap-2 font-proof text-[12px]">
+          <dd className="flex items-center gap-2 font-sans text-[12px]">
             {truncateAddress(order.providerAccount.receiveAddress)}
             <button
               type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-ledger-edge text-quote-blue"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border-2 border-sage-line text-focus"
               aria-label="Copy receive address"
               onClick={() => {
                 void navigator.clipboard.writeText(
@@ -156,13 +156,13 @@ export function CashOutPayment({
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Valid until</dt>
-          <dd className="font-proof text-[12px]">
+          <dd className="font-sans text-[12px]">
             {new Date(order.providerAccount.validUntil).toLocaleString()}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Time remaining</dt>
-          <dd className="font-proof text-sm font-semibold tabular-nums">
+          <dd className="font-sans text-sm font-semibold tabular-nums">
             {countdown}
             {!windowStatus.open ? ` · ${windowStatus.reason}` : ""}
           </dd>
@@ -175,13 +175,13 @@ export function CashOutPayment({
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Account</dt>
-          <dd className="font-proof text-[12px]">
+          <dd className="font-sans text-[12px]">
             {order.recipient.accountIdentifierMasked}
           </dd>
         </div>
       </dl>
 
-      <p className="mt-4 rounded-[10px] border border-rate-amber/40 bg-receipt-field px-3 py-2 text-xs text-rate-amber">
+      <p className="mt-4 rounded-[8px] border-2 border-warning/40 bg-cream px-3 py-2 text-xs text-warning">
         Payment must complete at least{" "}
         {Math.round(PAYMENT_EXPIRY_SAFETY_MS / 1000)}s before Paycrest
         validUntil (Providus safety margin). Direct ERC-20 transfer only — no
@@ -190,13 +190,13 @@ export function CashOutPayment({
 
       {deposit.state.kind === "confirmed" ? (
         <div
-          className="mt-4 rounded-[10px] border border-provident-green/40 bg-receipt-field px-4 py-3"
+          className="mt-4 rounded-[8px] border-2 border-success/40 bg-cream px-4 py-3"
           role="status"
         >
           <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 text-provident-green" />
+            <CheckCircle2 className="mt-0.5 h-4 w-4 text-success" />
             <div>
-              <p className="text-sm font-semibold text-ledger-stone">
+              <p className="text-sm font-semibold text-ink">
                 Celo USDC deposit confirmed on-chain. This confirms the Celo deposit only — not that NGN has been paid out.
               </p>
               {explorerTx ? (
@@ -204,7 +204,7 @@ export function CashOutPayment({
                   href={explorerTx}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 inline-block text-sm font-semibold text-quote-blue"
+                  className="mt-2 inline-block text-sm font-semibold text-focus"
                 >
                   View transaction on explorer
                 </a>
@@ -216,10 +216,10 @@ export function CashOutPayment({
 
       {deposit.state.kind === "reverted" ? (
         <div
-          className="mt-4 rounded-[10px] border border-loss-red/40 bg-receipt-field px-4 py-3"
+          className="mt-4 rounded-[8px] border-2 border-error/40 bg-cream px-4 py-3"
           role="status"
         >
-          <p className="text-sm font-semibold text-loss-red">
+          <p className="text-sm font-semibold text-error">
             Transaction reverted on Celo mainnet.
           </p>
           {explorerTx ? (
@@ -227,7 +227,7 @@ export function CashOutPayment({
               href={explorerTx}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-block text-sm font-semibold text-loss-red underline"
+              className="mt-2 inline-block text-sm font-semibold text-error underline"
             >
               View reverted transaction
             </a>
@@ -243,14 +243,14 @@ export function CashOutPayment({
       ) : null}
 
       {deposit.state.kind === "error" ? (
-        <p className="mt-3 text-sm text-loss-red" role="alert">
+        <p className="mt-3 text-sm text-error" role="alert">
           {deposit.state.message}
         </p>
       ) : null}
 
       {deposit.state.kind === "confirming" ? (
-        <div className="mt-4 space-y-3 rounded-[10px] border-ledger bg-receipt-field p-4">
-          <p className="text-sm font-semibold text-ledger-stone">
+        <div className="mt-4 space-y-3 rounded-[8px] border-2 border-ink bg-cream p-4">
+          <p className="text-sm font-semibold text-ink">
             Confirm payment of {order.totalUsdcToSend} USDC
           </p>
           <div className="text-xs text-receipt-grey flex flex-col gap-2">
@@ -258,7 +258,7 @@ export function CashOutPayment({
               Your wallet will send a direct USDC transfer to Paycrest. No
               approval step. Do not create another order.
             </p>
-            <p className="flex items-center gap-1.5 text-ledger-stone bg-ledger-stone/5 p-2 rounded-md">
+            <p className="flex items-center gap-1.5 text-ink bg-ink/5 p-2 rounded-md">
               <Info className="h-4 w-4" />
               Gas estimate is padded with a 25% safety buffer to prevent out-of-gas errors.
             </p>

@@ -89,7 +89,7 @@ export function CashOutRecipient({
 
       {institutions.state.kind === "error" ? (
         <div className="mt-4 space-y-2">
-          <p className="text-sm text-loss-red" role="alert">
+          <p className="text-sm text-error" role="alert">
             {institutions.state.message}
           </p>
           <Button
@@ -104,7 +104,7 @@ export function CashOutRecipient({
       ) : null}
 
       {institutions.state.kind === "empty" ? (
-        <p className="mt-4 text-sm text-rate-amber" role="status">
+        <p className="mt-4 text-sm text-warning" role="status">
           No supported NGN banks are available right now. Cash-out recipient
           setup is temporarily unavailable.
         </p>
@@ -115,20 +115,20 @@ export function CashOutRecipient({
           <div>
             <label
               htmlFor="bank-search"
-              className="text-sm font-semibold text-ledger-stone"
+              className="text-sm font-semibold text-ink"
             >
               Bank
             </label>
             <input
               id="bank-search"
-              className="mt-1.5 h-12 w-full rounded-[10px] border-ledger bg-clear-paper px-4 text-base text-ledger-stone shadow-base focus:outline-none focus:shadow-elevated"
+              className="mt-1.5 h-12 w-full rounded-[8px] border-2 border-ink bg-cream px-4 text-base text-ink focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               placeholder="Search banks…"
               value={bankQuery}
               onChange={(e) => setBankQuery(e.target.value)}
               autoComplete="off"
             />
             <div
-              className="mt-2 max-h-48 overflow-y-auto rounded-[10px] border-ledger bg-receipt-field"
+              className="mt-2 max-h-48 overflow-y-auto rounded-[8px] border-2 border-ink bg-cream"
               role="listbox"
               aria-label="Nigerian banks"
             >
@@ -146,10 +146,10 @@ export function CashOutRecipient({
                       role="option"
                       aria-selected={selected}
                       className={cn(
-                        "flex w-full items-center justify-between gap-2 border-b border-ledger-edge px-3 py-2.5 text-left text-sm last:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-provident-green",
+                        "flex min-h-11 w-full items-center justify-between gap-2 border-b border-sage-line px-3 py-2.5 text-left text-sm last:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-focus",
                         selected
-                          ? "bg-provident-green text-white"
-                          : "text-ledger-stone hover:bg-ledger-edge/50",
+                          ? "bg-success text-white"
+                          : "text-ink hover:bg-sage-line/50",
                       )}
                       onClick={() => handleBankChange(bank.code)}
                     >
@@ -186,7 +186,7 @@ export function CashOutRecipient({
               }
             />
             {accountCheck && !accountCheck.ok ? (
-              <p className="mt-2 text-sm text-loss-red" role="alert">
+              <p className="mt-2 text-sm text-error" role="alert">
                 {accountCheck.message}
               </p>
             ) : null}
@@ -225,34 +225,34 @@ export function CashOutRecipient({
           </Button>
 
           {verification.state.kind === "error" ? (
-            <p className="text-sm text-loss-red" role="alert">
+            <p className="text-sm text-error" role="alert">
               {verification.state.message}
             </p>
           ) : null}
 
           {verified ? (
             <div
-              className="rounded-[10px] border border-provident-green/40 bg-receipt-field px-4 py-3"
+              className="rounded-[8px] border-2 border-success/40 bg-cream px-4 py-3"
               role="status"
             >
               <div className="flex items-start gap-2">
                 <CheckCircle2
-                  className="mt-0.5 h-4 w-4 text-provident-green"
+                  className="mt-0.5 h-4 w-4 text-success"
                   aria-hidden
                 />
                 <div className="space-y-1 text-sm">
-                  <p className="font-semibold text-ledger-stone">
+                  <p className="font-semibold text-ink">
                     Account verified
                   </p>
-                  <p className="text-ledger-stone">
+                  <p className="text-ink">
                     <span className="text-receipt-grey">Name: </span>
                     {verified.accountName}
                   </p>
-                  <p className="text-ledger-stone">
+                  <p className="text-ink">
                     <span className="text-receipt-grey">Bank: </span>
                     {verified.institutionName}
                   </p>
-                  <p className="font-proof text-[12px] text-ledger-stone">
+                  <p className="font-sans text-[12px] text-ink">
                     Account:{" "}
                     {maskAccountIdentifier(verified.accountIdentifier)}
                   </p>

@@ -4,7 +4,7 @@ import { RouteStepper } from "@/components/providus/route-stepper";
 import { ValueLine } from "@/components/providus/value-line";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { LinkButton } from "@/components/ui/link-button";
+import { RouteCheckCTA } from "@/components/ui/route-check-cta";
 
 export const metadata: Metadata = {
   title: "Savings receipt",
@@ -16,11 +16,13 @@ export default function ReceiptPage() {
   return (
     <div className="container-providus py-10 sm:py-14">
       <div className="max-w-2xl">
-        <p className="font-proof text-receipt-grey">Proof surface</p>
-        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-receipt-grey">
+          Proof surface
+        </p>
+        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
           Savings receipt
         </h1>
-        <p className="mt-3 text-receipt-grey leading-relaxed">
+        <p className="mt-4 max-w-xl text-receipt-grey leading-relaxed">
           Complete a Route Check to get a savings receipt. Estimates only—never
           presented as a guaranteed saving.
         </p>
@@ -34,17 +36,13 @@ export default function ReceiptPage() {
           icon={<Receipt className="h-5 w-5" />}
           title="No receipt yet"
           description="Complete a Route Check to get a savings receipt. When available, it will show the estimated amount you kept, the path taken, and capture time—without wallet balances or provider personal data."
-          action={
-            <LinkButton href="/check" variant="primary" size="lg">
-              Check my route
-            </LinkButton>
-          }
+          action={<RouteCheckCTA />}
         />
 
         <Card variant="verdict" className="flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>Receipt shell</CardTitle>
-            <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 font-proof text-[12px] text-receipt-grey">
+            <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-receipt-grey">
               EMPTY
             </span>
           </div>
@@ -52,7 +50,7 @@ export default function ReceiptPage() {
             Structure for a shareable, data-minimised proof surface.
           </CardDescription>
 
-          <div className="mt-8 rounded-[10px] border border-dashed border-ledger-edge bg-receipt-field px-4 py-8 text-center">
+          <div className="mt-8 rounded-[8px] border border-dashed border-ledger-edge bg-receipt-field px-4 py-8 text-center">
             <p className="font-display text-2xl font-semibold tracking-tight text-receipt-grey/80 sm:text-3xl">
               Estimated keep
             </p>
