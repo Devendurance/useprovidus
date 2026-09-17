@@ -34,3 +34,22 @@
 
 - Always follow/reference the UI design system when creating or reviewing components or pages.
 - Design System: @DESIGN.md
+
+## AGENT STATE CONTINUITY
+
+The repository state for future agent sessions lives in `.agent-state/`:
+
+- `.agent-state/project-state.md` contains stable product, stack, architecture, key-path, integration, and verification facts.
+- `.agent-state/memory.md` contains durable decisions, conventions, discoveries, and known gotchas.
+- `.agent-state/left-off.md` contains the current objective, progress, changed files, verification, blockers, and exact next action.
+
+- At the start of every session or new task, read all three state files before exploring or changing the codebase.
+- Treat source code, configuration, and tests as the source of truth. If they conflict with state notes, verify the repository and correct the notes.
+- Update `left-off.md` after meaningful implementation checkpoints, failed verification, blockers, or changes in direction.
+- Update `project-state.md` when product status, architecture, stack, key paths, or integrations change.
+- Update `memory.md` when a decision, convention, discovery, or gotcha should survive beyond the current task.
+- Before ending a session or handing work to another agent, record verified results, unresolved issues, and one exact next action in `left-off.md`.
+- Keep state entries concise and dated. Never write secrets, credentials, wallet keys, tokens, private user data, generated build output, caches, or temporary files.
+- If a required state file is missing, recreate it using the required headings and responsibility for that file.
+- If a state note is stale or unknown, verify it against the repository and update the note instead of inventing a result.
+- Preserve existing user changes in a dirty worktree; never clean or revert them merely to make the handoff look tidy.
