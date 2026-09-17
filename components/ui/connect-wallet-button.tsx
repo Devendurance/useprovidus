@@ -1,7 +1,15 @@
 "use client";
 
-import { useId, useState } from "react";
+import { createPortal } from "react-dom";
 import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  AlertTriangle,
   ExternalLink,
   Loader2,
   Unplug,
@@ -24,6 +32,17 @@ type ConnectWalletButtonProps = {
   showBalances?: boolean;
 };
 
+type PopoverPlacement = {
+  top: number;
+  left: number;
+};
+
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const NOOP_SUBSCRIBE = () => () => {};
+const CLIENT_HYDRATED = () => true;
+const SERVER_HYDRATED = () => false;
+
 export function ConnectWalletButton({
   className,
   size = "sm",
@@ -32,23 +51,43 @@ export function ConnectWalletButton({
   showBalances = true,
 }: ConnectWalletButtonProps) {
   const wallet = useProvidusWallet();
+  const hydrated = useSyncExternalStore(
+    NOOP_SUBSCRIBE,
+    CLIENT_HYDRATED,
+    SERVER_HYDRATED,
+  );
   const statusId = useId();
-  const chooserId = useId();
-  const [chooserOpen, setChooserOpen] = useState(false);
+  const panelId = useId();
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [placement, setPlacement] = useState<PopoverPlacement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const previousStatusRef = useRef(wallet.status);
 
   const shell = cn(
-    "relative inline-flex flex-col items-stretch",
+    "inline-flex h-11 min-h-11 items-center",
     fullWidth && "w-full",
   );
 
-  function openChooser() {
-    wallet.clearConnectError();
-    setChooserOpen(true);
-    // Does not call connect — user must pick a wallet.
+  const displayedStatus = hydrated ? wallet.status : "disconnected";
+  const displayedConnectPending = hydrated && wallet.isConnectPending;
+  const displayedConnectError = hydrated ? wallet.connectError : null;
+  const isChooserState =
+    displayedStatus === "disconnected" || displayedStatus === "connecting";
+  const isWrongNetwork = displayedStatus === "wrong-network";
+  const isConnected = displayedStatus === "connected";
+
+  function openPanel() {
+    if (displayedStatus === "disconnected") {
+      wallet.clearConnectError();
+    }
+    setPanelOpen(true);
   }
 
-  function closeChooser() {
-    setChooserOpen(false);
+  function closePanel() {
+    setPanelOpen(false);
+    triggerRef.current?.focus();
   }
 
   function selectWallet(id: SupportedWalletId, installed: boolean) {
@@ -56,56 +95,199 @@ export function ConnectWalletButton({
     wallet.connectWithConnectorId(id);
   }
 
-  // Keep chooser visible while a connection is pending after user selection
-  const showChooser =
-    wallet.status === "disconnected" || wallet.status === "connecting";
+  function disconnect() {
+    closePanel();
+    wallet.disconnectWallet();
+  }
 
-  if (showChooser) {
-    return (
-      <div className={shell}>
-        <Button
-          type="button"
-          variant="ghost"
-          size={size}
-          fullWidth={fullWidth}
-          className={cn("border-ledger bg-clear-paper shadow-base", className)}
-          onClick={openChooser}
-          aria-expanded={chooserOpen}
-          aria-controls={chooserId}
-          disabled={wallet.isConnectPending}
-          aria-busy={wallet.isConnectPending}
-        >
-          {wallet.isConnectPending ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-          ) : (
-            <Wallet className="h-4 w-4 shrink-0" aria-hidden />
-          )}
-          {wallet.isConnectPending ? "Connecting…" : label}
-        </Button>
+  // A successful connect or network switch closes the details panel. Opening
+  // an already-connected trigger does not close it because this only responds
+  // to a status transition.
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current;
+    previousStatusRef.current = wallet.status;
 
-        {chooserOpen ? (
-          <div
-            id={chooserId}
-            role="dialog"
-            aria-label="Choose a wallet"
-            className="absolute left-0 right-0 top-full z-30 mt-2 min-w-[260px] rounded-[14px] border-ledger bg-clear-paper p-3 shadow-prominent sm:left-auto sm:right-0 sm:w-[300px]"
+    const completedConnection =
+      previousStatus !== "connected" && wallet.status === "connected";
+    const completedWrongNetworkConnection =
+      previousStatus === "connecting" && wallet.status === "wrong-network";
+
+    if (
+      panelOpen &&
+      (completedConnection || completedWrongNetworkConnection)
+    ) {
+      closePanel();
+    }
+  }, [panelOpen, wallet.status]);
+
+  // Keep the popover attached to the trigger while the page scrolls or the
+  // viewport changes. The panel itself is fixed, so it never contributes to
+  // the header's layout height.
+  useEffect(() => {
+    if (!panelOpen || typeof window === "undefined") return;
+
+    let frame = 0;
+    function positionPanel() {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const isMobile = window.matchMedia("(max-width: 639px)").matches;
+        if (isMobile) {
+          setPlacement(null);
+          return;
+        }
+
+        const trigger = triggerRef.current;
+        if (!trigger) return;
+
+        const triggerRect = trigger.getBoundingClientRect();
+        const panelWidth =
+          panelRef.current?.getBoundingClientRect().width ??
+          Math.min(360, window.innerWidth - 24);
+        const panelHeight =
+          panelRef.current?.getBoundingClientRect().height ?? 420;
+        const gutter = 12;
+        const gap = 10;
+        const maxLeft = Math.max(
+          gutter,
+          window.innerWidth - panelWidth - gutter,
+        );
+        const left = Math.min(
+          Math.max(gutter, triggerRect.right - panelWidth),
+          maxLeft,
+        );
+        const belowTop = triggerRect.bottom + gap;
+        const aboveTop = triggerRect.top - panelHeight - gap;
+        const top =
+          belowTop + panelHeight <= window.innerHeight - gutter
+            ? belowTop
+            : Math.max(gutter, aboveTop);
+
+        setPlacement({ top, left });
+      });
+    }
+
+    positionPanel();
+    window.addEventListener("resize", positionPanel);
+    window.addEventListener("scroll", positionPanel, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", positionPanel);
+      window.removeEventListener("scroll", positionPanel, true);
+    };
+  }, [panelOpen]);
+
+  // Focus the panel on open, trap Tab navigation within it, and provide the
+  // expected Escape-to-close behavior for both the desktop popover and the
+  // mobile bottom sheet.
+  useEffect(() => {
+    if (!panelOpen) return;
+
+    const panel = panelRef.current;
+    closeRef.current?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePanel();
+        return;
+      }
+
+      if (event.key !== "Tab" || !panel) return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [panelOpen]);
+
+  const truncated = wallet.address
+    ? truncateAddress(wallet.address)
+    : "Wallet";
+  const triggerLabel = isWrongNetwork
+    ? "Wrong network"
+    : displayedConnectPending
+      ? "Connecting…"
+      : isConnected
+        ? truncated
+        : label;
+  const statusText = isWrongNetwork
+    ? "Wrong network. Switch to Celo mainnet to use Providus payments."
+    : isConnected
+      ? `Connected on Celo: ${wallet.address ?? "wallet"}.`
+      : displayedConnectPending
+        ? "Connecting. Confirm the request in your wallet."
+        : displayedConnectError
+          ? `Connection error: ${displayedConnectError}`
+          : "";
+
+  const panel = panelOpen ? (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-[90] cursor-default border-0 bg-transparent p-0 max-sm:bg-ink/20"
+        onClick={closePanel}
+        aria-label="Close wallet details"
+      />
+      <div
+        id={panelId}
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${panelId}-title`}
+        className="fixed z-[100] max-h-[calc(100dvh-24px)] w-[min(360px,calc(100vw-24px))] overflow-y-auto rounded-[8px] border-2 border-ink bg-cream p-3 text-ink max-sm:inset-x-3 max-sm:bottom-3 max-sm:left-3 max-sm:top-auto max-sm:w-auto"
+        style={placement ?? undefined}
+      >
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p
+              id={`${panelId}-title`}
+              className="text-sm font-semibold text-ink"
+            >
+              {isChooserState
+                ? "Connect wallet"
+                : isWrongNetwork
+                  ? "Wallet needs attention"
+                  : "Wallet connected"}
+            </p>
+            <p className="mt-1 break-words text-xs text-receipt-grey">
+              {isChooserState
+                ? "Choose a wallet deliberately."
+                : isWrongNetwork
+                  ? "Switch networks before using Providus payments."
+                  : "Manage this wallet session."}
+            </p>
+          </div>
+          <button
+            type="button"
+            ref={closeRef}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border-2 border-sage-line text-receipt-grey hover:bg-sage-line/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            onClick={closePanel}
+            aria-label="Close wallet details"
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-ledger-stone">
-                Connect wallet
-              </p>
-              <button
-                type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-ledger-edge text-receipt-grey hover:bg-ledger-edge/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green"
-                onClick={closeChooser}
-                aria-label="Close wallet chooser"
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+
+        {isChooserState ? (
+          <>
             <p className="mb-3 text-xs text-receipt-grey">
-              MetaMask, Rabby, or OKX only. Choose deliberately — no automatic
-              selection.
+              MetaMask, Rabby, or OKX only. No automatic wallet selection.
             </p>
             <ul className="flex flex-col gap-2" role="list">
               {wallet.walletOptions.map((option, index) => (
@@ -114,10 +296,10 @@ export function ConnectWalletButton({
                     <button
                       type="button"
                       className={cn(
-                        "flex min-h-11 flex-1 items-center justify-between gap-2 rounded-[10px] border-ledger px-3 py-2 text-left text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green",
+                        "flex min-h-11 flex-1 items-center justify-between gap-2 rounded-[8px] border-2 border-ink px-3 py-2 text-left text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
                         option.installed
-                          ? "bg-receipt-field text-ledger-stone hover:bg-ledger-edge/50"
-                          : "cursor-not-allowed bg-receipt-field/60 text-receipt-grey opacity-80",
+                          ? "bg-cream text-ink hover:bg-sage-line/50"
+                          : "cursor-not-allowed bg-cream/60 text-receipt-grey opacity-80",
                       )}
                       disabled={!option.installed || wallet.isConnectPending}
                       onClick={() => selectWallet(option.id, option.installed)}
@@ -128,12 +310,12 @@ export function ConnectWalletButton({
                       }
                     >
                       <span className="flex items-center gap-2">
-                        <span className="font-proof text-[11px] text-receipt-grey">
+                        <span className="font-sans text-[11px] text-receipt-grey">
                           {String(index + 1).padStart(2, "0")}
                         </span>
                         {option.name}
                       </span>
-                      <span className="font-proof text-[11px] font-medium text-receipt-grey">
+                      <span className="font-sans text-[11px] font-medium text-receipt-grey">
                         {option.installed ? "Installed" : option.notInstalledLabel}
                       </span>
                     </button>
@@ -142,9 +324,8 @@ export function ConnectWalletButton({
                         href={option.installUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex h-11 shrink-0 items-center justify-center rounded-[10px] border border-ledger-edge px-3 text-xs font-semibold text-quote-blue hover:bg-ledger-edge/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green"
-                        // Opening install link must not trigger wallet connect
-                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex h-11 shrink-0 items-center justify-center rounded-[8px] border-2 border-sage-line px-3 text-xs font-semibold text-focus hover:bg-sage-line/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                        onClick={(event) => event.stopPropagation()}
                       >
                         Install
                       </a>
@@ -153,178 +334,168 @@ export function ConnectWalletButton({
                 </li>
               ))}
             </ul>
-            {wallet.isConnectPending ? (
-              <p className="mt-3 text-xs text-receipt-grey" role="status" id={statusId}>
+            {displayedConnectPending ? (
+              <p className="mt-3 text-xs text-receipt-grey" role="status">
                 Confirm the request in the selected wallet only…
               </p>
             ) : null}
-            {wallet.connectError ? (
+            {displayedConnectError ? (
               <p
                 role="alert"
-                className="mt-3 rounded-[10px] border border-loss-red/40 bg-receipt-field px-3 py-2 text-xs font-medium text-loss-red"
+                className="mt-3 rounded-[8px] border-2 border-error/40 bg-cream px-3 py-2 text-xs font-medium text-error"
               >
-                {wallet.connectError}
+                {displayedConnectError}
               </p>
             ) : null}
-          </div>
-        ) : wallet.connectError ? (
-          <p
-            role="alert"
-            className="absolute left-0 right-0 top-full z-20 mt-2 rounded-[10px] border border-loss-red/40 bg-clear-paper px-3 py-2 text-left text-xs font-medium text-loss-red shadow-elevated sm:min-w-[220px]"
-          >
-            {wallet.connectError}
-          </p>
-        ) : null}
+          </>
+        ) : (
+          <>
+            {isWrongNetwork ? (
+              <div className="space-y-2">
+                <p
+                  className="flex items-start gap-2 text-xs font-medium text-error"
+                  role="status"
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                  <span>Switch to Celo mainnet to use Providus payments.</span>
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    fullWidth
+                    onClick={() => wallet.switchToCelo()}
+                    disabled={wallet.isSwitchPending}
+                  >
+                    {wallet.isSwitchPending ? "Switching…" : "Switch to Celo"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    fullWidth
+                    onClick={disconnect}
+                    disabled={wallet.isDisconnectPending}
+                  >
+                    <Unplug className="h-4 w-4" aria-hidden />
+                    Disconnect
+                  </Button>
+                </div>
+                {wallet.switchError ? (
+                  <p className="text-xs text-error" role="alert">
+                    {wallet.switchError}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2 rounded-[8px] border-2 border-sage-line px-3 py-2">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-success" aria-hidden />
+                  <span className="min-w-0 flex-1 break-all font-sans text-[13px] tracking-tight">
+                    {wallet.address ?? truncated}
+                  </span>
+                  {wallet.address ? (
+                    <a
+                      href={addressExplorerUrl(wallet.address)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border-2 border-sage-line text-focus hover:bg-sage-line/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                      aria-label="View address on Celoscan"
+                    >
+                      <ExternalLink className="h-4 w-4" aria-hidden />
+                    </a>
+                  ) : null}
+                </div>
+                {showBalances ? (
+                  <div className="space-y-1 border-t border-sage-line pt-2">
+                    {wallet.balancesLoading ? (
+                      <p className="font-sans text-[12px] text-receipt-grey">
+                        Reading balances…
+                      </p>
+                    ) : (
+                      <dl className="grid grid-cols-2 gap-2 font-sans text-[12px] text-ink">
+                        <div>
+                          <dt className="text-receipt-grey">CELO</dt>
+                          <dd className="font-medium tabular-nums">
+                            {wallet.nativeBalance?.value ?? "—"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-receipt-grey">USDC</dt>
+                          <dd className="font-medium tabular-nums">
+                            {wallet.usdcBalance?.value ??
+                              (wallet.usdcConfigured ? "—" : "n/a")}
+                          </dd>
+                        </div>
+                      </dl>
+                    )}
+                    {wallet.balancesError ? (
+                      <p className="text-[11px] text-warning" role="status">
+                        {wallet.balancesError}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  fullWidth
+                  onClick={disconnect}
+                  disabled={wallet.isDisconnectPending}
+                >
+                  <Unplug className="h-4 w-4" aria-hidden />
+                  Disconnect
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </div>
-    );
-  }
-
-  // Connected or wrong-network
-  const truncated = wallet.address
-    ? truncateAddress(wallet.address)
-    : "Wallet";
+    </>
+  ) : null;
 
   return (
     <div className={shell}>
-      <div
+      <Button
+        type="button"
+        ref={triggerRef}
+        variant="ghost"
+        size={size}
+        fullWidth={fullWidth}
         className={cn(
-          "flex flex-col gap-2 rounded-[10px] border-ledger bg-clear-paper p-2 shadow-base",
-          fullWidth && "w-full",
+          "h-11 min-h-11 max-w-full border-2 border-ink bg-cream",
+          isWrongNetwork && "border-error text-error hover:bg-error/10",
           className,
         )}
+        onClick={() => (panelOpen ? closePanel() : openPanel())}
+        aria-expanded={panelOpen}
+        aria-controls={panelId}
+        aria-haspopup="dialog"
+        aria-describedby={statusId}
+        disabled={displayedConnectPending}
+        aria-busy={displayedConnectPending}
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <div
-            className="inline-flex min-h-11 flex-1 items-center gap-2 rounded-[10px] px-3 py-2 text-left text-sm font-semibold text-ledger-stone"
-            aria-describedby={statusId}
-          >
-            <span
-              className={cn(
-                "h-2 w-2 shrink-0 rounded-full",
-                wallet.status === "connected"
-                  ? "bg-provident-green"
-                  : "bg-rate-amber",
-              )}
-              aria-hidden
-            />
-            <span className="font-proof text-[13px] tracking-tight">
-              {truncated}
-            </span>
-          </div>
-          {wallet.address && wallet.status === "connected" ? (
-            <a
-              href={addressExplorerUrl(wallet.address)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-ledger-edge text-quote-blue hover:bg-ledger-edge/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green"
-              aria-label="View address on Celoscan"
-            >
-              <ExternalLink className="h-4 w-4" aria-hidden />
-            </a>
-          ) : null}
-        </div>
+        {displayedConnectPending ? (
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+        ) : isWrongNetwork ? (
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+        ) : isConnected ? (
+          <span className="h-2 w-2 shrink-0 rounded-full bg-success" aria-hidden />
+        ) : (
+          <Wallet className="h-4 w-4 shrink-0" aria-hidden />
+        )}
+        <span className="truncate">{triggerLabel}</span>
+      </Button>
 
-        {wallet.status === "wrong-network" ? (
-          <div className="space-y-2 px-1 pb-1">
-            <p className="text-xs font-medium text-rate-amber" role="status">
-              Switch to Celo mainnet to use Providus payments.
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                fullWidth
-                onClick={() => wallet.switchToCelo()}
-                disabled={wallet.isSwitchPending}
-              >
-                {wallet.isSwitchPending ? "Switching…" : "Switch to Celo"}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                fullWidth
-                onClick={() => wallet.disconnectWallet()}
-                disabled={wallet.isDisconnectPending}
-              >
-                <Unplug className="h-4 w-4" aria-hidden />
-                Disconnect
-              </Button>
-            </div>
-            {wallet.switchError ? (
-              <p className="text-xs text-loss-red" role="alert">
-                {wallet.switchError}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {wallet.status === "connected" && showBalances ? (
-          <div className="space-y-1 border-t border-ledger-edge px-1 pb-1 pt-2">
-            {wallet.balancesLoading ? (
-              <p className="font-proof text-[12px] text-receipt-grey">
-                Reading balances…
-              </p>
-            ) : (
-              <dl className="grid grid-cols-2 gap-2 font-proof text-[12px] text-ledger-stone">
-                <div>
-                  <dt className="text-receipt-grey">CELO</dt>
-                  <dd className="font-medium tabular-nums">
-                    {wallet.nativeBalance?.value ?? "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-receipt-grey">USDC</dt>
-                  <dd className="font-medium tabular-nums">
-                    {wallet.usdcBalance?.value ??
-                      (wallet.usdcConfigured ? "—" : "n/a")}
-                  </dd>
-                </div>
-              </dl>
-            )}
-            {wallet.balancesError ? (
-              <p className="text-[11px] text-rate-amber" role="status">
-                {wallet.balancesError}
-              </p>
-            ) : null}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              fullWidth
-              className="mt-1"
-              onClick={() => wallet.disconnectWallet()}
-              disabled={wallet.isDisconnectPending}
-            >
-              <Unplug className="h-4 w-4" aria-hidden />
-              Disconnect
-            </Button>
-          </div>
-        ) : null}
-
-        {wallet.status === "connected" && !showBalances ? (
-          <div className="px-1 pb-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              fullWidth
-              onClick={() => wallet.disconnectWallet()}
-              disabled={wallet.isDisconnectPending}
-            >
-              <Unplug className="h-4 w-4" aria-hidden />
-              Disconnect
-            </Button>
-          </div>
-        ) : null}
+      <div id={statusId} className="sr-only" role="status" aria-live="polite">
+        {statusText}
       </div>
 
-      <div id={statusId} className="sr-only" role="status">
-        {wallet.status === "connected"
-          ? `Connected on Celo: ${wallet.address}`
-          : `Connected on unsupported network. Switch to Celo.`}
-      </div>
+      {panel && typeof document !== "undefined"
+        ? createPortal(panel, document.body)
+        : null}
     </div>
   );
 }

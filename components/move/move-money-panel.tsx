@@ -173,10 +173,10 @@ export function MoveMoneyPanel() {
                   role="tab"
                   aria-selected={selected}
                   className={cn(
-                    "rounded-[10px] border-ledger px-3 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green",
+                    "rounded-[8px] border-2 border-ink px-3 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
                     selected
-                      ? "bg-provident-green text-white shadow-elevated"
-                      : "bg-receipt-field text-ledger-stone hover:bg-ledger-edge/50",
+                      ? "bg-success text-white "
+                      : "bg-cream text-ink hover:bg-sage-line/50",
                   )}
                   onClick={() => handleDirectionChange(opt.id)}
                 >
@@ -185,7 +185,7 @@ export function MoveMoneyPanel() {
                   </span>
                   <span
                     className={cn(
-                      "mt-1 block font-proof text-[11px]",
+                      "mt-1 block font-sans text-[11px]",
                       selected ? "text-white/85" : "text-receipt-grey",
                     )}
                   >
@@ -196,22 +196,22 @@ export function MoveMoneyPanel() {
             })}
           </div>
 
-          <dl className="mt-5 grid gap-3 border-t border-ledger-edge pt-4 text-sm">
+          <dl className="mt-5 grid gap-3 border-t border-sage-line pt-4 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-receipt-grey">Corridor</dt>
-              <dd className="font-medium text-ledger-stone text-right">
+              <dd className="font-medium text-ink text-right">
                 {directionDescription(direction)}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-receipt-grey">Network</dt>
-              <dd className="font-proof text-[13px] text-ledger-stone">
+              <dd className="font-sans text-[13px] text-ink">
                 Celo mainnet · 42220
               </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-receipt-grey">Wallet role</dt>
-              <dd className="text-right text-ledger-stone font-medium">
+              <dd className="text-right text-ink font-medium">
                 {walletRoleForDirection(direction)}
               </dd>
             </div>
@@ -250,7 +250,7 @@ export function MoveMoneyPanel() {
               }
             />
             {amountValidation && !amountValidation.ok ? (
-              <p className="mt-2 text-sm text-loss-red" role="alert">
+              <p className="mt-2 text-sm text-error" role="alert">
                 {amountValidation.message}
               </p>
             ) : null}
@@ -314,7 +314,7 @@ export function MoveMoneyPanel() {
             <ConnectWalletButton fullWidth showBalances={false} />
           </div>
 
-          {wallet.status === "disconnected" ? (
+          {wallet.status !== "connected" && wallet.status !== "wrong-network" ? (
             <p className="mt-3 text-sm text-receipt-grey">
               Connect a wallet before cash-out review is ready.
             </p>
@@ -322,7 +322,7 @@ export function MoveMoneyPanel() {
 
           {wallet.status === "wrong-network" ? (
             <div className="mt-3 space-y-2">
-              <p className="text-sm text-rate-amber" role="status">
+              <p className="text-sm text-warning" role="status">
                 Switch to Celo mainnet. This flow is not ready on other
                 networks.
               </p>
@@ -340,10 +340,10 @@ export function MoveMoneyPanel() {
           ) : null}
 
           {wallet.status === "connected" ? (
-            <dl className="mt-4 space-y-2 border-t border-ledger-edge pt-4 text-sm">
+            <dl className="mt-4 space-y-2 border-t border-sage-line pt-4 text-sm">
               <div className="flex justify-between gap-2">
                 <dt className="text-receipt-grey">Address</dt>
-                <dd className="font-proof text-[12px] text-ledger-stone">
+                <dd className="font-sans text-[12px] text-ink">
                   {wallet.address
                     ? `${wallet.address.slice(0, 6)}…${wallet.address.slice(-4)}`
                     : "—"}
@@ -351,7 +351,7 @@ export function MoveMoneyPanel() {
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-receipt-grey">USDC balance</dt>
-                <dd className="font-proof text-[13px] font-medium tabular-nums">
+                <dd className="font-sans text-[13px] font-medium tabular-nums">
                   {wallet.balancesLoading
                     ? "…"
                     : wallet.usdcBalance
@@ -362,7 +362,7 @@ export function MoveMoneyPanel() {
                 </dd>
               </div>
               {wallet.balancesError ? (
-                <p className="text-xs text-rate-amber" role="status">
+                <p className="text-xs text-warning" role="status">
                   {wallet.balancesError}
                 </p>
               ) : null}
@@ -424,7 +424,7 @@ function QuotePanel({
     return (
       <Card variant="surface">
         <div className="flex items-start gap-2">
-          <AlertTriangle className="mt-0.5 h-4 w-4 text-loss-red" aria-hidden />
+          <AlertTriangle className="mt-0.5 h-4 w-4 text-error" aria-hidden />
           <div>
             <CardTitle className="text-base">Support check failed</CardTitle>
             <CardDescription className="mt-1">
@@ -449,7 +449,7 @@ function QuotePanel({
     return (
       <Card variant="surface">
         <div className="flex items-start gap-2">
-          <AlertTriangle className="mt-0.5 h-4 w-4 text-loss-red" aria-hidden />
+          <AlertTriangle className="mt-0.5 h-4 w-4 text-error" aria-hidden />
           <div>
             <CardTitle className="text-base">Token configuration mismatch</CardTitle>
             <CardDescription className="mt-1">
@@ -475,7 +475,7 @@ function QuotePanel({
     <Card variant="verdict">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-proof text-receipt-grey">Live quote</p>
+          <p className="font-sans text-receipt-grey">Live quote</p>
           <CardTitle className="mt-1">{directionLabel(direction)}</CardTitle>
         </div>
         <Button
@@ -496,7 +496,7 @@ function QuotePanel({
         </p>
       ) : null}
       {walletStatus === "wrong-network" ? (
-        <p className="mt-3 text-sm text-rate-amber" role="status">
+        <p className="mt-3 text-sm text-warning" role="status">
           Wrong network — switch to Celo. Not executable.
         </p>
       ) : null}
@@ -508,7 +508,7 @@ function QuotePanel({
       ) : null}
 
       {quoteState.kind === "invalid_amount" ? (
-        <p className="mt-4 text-sm text-loss-red" role="alert">
+        <p className="mt-4 text-sm text-error" role="alert">
           {quoteState.message}
         </p>
       ) : null}
@@ -524,7 +524,7 @@ function QuotePanel({
         <div className="mt-4 space-y-3">
           {direction === "buy-usdc" ? (
             <>
-              <p className="text-sm font-semibold text-rate-amber">
+              <p className="text-sm font-semibold text-warning">
                 Buying USDC on Celo is temporarily unavailable
               </p>
               <p className="text-sm text-receipt-grey">
@@ -535,7 +535,7 @@ function QuotePanel({
             </>
           ) : (
             <>
-              <p className="text-sm font-semibold text-rate-amber">
+              <p className="text-sm font-semibold text-warning">
                 Cash out temporarily unavailable
               </p>
               <p className="text-sm text-receipt-grey">
@@ -551,7 +551,7 @@ function QuotePanel({
 
       {quoteState.kind === "error" ? (
         <div className="mt-4 space-y-2">
-          <p className="text-sm font-semibold text-loss-red" role="alert">
+          <p className="text-sm font-semibold text-error" role="alert">
             {quoteState.message}
           </p>
           <Button type="button" variant="secondary" size="sm" onClick={onRefresh}>
@@ -565,7 +565,7 @@ function QuotePanel({
           <dl className="grid gap-3 sm:grid-cols-2">
             <div>
               <dt className="text-xs text-receipt-grey">USDC amount</dt>
-              <dd className="font-display text-2xl font-semibold tracking-tight tabular-nums">
+              <dd className="font-sans text-2xl font-semibold tracking-tight tabular-nums">
                 {quoteState.amount}
               </dd>
             </div>
@@ -575,7 +575,7 @@ function QuotePanel({
                   ? "Estimated NGN required"
                   : "Estimated NGN to receive"}
               </dt>
-              <dd className="font-display text-2xl font-semibold tracking-tight tabular-nums text-provident-green">
+              <dd className="font-sans text-2xl font-semibold tracking-tight tabular-nums text-success">
                 ₦
                 {formatDecimalForDisplay(quoteState.estimatedNgn, {
                   maxFractional: 2,
@@ -584,7 +584,7 @@ function QuotePanel({
             </div>
             <div>
               <dt className="text-xs text-receipt-grey">Rate (NGN per USDC)</dt>
-              <dd className="font-proof text-sm font-medium tabular-nums">
+              <dd className="font-sans text-sm font-medium tabular-nums">
                 {quoteState.quote.rate}
               </dd>
             </div>
@@ -596,13 +596,13 @@ function QuotePanel({
             </div>
           </dl>
 
-          <p className="rounded-[10px] border border-rate-amber/40 bg-receipt-field px-3 py-2 text-xs text-rate-amber">
+          <p className="rounded-[8px] border-2 border-warning/40 bg-cream px-3 py-2 text-xs text-warning">
             Rates change. No funds have moved. Fees are not final until order
             creation (next step).
           </p>
 
           {balanceCheck.show ? (
-            <p className="text-sm font-semibold text-loss-red" role="alert">
+            <p className="text-sm font-semibold text-error" role="alert">
               Insufficient USDC balance for this cash-out amount.
             </p>
           ) : null}

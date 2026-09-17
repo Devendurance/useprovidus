@@ -108,7 +108,7 @@ export function RouteCheckForm() {
         />
 
         {submittedNote ? (
-          <p className="text-sm text-rate-amber" role="status">
+          <p className="text-sm text-warning" role="status">
             {submittedNote}
           </p>
         ) : null}

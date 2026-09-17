@@ -20,11 +20,13 @@ export default function CheckPreviewPage() {
   return (
     <div className="container-providus py-10 sm:py-14">
       <div className="max-w-2xl">
-        <p className="font-proof text-receipt-grey">Locked preview</p>
-        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-receipt-grey">
+          Locked preview
+        </p>
+        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
           Route comparison preview
         </h1>
-        <p className="mt-3 text-receipt-grey leading-relaxed">
+        <p className="mt-4 max-w-xl text-receipt-grey leading-relaxed">
           Preview will appear here once route comparison is connected. No
           estimate to show yet.
         </p>
@@ -64,7 +66,7 @@ export default function CheckPreviewPage() {
                 <p className="font-proof text-receipt-grey">Value Line</p>
                 <CardTitle className="mt-1">Structure only</CardTitle>
               </div>
-              <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 font-proof text-[12px] text-receipt-grey">
+              <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-receipt-grey">
                 LOCKED
               </span>
             </div>

@@ -31,11 +31,13 @@ export default function CheckVerdictPage() {
   return (
     <div className="container-providus py-10 sm:py-14">
       <div className="max-w-2xl">
-        <p className="font-proof text-receipt-grey">Route Verdict</p>
-        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-receipt-grey">
+          Route Verdict
+        </p>
+        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
           Best route for your money
         </h1>
-        <p className="mt-3 text-receipt-grey leading-relaxed">
+        <p className="mt-4 max-w-xl text-receipt-grey leading-relaxed">
           Full Route Verdict unlocks after a Route Check payment. Functionality
           is not connected yet.
         </p>
@@ -63,7 +65,7 @@ export default function CheckVerdictPage() {
                 <p className="font-proof text-receipt-grey">Recommended route</p>
                 <CardTitle className="mt-1">Not available yet</CardTitle>
               </div>
-              <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 font-proof text-[12px] text-receipt-grey">
+              <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-receipt-grey">
                 NOT UNLOCKED
               </span>
             </div>
@@ -72,7 +74,7 @@ export default function CheckVerdictPage() {
               {REQUIRED_FIELDS.map((field) => (
                 <div
                   key={field.label}
-                  className="rounded-[10px] border border-ledger-edge bg-receipt-field px-3 py-3"
+                  className="rounded-[8px] border border-ledger-edge bg-receipt-field px-3 py-3"
                 >
                   <p className="text-sm font-semibold text-ledger-stone">
                     {field.label}
@@ -115,7 +117,7 @@ export default function CheckVerdictPage() {
               {[1, 2].map((i) => (
                 <div
                   key={i}
-                  className="rounded-[10px] border border-dashed border-ledger-edge px-3 py-4 text-sm text-receipt-grey"
+                    className="rounded-[8px] border border-dashed border-ledger-edge px-3 py-4 text-sm text-receipt-grey"
                 >
                   Alternative route slot {i} — empty
                 </div>

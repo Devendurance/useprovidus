@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
 import {
   ClipboardList,
-  ScanSearch,
-  Lock,
-  Unlock,
   ExternalLink,
+  Lock,
   Receipt,
+  ScanSearch,
+  Unlock,
 } from "lucide-react";
-import { LinkButton } from "@/components/ui/link-button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ValueLine } from "@/components/providus/value-line";
+import { RouteCheckCTA } from "@/components/ui/route-check-cta";
 
 export const metadata: Metadata = {
   title: "How it works",
@@ -68,114 +67,159 @@ const VERDICT_FIELDS = [
 
 export default function HowItWorksPage() {
   return (
-    <div className="container-providus py-10 sm:py-14">
-      <div className="max-w-2xl">
-        <p className="font-proof text-receipt-grey">Route Check flow</p>
-        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl lg:text-5xl">
-          Show the outcome before the money moves.
-        </h1>
-        <p className="mt-4 text-lg leading-relaxed text-receipt-grey">
-          Providus is a route-intelligence agent—not an on-ramp or wallet. It
-          compares local routes into Celo by what you actually receive after
-          fees, FX, limits and settlement time.
-        </p>
-      </div>
+    <div className="relative isolate overflow-hidden bg-[#CBD2C4]">
+      <div className="pointer-events-none absolute right-[-180px] top-[-120px] -z-10 h-[560px] w-[560px] rounded-full border border-[#BEC6B7]/70 opacity-70 before:absolute before:inset-10 before:rounded-full before:border before:border-[#BEC6B7]/50 after:absolute after:inset-24 after:rounded-full after:border after:border-[#BEC6B7]/35" aria-hidden />
 
-      <div className="mt-10 rounded-[14px] border-ledger bg-clear-paper p-6 shadow-elevated sm:p-8">
-        <p className="mb-4 text-sm font-semibold text-ledger-stone">
-          The Value Line
-        </p>
-        <ValueLine />
-        <p className="mt-4 text-sm text-receipt-grey">
-          Every preview, Route Verdict and savings receipt follows this
-          structure. It is calculation logic—not decoration.
-        </p>
-      </div>
-
-      <ol className="mt-12 grid gap-4 md:grid-cols-2">
-        {FLOW.map((step, i) => {
-          const Icon = step.icon;
-          return (
-            <li key={step.title}>
-              <Card variant="surface" className="h-full">
-                <div className="mb-3 flex items-center gap-3">
-                  <span className="font-proof text-provident-green">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] border-ledger bg-receipt-field text-provident-green shadow-base">
-                    <Icon className="h-4 w-4" aria-hidden />
-                  </span>
-                </div>
-                <CardTitle>{step.title}</CardTitle>
-                <CardDescription>{step.body}</CardDescription>
-              </Card>
-            </li>
-          );
-        })}
-      </ol>
-
-      <section className="mt-14 grid gap-8 lg:grid-cols-[1fr_1fr]">
-        <div>
-          <h2 className="font-display text-2xl font-semibold tracking-tight">
-            What a full Route Verdict includes
-          </h2>
-          <p className="mt-3 text-receipt-grey leading-relaxed">
-            No payment unlock is complete until the result includes an
-            actionable route—not just an abstract score.
+      <div className="mx-auto w-full max-w-[1200px] px-4 py-12 sm:px-6 sm:py-16 md:px-8 lg:py-20">
+        <div className="max-w-[720px]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1A1A1A]/60">
+            Route Check · The flow
           </p>
-          <ul className="mt-6 space-y-2">
-            {VERDICT_FIELDS.map((field) => (
-              <li
-                key={field}
-                className="flex items-start gap-2 text-sm text-ledger-stone"
-              >
-                <span
-                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-provident-green"
-                  aria-hidden
-                />
-                {field}
-              </li>
-            ))}
-          </ul>
+          <h1 className="mt-4 font-sans text-3xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#1A1A1A] sm:text-4xl lg:text-5xl">
+            Show the outcome before the money moves.
+          </h1>
+          <p className="mt-5 max-w-[650px] text-[15px] leading-7 text-[#1A1A1A]/72 sm:text-base">
+            Providus is a route-intelligence agent—not an on-ramp or wallet. It
+            compares local routes into Celo by what you actually receive after
+            fees, FX, limits and settlement time.
+          </p>
         </div>
 
-        <div className="space-y-4">
-          <Card variant="standard">
-            <CardTitle>Ranking policy</CardTitle>
-            <CardDescription>
-              Recommendations rank user outcome, never provider placement.
-              Effective received amount carries the most weight, followed by
-              fees, reliability, speed and a small Celo-native bonus.
-            </CardDescription>
-            <p className="mt-4 font-proof text-receipt-grey">
-              Manual or estimated quotes are marked with source and capture
-              time. Sponsored links cannot improve rank.
+        <section className="mt-12 border-[1.5px] border-[#1A1A1A] bg-[#F5F2EA] p-5 sm:p-8" aria-labelledby="value-line-heading">
+          <div className="flex flex-col gap-2 border-b border-[#1A1A1A]/20 pb-5 sm:flex-row sm:items-baseline sm:justify-between">
+            <h2 id="value-line-heading" className="font-sans text-xl font-semibold tracking-[-0.02em] text-[#1A1A1A] sm:text-2xl">
+              The Value Line
+            </h2>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#1A1A1A]/50">
+              Outcome first
+            </span>
+          </div>
+          <div className="mt-6">
+            <ValueLine />
+          </div>
+          <p className="mt-5 max-w-[680px] text-sm leading-6 text-[#1A1A1A]/65">
+            Every preview, Route Verdict and savings receipt follows this
+            structure. It is calculation logic—not decoration.
+          </p>
+        </section>
+
+        <section className="mt-16 sm:mt-20" aria-labelledby="flow-heading">
+          <div className="flex flex-col gap-3 border-b-[1.5px] border-[#1A1A1A] pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/55">
+                Six clear moments
+              </p>
+              <h2 id="flow-heading" className="mt-2 font-sans text-2xl font-semibold tracking-[-0.025em] text-[#1A1A1A] sm:text-3xl">
+                From question to handoff.
+              </h2>
+            </div>
+            <p className="max-w-[310px] text-sm leading-6 text-[#1A1A1A]/65 sm:text-right">
+              Each step explains what changes, what stays yours and what the
+              next decision unlocks.
             </p>
-          </Card>
-          <Card variant="surface">
-            <CardTitle>Boundaries</CardTitle>
-            <ul className="mt-3 space-y-2 text-sm text-receipt-grey">
-              <li>No custody of user funds</li>
-              <li>No fiat purchase execution in MVP</li>
-              <li>No claim of global coverage</li>
-              <li>No stale quote presented as a final price</li>
-            </ul>
-          </Card>
-        </div>
-      </section>
+          </div>
 
-      <div className="mt-14 flex flex-col items-start gap-4 rounded-[14px] border-ledger-thick bg-clear-paper p-6 shadow-prominent sm:flex-row sm:items-center sm:justify-between sm:p-8">
-        <div>
-          <p className="font-display text-xl font-semibold tracking-tight">
-            Check a route
-          </p>
-          <p className="mt-1 text-sm text-receipt-grey">
-            Start with inputs. Live quotes and x402 unlock connect next.
-          </p>
-        </div>
-        <LinkButton href="/check" variant="primary" size="lg">
-          Check my route
-        </LinkButton>
+          <ol className="mt-8 grid gap-x-5 gap-y-5 md:grid-cols-2 lg:grid-cols-3">
+            {FLOW.map((step, i) => {
+              const Icon = step.icon;
+              return (
+                <li key={step.title} className="relative">
+                  <article className="h-full rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#F5F2EA] p-5 transition-colors duration-150 hover:bg-white sm:p-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold tracking-[0.16em] text-[#1A1A1A]/50">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className="flex h-10 w-10 items-center justify-center rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#CBD2C4] text-[#1A1A1A]">
+                        <Icon className="h-[18px] w-[18px]" aria-hidden />
+                      </span>
+                    </div>
+                    <h3 className="mt-9 font-sans text-lg font-semibold leading-6 tracking-[-0.015em] text-[#1A1A1A]">
+                      {step.title}
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-[#1A1A1A]/70">
+                      {step.body}
+                    </p>
+                    {i < FLOW.length - 1 ? (
+                      <span className="absolute -bottom-[13px] left-1/2 hidden h-[24px] w-px bg-[#1A1A1A]/25 lg:block" aria-hidden />
+                    ) : null}
+                  </article>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+
+        <section className="mt-16 grid gap-6 border-t-[1.5px] border-[#1A1A1A] pt-10 sm:mt-20 sm:pt-12 lg:grid-cols-[1fr_0.9fr] lg:gap-12" aria-labelledby="verdict-heading">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/55">
+              The unlocked answer
+            </p>
+            <h2 id="verdict-heading" className="mt-3 font-sans text-2xl font-semibold tracking-[-0.025em] text-[#1A1A1A] sm:text-3xl">
+              What a full Route Verdict includes
+            </h2>
+            <p className="mt-3 max-w-[560px] leading-7 text-[#1A1A1A]/70">
+              No payment unlock is complete until the result includes an
+              actionable route—not just an abstract score.
+            </p>
+            <ul className="mt-7 grid gap-x-5 gap-y-3 sm:grid-cols-2">
+              {VERDICT_FIELDS.map((field) => (
+                <li key={field} className="flex min-w-0 items-start gap-3 text-sm leading-5 text-[#1A1A1A]">
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#1A1A1A]" aria-hidden />
+                  <span>{field}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-4">
+            <article className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#F5F2EA] p-6">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#1A1A1A]/50">
+                Policy 01
+              </p>
+              <h3 className="mt-3 font-sans text-xl font-semibold tracking-[-0.02em] text-[#1A1A1A]">
+                Ranking policy
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-[#1A1A1A]/70">
+                Recommendations rank user outcome, never provider placement.
+                Effective received amount carries the most weight, followed by
+                fees, reliability, speed and a small Celo-native bonus.
+              </p>
+              <p className="mt-5 border-t border-[#1A1A1A]/20 pt-4 text-xs leading-5 text-[#1A1A1A]/60">
+                Manual or estimated quotes are marked with source and capture
+                time. Sponsored links cannot improve rank.
+              </p>
+            </article>
+            <article className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#1A1A1A] p-6 text-[#F5F2EA]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#CBD2C4]/65">
+                Policy 02
+              </p>
+              <h3 className="mt-3 font-sans text-xl font-semibold tracking-[-0.02em]">
+                Boundaries
+              </h3>
+              <ul className="mt-4 space-y-2 text-sm leading-6 text-[#F5F2EA]/75">
+                <li>No custody of user funds</li>
+                <li>No fiat purchase execution in MVP</li>
+                <li>No claim of global coverage</li>
+                <li>No stale quote presented as a final price</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section className="mt-16 flex flex-col gap-5 border-[1.5px] border-[#1A1A1A] bg-[#F5F2EA] p-6 sm:mt-20 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#1A1A1A]/50">
+              Start with your numbers
+            </p>
+            <h2 className="mt-2 font-sans text-xl font-semibold tracking-[-0.02em] text-[#1A1A1A] sm:text-2xl">
+              Check a route
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-[#1A1A1A]/65">
+              Start with inputs. Live quotes and x402 unlock connect next.
+            </p>
+          </div>
+          <RouteCheckCTA className="shrink-0" />
+        </section>
       </div>
     </div>
   );

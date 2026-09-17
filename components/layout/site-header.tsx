@@ -26,20 +26,19 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ledger-edge bg-receipt-field/95 backdrop-blur-sm">
-      <div className="container-providus flex h-16 items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 border-b border-ink/20 bg-sage/95 backdrop-blur-sm">
+      <div
+        className={cn(
+          "container-providus flex min-h-20 items-center justify-between gap-4 py-3",
+          pathname === "/" && "container-providus-home",
+        )}
+      >
         <Link
           href="/"
-          className="group flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green"
+          className="group shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           onClick={() => setOpen(false)}
         >
-          <span
-            className="flex h-9 w-9 items-center justify-center rounded-[10px] border-ledger bg-provident-green text-sm font-bold text-white shadow-base"
-            aria-hidden
-          >
-            P
-          </span>
-          <span className="font-display text-lg font-semibold tracking-tight text-ledger-stone">
+          <span className="font-brand text-[1.35rem] font-bold uppercase leading-none tracking-[0.06em] text-ink">
             Providus
           </span>
         </Link>
@@ -53,10 +52,10 @@ export function SiteHeader() {
               key={item.href}
               href={item.href}
               className={cn(
-                "rounded-[10px] px-3 py-2 text-sm font-semibold tracking-tight transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green",
+                "rounded-[8px] px-3 py-2 text-sm font-medium tracking-tight transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
                 isActive(pathname, item.href)
-                  ? "bg-ledger-stone text-receipt-field"
-                  : "text-receipt-grey hover:bg-ledger-edge/60 hover:text-ledger-stone",
+                  ? "bg-ink text-cream"
+                  : "text-ink/75 hover:bg-cream/70 hover:text-ink",
               )}
             >
               {item.label}
@@ -68,7 +67,7 @@ export function SiteHeader() {
           <ConnectWalletButton />
           <Link
             href="/check"
-            className="inline-flex h-[44px] min-h-11 items-center justify-center rounded-[10px] border-ledger-thick bg-provident-green px-5 text-sm font-semibold text-white shadow-elevated transition-[transform,box-shadow,background-color] duration-100 hover:bg-deep-provision hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_#18211F] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green"
+            className="inline-flex h-11 min-h-11 items-center justify-center rounded-[8px] border-[1.5px] border-ink bg-cream px-5 text-sm font-semibold text-ink transition-colors hover:bg-ink hover:text-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             Move Money
           </Link>
@@ -76,7 +75,7 @@ export function SiteHeader() {
 
         <button
           type="button"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border-ledger bg-clear-paper shadow-base md:hidden"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] border-[1.5px] border-ink bg-cream text-ink md:hidden"
           aria-expanded={open}
           aria-controls="mobile-nav"
           aria-label={open ? "Close menu" : "Open menu"}
@@ -89,7 +88,7 @@ export function SiteHeader() {
       {open ? (
         <div
           id="mobile-nav"
-          className="border-t border-ledger-edge bg-receipt-field md:hidden"
+          className="border-t border-ink/20 bg-sage md:hidden"
         >
           <nav
             className="container-providus flex flex-col gap-1 py-4"
@@ -101,21 +100,21 @@ export function SiteHeader() {
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "rounded-[10px] px-3 py-3 text-sm font-semibold",
+                  "min-h-11 rounded-[8px] px-3 py-3 text-sm font-medium",
                   isActive(pathname, item.href)
-                    ? "bg-ledger-stone text-receipt-field"
-                    : "text-ledger-stone hover:bg-ledger-edge/60",
+                    ? "bg-ink text-cream"
+                    : "text-ink hover:bg-cream/70",
                 )}
               >
                 {item.label}
               </Link>
             ))}
-            <div className="mt-3 flex flex-col gap-2 border-t border-ledger-edge pt-4">
+            <div className="mt-3 flex flex-col gap-2 border-t border-ink/20 pt-4">
               <ConnectWalletButton fullWidth />
               <Link
                 href="/check"
                 onClick={() => setOpen(false)}
-                className="inline-flex h-[52px] items-center justify-center rounded-[10px] border-ledger-thick bg-provident-green px-7 text-base font-semibold text-white shadow-elevated"
+                className="inline-flex h-11 min-h-11 items-center justify-center rounded-[8px] border-[1.5px] border-ink bg-cream px-7 text-base font-semibold text-ink transition-colors hover:bg-ink hover:text-cream"
               >
                 Move Money
               </Link>

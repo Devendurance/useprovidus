@@ -30,7 +30,7 @@ export function ValueLine({
   return (
     <div className={cn("w-full", className)}>
       {caption ? (
-        <p className="mb-3 font-proof text-receipt-grey">{caption}</p>
+        <p className="mb-3 font-sans text-receipt-grey">{caption}</p>
       ) : null}
       <ol
         className={cn(
@@ -48,17 +48,17 @@ export function ValueLine({
           >
             <div
               className={cn(
-                "flex min-h-[72px] w-full flex-col justify-center rounded-[10px] border-ledger px-3 py-3 shadow-base sm:min-h-0",
+                "flex min-h-[72px] w-full flex-col justify-center rounded-[8px] border-2 border-ink px-3 py-3  sm:min-h-0",
                 compact && "min-h-0 px-2.5 py-2",
                 step.emphasis
-                  ? "bg-provident-green text-white"
-                  : "bg-clear-paper text-ledger-stone",
+                  ? "bg-success text-white"
+                  : "bg-cream text-ink",
               )}
             >
               <span
                 className={cn(
                   "text-sm font-semibold tracking-tight",
-                  step.emphasis ? "text-white" : "text-ledger-stone",
+                  step.emphasis ? "text-white" : "text-ink",
                 )}
               >
                 {step.label}
@@ -66,7 +66,7 @@ export function ValueLine({
               {step.detail ? (
                 <span
                   className={cn(
-                    "mt-0.5 font-proof text-[12px]",
+                    "mt-0.5 font-sans text-[12px]",
                     step.emphasis ? "text-white/85" : "text-receipt-grey",
                   )}
                 >

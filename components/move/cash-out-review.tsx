@@ -75,7 +75,7 @@ export function CashOutReview({
 
   return (
     <Card variant="verdict">
-      <p className="font-proof text-receipt-grey">Cash-out review</p>
+      <p className="font-sans text-receipt-grey">Cash-out review</p>
       <CardTitle className="mt-1">Create order & deposit USDC</CardTitle>
       <CardDescription className="mt-2">
         Pre-order quote is an estimate. Creating an order starts a time-limited
@@ -85,7 +85,7 @@ export function CashOutReview({
       <dl className="mt-5 grid gap-3 sm:grid-cols-2 text-sm">
         <div>
           <dt className="text-xs text-receipt-grey">USDC to cash out</dt>
-          <dd className="font-display text-xl font-semibold tabular-nums">
+          <dd className="font-sans text-xl font-semibold tabular-nums">
             {amount}
           </dd>
         </div>
@@ -93,7 +93,7 @@ export function CashOutReview({
           <dt className="text-xs text-receipt-grey">
             Pre-order estimated NGN (not final)
           </dt>
-          <dd className="font-display text-xl font-semibold tabular-nums text-provident-green">
+          <dd className="font-sans text-xl font-semibold tabular-nums text-success">
             ₦{formatDecimalForDisplay(estimatedNgn, { maxFractional: 2 })}
           </dd>
         </div>
@@ -103,23 +103,23 @@ export function CashOutReview({
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Pre-order rate (estimate)</dt>
-          <dd className="font-proof tabular-nums">{rate}</dd>
+          <dd className="font-sans tabular-nums">{rate}</dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Refund / source wallet</dt>
-          <dd className="font-proof text-[12px]">
+          <dd className="font-sans text-[12px]">
             {walletAddress ? truncateAddress(walletAddress) : "—"}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">USDC balance</dt>
-          <dd className="font-proof tabular-nums">
+          <dd className="font-sans tabular-nums">
             {usdcBalanceDisplay ?? "—"}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Quote checked</dt>
-          <dd className="font-proof text-[12px]">
+          <dd className="font-sans text-[12px]">
             {new Date(quoteCheckedAt).toLocaleString()}
             {!fresh ? " · refresh needed" : ""}
           </dd>
@@ -140,19 +140,19 @@ export function CashOutReview({
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Account</dt>
-          <dd className="font-proof text-[12px]">
+          <dd className="font-sans text-[12px]">
             {maskAccountIdentifier(recipient.accountIdentifier)}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">Verified</dt>
-          <dd className="font-proof text-[12px]">
+          <dd className="font-sans text-[12px]">
             {new Date(recipient.verifiedAt).toLocaleString()}
           </dd>
         </div>
       </dl>
 
-      <p className="mt-4 rounded-[10px] border border-rate-amber/40 bg-receipt-field px-3 py-2 text-xs text-rate-amber">
+      <p className="mt-4 rounded-[8px] border-2 border-warning/40 bg-cream px-3 py-2 text-xs text-warning">
         Creating an order starts a time-limited payment window. Paycrest returns
         final rate, fees, receive address and expiry. Pre-order quote (refresh
         every {Math.round(PROVIDUS_QUOTE_FRESHNESS_MS / 1000)}s) is not
@@ -181,8 +181,8 @@ export function CashOutReview({
       ) : null}
 
       {orderFlow.state.kind === "unknown_outcome" ? (
-        <div className="mt-4 rounded-[10px] border border-loss-red/40 bg-receipt-field px-4 py-3">
-          <p className="text-sm font-semibold text-loss-red">
+        <div className="mt-4 rounded-[8px] border-2 border-error/40 bg-cream px-4 py-3">
+          <p className="text-sm font-semibold text-error">
             Order creation outcome unknown
           </p>
           <p className="mt-1 text-xs text-receipt-grey">
@@ -196,15 +196,15 @@ export function CashOutReview({
 
       {orderFlow.state.kind === "error" ? (
         <div className="mt-4 space-y-2">
-          <p className="text-sm text-loss-red" role="alert">
+          <p className="text-sm text-error" role="alert">
             {orderFlow.state.message}
             {orderFlow.state.code ? ` (${orderFlow.state.code})` : ""}
           </p>
           {orderFlow.state.validationDetails &&
           orderFlow.state.validationDetails.length > 0 ? (
-            <ul className="space-y-1 rounded-[10px] border border-loss-red/30 bg-receipt-field p-3 text-xs text-loss-red">
+            <ul className="space-y-1 rounded-[8px] border-2 border-error/30 bg-cream p-3 text-xs text-error">
               {orderFlow.state.validationDetails.map((detail, idx) => (
-                <li key={idx} className="font-proof">
+                <li key={idx} className="font-sans">
                   Field: <span className="font-semibold">{detail.field}</span> —{" "}
                   {detail.message}
                 </li>
@@ -218,12 +218,12 @@ export function CashOutReview({
             </p>
           ) : null}
           {orderFlow.state.diagnosticId ? (
-            <p className="text-xs text-receipt-grey font-proof">
+            <p className="text-xs text-receipt-grey font-sans">
               Diagnostic: {orderFlow.state.diagnosticId}
             </p>
           ) : null}
           {orderFlow.state.reference ? (
-            <p className="text-xs text-receipt-grey font-proof">
+            <p className="text-xs text-receipt-grey font-sans">
               Reference: {orderFlow.state.reference}
             </p>
           ) : null}
@@ -244,8 +244,8 @@ export function CashOutReview({
       ) : null}
 
       {orderFlow.state.kind === "confirming" ? (
-        <div className="mt-4 space-y-3 rounded-[10px] border-ledger bg-receipt-field p-4">
-          <p className="text-sm font-semibold text-ledger-stone">
+        <div className="mt-4 space-y-3 rounded-[8px] border-2 border-ink bg-cream p-4">
+          <p className="text-sm font-semibold text-ink">
             Confirm: create cash-out order for {amount} USDC?
           </p>
           <p className="text-xs text-receipt-grey">
