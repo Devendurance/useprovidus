@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { History } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { LinkButton } from "@/components/ui/link-button";
+import { RouteCheckCTA } from "@/components/ui/route-check-cta";
 import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
 import { AssistantPanel } from "@/components/assistant/assistant-panel";
 
@@ -30,9 +30,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <ConnectWalletButton />
-          <LinkButton href="/check" variant="primary" size="md">
-            Start a cash-out
-          </LinkButton>
+          <RouteCheckCTA />
         </div>
       </div>
 
@@ -67,9 +65,7 @@ export default function DashboardPage() {
             title="No payment history yet"
             description="No verified Providus cash-outs are stored in this browser. Start a cash-out to review a live quote and approve the exact Celo transfer. History will not be fabricated from wallet balances or provider guesses."
             action={
-              <LinkButton href="/check" variant="primary" size="lg">
-                Start a cash-out
-              </LinkButton>
+              <RouteCheckCTA emphasis="flat" />
             }
           />
 

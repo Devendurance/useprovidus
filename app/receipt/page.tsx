@@ -4,7 +4,7 @@ import { RouteStepper } from "@/components/providus/route-stepper";
 import { ValueLine } from "@/components/providus/value-line";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { LinkButton } from "@/components/ui/link-button";
+import { RouteCheckCTA } from "@/components/ui/route-check-cta";
 
 export const metadata: Metadata = {
   title: "Payment receipt",
@@ -36,9 +36,7 @@ export default function ReceiptPage() {
           title="No verified payment receipt yet"
           description="Start a Celo USDC cash-out from Move Money. Providus will keep the quote, recipient, wallet approval and settlement states distinct instead of inventing a completed payout."
           action={
-            <LinkButton href="/check" variant="primary" size="lg">
-              Start a cash-out
-            </LinkButton>
+            <RouteCheckCTA />
           }
         />
 

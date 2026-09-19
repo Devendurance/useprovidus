@@ -52,7 +52,7 @@ export function MessageList({
             Providus Intent Assistant
           </h3>
           <p className="mt-1 max-w-md text-sm text-receipt-grey leading-relaxed">
-            Clarify airtime top-ups, check transaction status, or explore Celo route intelligence.
+            Clarify a target payment or check transaction status.
             Try one of the prompts below to get started.
           </p>
 

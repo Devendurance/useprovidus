@@ -7,7 +7,7 @@ import {
   ExternalLink,
   Receipt,
 } from "lucide-react";
-import { LinkButton } from "@/components/ui/link-button";
+import { RouteCheckCTA } from "@/components/ui/route-check-cta";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ValueLine } from "@/components/providus/value-line";
 
@@ -170,9 +170,7 @@ export default function HowItWorksPage() {
             exact Celo USDC transfer.
           </p>
         </div>
-        <LinkButton href="/check" variant="primary" size="lg">
-          Start a cash-out
-        </LinkButton>
+        <RouteCheckCTA />
       </div>
     </div>
   );

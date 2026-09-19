@@ -1,4 +1,5 @@
 import { LinkButton } from "@/components/ui/link-button";
+import { RouteCheckCTA } from "@/components/ui/route-check-cta";
 
 export default function NotFound() {
   return (
@@ -14,9 +15,7 @@ export default function NotFound() {
         <LinkButton href="/" variant="ghost" size="lg">
           Home
         </LinkButton>
-        <LinkButton href="/check" variant="primary" size="lg">
-          Start a cash-out
-        </LinkButton>
+        <RouteCheckCTA />
       </div>
     </div>
   );
