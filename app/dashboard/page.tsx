@@ -42,7 +42,7 @@ export default function DashboardPage() {
             Providus Assistant
           </h2>
           <p className="mt-1 text-sm text-receipt-grey leading-relaxed">
-            Draft an airtime payment intent, check live transaction stages, or explore Celo route intelligence.
+            Draft a target airtime payment intent or ask about a transaction stage.
           </p>
         </div>
 
