@@ -1,6 +1,12 @@
 "use client";
 
-import type { PaymentIntent } from "@/lib/assistant/types";
+import type {
+  PaymentIntent,
+  AirtimePreview,
+  ConfirmedAirtimePayment,
+} from "@/lib/assistant/types";
+import type { ConfirmedPaymentState } from "@/hooks/use-assistant";
+import { AirtimePreviewCard } from "@/components/assistant/airtime-preview-card";
 import { cn } from "@/lib/cn";
 import {
   Smartphone,
@@ -14,6 +20,17 @@ import {
 export interface IntentDraftCardProps {
   intent: PaymentIntent | null;
   className?: string;
+  preview?: AirtimePreview | null;
+  previewLoading?: boolean;
+  previewError?: string | null;
+  confirmed?: boolean;
+  confirmedPayment?: ConfirmedPaymentState | ConfirmedAirtimePayment | null;
+  onConfirm?: () => void;
+  onRefresh?: () => void;
+  onEdit?: () => void;
+  onConfirmPayment?: () => void;
+  onRefreshPreview?: () => void;
+  onEditIntent?: () => void;
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -22,9 +39,57 @@ const FIELD_LABELS: Record<string, string> = {
   network: "Network provider",
 };
 
-export function IntentDraftCard({ intent, className }: IntentDraftCardProps) {
+export function IntentDraftCard({
+  intent,
+  className,
+  preview,
+  previewLoading = false,
+  previewError = null,
+  confirmed = false,
+  confirmedPayment = null,
+  onConfirm,
+  onRefresh,
+  onEdit,
+  onConfirmPayment,
+  onRefreshPreview,
+  onEditIntent,
+}: IntentDraftCardProps) {
+  const handleConfirm = onConfirmPayment ?? onConfirm;
+  const handleRefresh = onRefreshPreview ?? onRefresh;
+  const handleEdit = onEditIntent ?? onEdit;
   if (!intent) {
     return null;
+  }
+
+  const hasPreviewContext =
+    preview !== undefined ||
+    previewLoading ||
+    Boolean(previewError) ||
+    Boolean(confirmedPayment) ||
+    confirmed;
+
+  // When intent is complete and preview/confirmation props are passed, render AirtimePreviewCard
+  if (
+    intent.type === "airtime" &&
+    intent.readyForConfirmation &&
+    hasPreviewContext
+  ) {
+    return (
+      <AirtimePreviewCard
+        preview={preview ?? null}
+        loading={previewLoading}
+        error={previewError}
+        confirmed={confirmed}
+        confirmedPayment={confirmedPayment}
+        onConfirm={handleConfirm}
+        onRefresh={handleRefresh}
+        onEdit={handleEdit}
+        onConfirmPayment={handleConfirm}
+        onRefreshPreview={handleRefresh}
+        onEditIntent={handleEdit}
+        className={className}
+      />
+    );
   }
 
   if (intent.type !== "airtime") {
@@ -97,7 +162,7 @@ export function IntentDraftCard({ intent, className }: IntentDraftCardProps) {
               Airtime Payment Intent Draft
             </h3>
             <p className="font-proof text-[11px] text-receipt-grey">
-              Read-only preview · Providus P3 assistant
+              Read-only preview · upcoming capability
             </p>
           </div>
         </div>
@@ -220,13 +285,13 @@ export function IntentDraftCard({ intent, className }: IntentDraftCardProps) {
         </div>
       ) : null}
 
-      {/* Read-Only Informational Notice - STRICTLY NO APPROVAL / EXECUTION BUTTON IN P3 */}
+      {/* Read-only informational notice; this surface does not execute payments. */}
       <div className="mt-3 flex items-center justify-between border-t border-ledger-edge/70 pt-3">
         <p className="text-xs text-receipt-grey flex items-center gap-1.5">
           <Info className="h-3.5 w-3.5 text-quote-blue shrink-0" aria-hidden="true" />
           <span>
             {readyForConfirmation
-              ? "All parameters validated. This draft is informational only — payment execution is disabled in P3."
+              ? "All parameters validated. This draft is informational only — payment execution is not available yet."
               : "Draft is being refined through chat conversation."}
           </span>
         </p>

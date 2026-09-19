@@ -19,8 +19,21 @@ export interface AssistantPanelProps {
 }
 
 export function AssistantPanel({ className }: AssistantPanelProps) {
-  const { messages, activeIntent, pending, error, send, reset } =
-    useAssistant();
+  const {
+    messages,
+    activeIntent,
+    pending,
+    error,
+    send,
+    reset,
+    preview,
+    previewLoading,
+    previewError,
+    confirmedPayment,
+    confirmPayment,
+    refreshPreview,
+    editIntent,
+  } = useAssistant();
   const [dismissedError, setDismissedError] = useState<string | null>(null);
 
   const displayError = error && error !== dismissedError ? error : null;
@@ -50,7 +63,7 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
                 Providus Assistant
               </h2>
               <span className="rounded border border-ledger-edge bg-clear-paper px-1.5 py-0.5 font-proof text-[10px] text-receipt-grey">
-                P3 Preview
+                Upcoming · payment preview
               </span>
             </div>
             <p className="font-proof text-[11px] text-receipt-grey">
@@ -78,7 +91,16 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
       {/* Active Intent Draft Card Preview (Docked if active) */}
       {activeIntent ? (
         <div className="border-b border-ledger-edge/80 bg-receipt-field/60 p-3 sm:p-4">
-          <IntentDraftCard intent={activeIntent} />
+          <IntentDraftCard
+            intent={activeIntent}
+            preview={preview}
+            previewLoading={previewLoading}
+            previewError={previewError}
+            confirmedPayment={confirmedPayment}
+            onConfirmPayment={confirmPayment}
+            onRefreshPreview={refreshPreview}
+            onEditIntent={editIntent}
+          />
         </div>
       ) : null}
 
@@ -118,7 +140,7 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
       <div className="border-t border-ledger-edge/60 bg-receipt-field/40 px-4 py-1.5 text-center">
         <p className="font-proof text-[10px] text-receipt-grey flex items-center justify-center gap-1">
           <ShieldAlert className="h-3 w-3 text-quote-blue" />
-          <span>Informational only · Providus P3 does not execute transactions directly from chat</span>
+          <span>Informational only · payment execution is not available from chat</span>
         </p>
       </div>
 

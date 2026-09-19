@@ -25,6 +25,32 @@ export interface AirtimeIntent {
   readyForConfirmation: boolean;
 }
 
+export interface AirtimePreview {
+  intentFingerprint: string;
+  amountNgn: string;
+  phone: string;
+  network: PaymentNetwork;
+  amountUsdc: string;
+  feeUsdc: "0";
+  totalUsdc: string;
+  rate: string;
+  quotedAt: string;
+  expiresAt: string;
+}
+
+export interface ConfirmedAirtimePayment {
+  amountNgn: string;
+  phone: string;
+  network: PaymentNetwork;
+  amountUsdc: string;
+  feeUsdc: "0";
+  totalUsdc: string;
+  rate: string;
+  quotedAt: string;
+  expiresAt: string;
+  intentFingerprint: string;
+}
+
 export interface UnsupportedIntent {
   type: UnsupportedIntentType;
   missingFields: string[];

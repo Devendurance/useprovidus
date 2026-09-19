@@ -87,6 +87,7 @@ function asNumber(value: unknown): number | null {
 async function paycrestFetch(
   path: string,
   init?: RequestInit,
+  options?: { fetchFn?: typeof fetch },
 ): Promise<PaycrestResult<{ status: number; json: UpstreamJson }>> {
   const config = getPaycrestConfig();
   if (!config.ok) return config;
@@ -94,9 +95,10 @@ async function paycrestFetch(
   const url = resolvePaycrestUrl(config.data.baseUrl, path);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const doFetch = options?.fetchFn ?? fetch;
 
   try {
-    const response = await fetch(url, {
+    const response = await doFetch(url, {
       ...init,
       method: init?.method ?? "GET",
       signal: controller.signal,
@@ -229,10 +231,12 @@ function isNoProviderResponse(
 /**
  * Live corridor quote for celo / USDC / NGN.
  * amount is crypto notional (path param) — validated string passed as-is.
+ * `options.fetchFn` injects a fetch implementation for tests/self-checks.
  */
 export async function getCorridorQuote(
   side: PaycrestSide,
   cryptoAmount: string,
+  options?: { fetchFn?: typeof fetch },
 ): Promise<PaycrestResult<CorridorQuote>> {
   if (side !== "buy" && side !== "sell") {
     return {
@@ -247,7 +251,7 @@ export async function getCorridorQuote(
 
   const amount = amountCheck.data;
   const path = `/rates/${NETWORK}/${TOKEN}/${encodeURIComponent(amount)}/${FIAT}?side=${side}`;
-  const result = await paycrestFetch(path);
+  const result = await paycrestFetch(path, undefined, options);
   if (!result.ok) return result;
 
   const { status, json } = result.data;

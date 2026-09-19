@@ -79,6 +79,66 @@ export function multiplyDecimalStrings(a: string, b: string): string {
 }
 
 /**
+ * Exact inverse-quote division of two non-negative decimal strings.
+ *
+ * `numerator / denominator`, computed with BigInt scaling only — never
+ * floating point. The exact quotient is cut (or rounded) at `maxDecimals`
+ * fractional digits:
+ *
+ * - `"ceil"` (default) — any non-zero remainder increments the last digit, so
+ *   `result * denominator >= numerator` (never under-funds a payment).
+ * - `"floor"` — the remainder is discarded.
+ * - `"half_up"` — remainder at or above half of the divisor increments.
+ *
+ * Throws on invalid decimal inputs, a negative/non-integer `maxDecimals`, or a
+ * zero denominator.
+ */
+export function divideDecimalStrings(
+  numerator: string,
+  denominator: string,
+  maxDecimals = 6,
+  rounding: "ceil" | "floor" | "half_up" = "ceil",
+): string {
+  if (!Number.isInteger(maxDecimals) || maxDecimals < 0) {
+    throw new Error("Invalid maxDecimals for division");
+  }
+  const nn = normalizeDecimal(numerator);
+  const nd = normalizeDecimal(denominator);
+  if (nn === null || nd === null) {
+    throw new Error("Invalid decimal string for division");
+  }
+
+  const [ni, nf] = splitParts(nn);
+  const [di, df] = splitParts(nd);
+  const numeratorDigits = BigInt(ni + nf || "0");
+  const denominatorDigits = BigInt(di + df || "0");
+  if (denominatorDigits === BigInt(0)) {
+    throw new Error("Division by zero");
+  }
+
+  // numerator / denominator * 10^maxDecimals, expressed over integers:
+  // (N * 10^(df.length + maxDecimals)) / (D * 10^(nf.length))
+  const scaledNumerator =
+    numeratorDigits *
+    BigInt(10) ** BigInt(df.length + maxDecimals);
+  const scaledDenominator = denominatorDigits * BigInt(10) ** BigInt(nf.length);
+
+  let quotient = scaledNumerator / scaledDenominator;
+  const remainder = scaledNumerator % scaledDenominator;
+  if (remainder > BigInt(0)) {
+    if (rounding === "ceil") {
+      quotient += BigInt(1);
+    } else if (
+      rounding === "half_up" &&
+      remainder * BigInt(2) >= scaledDenominator
+    ) {
+      quotient += BigInt(1);
+    }
+  }
+  return formatScaledBigInt(quotient, maxDecimals);
+}
+
+/**
  * Convert a USDC decimal string to base units (6 decimals) as bigint.
  */
 export function usdcToBaseUnits(amount: string, decimals = 6): bigint {
