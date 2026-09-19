@@ -38,7 +38,7 @@ export function Select({
       {label ? (
         <label
           htmlFor={id}
-          className="text-sm font-semibold tracking-tight text-ledger-stone"
+          className="text-sm font-semibold tracking-tight text-ink"
         >
           {label}
         </label>
@@ -47,8 +47,8 @@ export function Select({
         <select
           id={id}
           className={cn(
-            "min-h-12 w-full appearance-none rounded-[10px] border-ledger bg-clear-paper px-4 py-3 pr-10 text-base text-ledger-stone shadow-base transition-[box-shadow,transform] duration-100 focus:outline-none focus:shadow-elevated focus:translate-x-px focus:translate-y-px disabled:cursor-not-allowed disabled:bg-ledger-edge/40 disabled:opacity-70",
-            error && "border-loss-red",
+            "min-h-12 w-full appearance-none rounded-[8px] border-[1.5px] border-ink bg-cream px-4 py-3 pr-10 text-base text-ink transition-[border-color,box-shadow,background-color] duration-150 focus:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 disabled:cursor-not-allowed disabled:bg-sage-line/40 disabled:opacity-70",
+            error && "border-error bg-error-surface/30 focus-visible:border-error focus-visible:ring-error/30",
             className,
           )}
           aria-describedby={describedBy || undefined}
@@ -68,7 +68,7 @@ export function Select({
         </select>
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-receipt-grey"
+          className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-ink/65"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
@@ -82,11 +82,11 @@ export function Select({
         </span>
       </div>
       {error ? (
-        <p id={errorId} className="text-sm text-loss-red" role="alert">
+        <p id={errorId} className="text-sm text-error" role="alert">
           {error}
         </p>
       ) : null}
-      {hint ? <p id={hintId} className="text-sm text-receipt-grey">{hint}</p> : null}
+      {hint ? <p id={hintId} className="text-sm text-ink/65">{hint}</p> : null}
     </div>
   );
 }

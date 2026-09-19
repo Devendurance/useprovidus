@@ -16,17 +16,17 @@ type LinkButtonProps = {
 
 const variantClasses: Record<LinkButtonVariant, string> = {
   primary:
-    "bg-provident-green text-white border-ledger-thick shadow-elevated hover:bg-deep-provision hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_#18211F] active:translate-x-[3px] active:translate-y-[3px] active:shadow-press",
+    "border-[1.5px] border-ink bg-cream text-ink shadow-sticker hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[5px_5px_0_var(--ink)] active:translate-x-[8px] active:translate-y-[8px] active:shadow-none",
   secondary:
-    "bg-ledger-stone text-receipt-field border-ledger shadow-elevated hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_#18211F]",
+    "border-[1.5px] border-ink bg-ink text-cream shadow-none hover:bg-ink/85 active:bg-ink",
   ghost:
-    "bg-clear-paper text-ledger-stone border-ledger shadow-base hover:bg-ledger-edge/40",
+    "border-[1.5px] border-ink bg-transparent text-ink shadow-none hover:bg-cream/70 active:bg-cream",
 };
 
 const sizeClasses: Record<LinkButtonSize, string> = {
-  sm: "min-h-11 h-11 px-5 text-sm",
-  md: "min-h-11 h-11 px-6 text-sm",
-  lg: "min-h-[52px] h-[52px] px-7 text-base",
+  sm: "min-h-11 px-5 py-2 text-sm",
+  md: "min-h-11 px-6 py-2 text-sm",
+  lg: "min-h-[52px] px-7 py-3 text-base",
 };
 
 export function LinkButton({
@@ -41,7 +41,7 @@ export function LinkButton({
     <Link
       href={href}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-[10px] border font-semibold tracking-tight transition-[transform,box-shadow,background-color] duration-100 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green",
+        "inline-flex items-center justify-center gap-2 rounded-[8px] font-semibold tracking-tight transition-[transform,box-shadow,background-color,color] duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus motion-reduce:transform-none motion-reduce:transition-none",
         variantClasses[variant],
         sizeClasses[size],
         fullWidth && "w-full",
