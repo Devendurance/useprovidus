@@ -75,3 +75,55 @@ export const agentTransactions = pgTable(
 
 export type AgentTransaction = typeof agentTransactions.$inferSelect;
 export type NewAgentTransaction = typeof agentTransactions.$inferInsert;
+
+/**
+ * Server-authoritative airtime quotes.
+ *
+ * A row is the only thing that can authorize payment preparation: the client
+ * receives the generated `id` (format `prev_${uuid}`) and hands it back, so no
+ * quote value ever has to be trusted from the browser. `consumed_at` and
+ * `transaction_id` are written exactly once by the atomic single-use
+ * consumption transition, and `expires_at` bounds the 60-second quote window.
+ */
+export const airtimePreviews = pgTable(
+  "airtime_previews",
+  {
+    id: text("id").primaryKey(),
+    walletAddress: text("wallet_address").notNull(),
+    intentFingerprint: text("intent_fingerprint").notNull(),
+    amountNgn: text("amount_ngn").notNull(),
+    phone: text("phone").notNull(),
+    network: text("network").notNull(),
+    rate: text("rate").notNull(),
+    amountUsdc: text("amount_usdc").notNull(),
+    feeUsdc: text("fee_usdc").notNull().default("0"),
+    totalUsdc: text("total_usdc").notNull(),
+    quotedAt: timestamp("quoted_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+    consumedAt: timestamp("consumed_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    transactionId: text("transaction_id"),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("preview_wallet_idx").on(table.walletAddress),
+    index("preview_fingerprint_idx").on(table.intentFingerprint),
+    index("preview_tx_idx").on(table.transactionId),
+  ],
+);
+
+export type AirtimePreviewRecord = typeof airtimePreviews.$inferSelect;
+export type NewAirtimePreviewRecord = typeof airtimePreviews.$inferInsert;

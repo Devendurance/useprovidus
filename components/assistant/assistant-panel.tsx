@@ -33,6 +33,13 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
     confirmPayment,
     refreshPreview,
     editIntent,
+    paymentInstructions,
+    preparingPayment,
+    preparationError,
+    depositStatus,
+    depositHash,
+    depositError,
+    confirmDeposit,
   } = useAssistant();
   const [dismissedError, setDismissedError] = useState<string | null>(null);
 
@@ -100,6 +107,13 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
             onConfirmPayment={confirmPayment}
             onRefreshPreview={refreshPreview}
             onEditIntent={editIntent}
+            paymentInstructions={paymentInstructions}
+            preparingPayment={preparingPayment}
+            preparationError={preparationError}
+            depositStatus={depositStatus}
+            depositHash={depositHash}
+            depositError={depositError}
+            onDepositConfirmed={confirmDeposit}
           />
         </div>
       ) : null}

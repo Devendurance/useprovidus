@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import type { AirtimePreview, ConfirmedAirtimePayment } from "@/lib/assistant/types";
 import type { ConfirmedPaymentState } from "@/hooks/use-assistant";
+import {
+  PaymentInstructionsCard,
+  type PaymentInstructions,
+  type DepositProgressionStatus,
+} from "@/components/assistant/payment-instructions-card";
 import { formatDecimalForDisplay } from "@/lib/money/decimal";
 import { cn } from "@/lib/cn";
 import {
@@ -24,12 +29,20 @@ export interface AirtimePreviewCardProps {
   error?: string | null;
   confirmed?: boolean;
   confirmedPayment?: ConfirmedPaymentState | ConfirmedAirtimePayment | null;
+  paymentInstructions?: PaymentInstructions | null;
+  preparingPayment?: boolean;
+  preparationError?: string | null;
+  depositStatus?: DepositProgressionStatus;
+  depositHash?: string | null;
+  depositError?: string | null;
   onConfirm?: () => void;
   onRefresh?: () => void;
   onEdit?: () => void;
   onConfirmPayment?: () => void;
   onRefreshPreview?: () => void;
   onEditIntent?: () => void;
+  onPayWithConnectedWallet?: () => Promise<void> | void;
+  onDepositConfirmed?: (celoTxHash: string) => Promise<{ ok: boolean; error?: string } | void>;
   className?: string;
 }
 
@@ -39,18 +52,27 @@ export function AirtimePreviewCard({
   error = null,
   confirmed = false,
   confirmedPayment = null,
+  paymentInstructions = null,
+  preparingPayment = false,
+  preparationError = null,
+  depositStatus = "awaiting_deposit",
+  depositHash = null,
+  depositError = null,
   onConfirm,
   onRefresh,
   onEdit,
   onConfirmPayment,
   onRefreshPreview,
   onEditIntent,
+  onPayWithConnectedWallet,
+  onDepositConfirmed,
   className,
 }: AirtimePreviewCardProps) {
   const handleConfirm = onConfirmPayment ?? onConfirm;
   const handleRefresh = onRefreshPreview ?? onRefresh;
   const handleEdit = onEditIntent ?? onEdit;
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const [localPreparing, setLocalPreparing] = useState(false);
 
   // Live countdown timer for 60s TTL
   useEffect(() => {
@@ -63,6 +85,35 @@ export function AirtimePreviewCard({
     return () => clearInterval(interval);
   }, [preview?.expiresAt]);
 
+  // Resolve payment instructions from explicit prop or confirmedPayment state
+  const effectiveInstructions: PaymentInstructions | null =
+    paymentInstructions ??
+    (confirmedPayment &&
+    typeof confirmedPayment === "object" &&
+    "paymentInstructions" in confirmedPayment &&
+    confirmedPayment.paymentInstructions
+      ? confirmedPayment.paymentInstructions
+      : null);
+
+  // When payment instructions are available, seamlessly present the payment instructions view
+  if (effectiveInstructions) {
+    return (
+      <PaymentInstructionsCard
+        instructions={effectiveInstructions}
+        status={depositStatus}
+        depositStatus={depositStatus}
+        depositHash={depositHash}
+        error={depositError}
+        depositError={depositError}
+        onPayWithConnectedWallet={onPayWithConnectedWallet}
+        onDepositConfirmed={onDepositConfirmed}
+        onBackToPreview={handleEdit}
+        className={className}
+      />
+    );
+  }
+
+  const isPreparing = preparingPayment || localPreparing;
   const expiresAtMs = preview?.expiresAt ? Date.parse(preview.expiresAt) : 0;
   const isExpired =
     !preview || !Number.isFinite(expiresAtMs) || nowMs >= expiresAtMs;
@@ -89,18 +140,15 @@ export function AirtimePreviewCard({
     ? `1 USDC = ₦${formatDecimalForDisplay(preview.rate)}`
     : null;
 
-  const formatClock = (iso: string): string => {
+  const onConfirmClick = async () => {
+    if (!handleConfirm || isPreparing || isExpired) {
+      return;
+    }
     try {
-      const d = new Date(iso);
-      if (!Number.isFinite(d.getTime())) return iso;
-      return d.toLocaleTimeString("en-US", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-    } catch {
-      return iso;
+      setLocalPreparing(true);
+      await handleConfirm();
+    } finally {
+      setLocalPreparing(false);
     }
   };
 
@@ -140,7 +188,7 @@ export function AirtimePreviewCard({
                 Airtime Payment Preview
               </h3>
               <span className="rounded border border-ledger-edge bg-receipt-field px-1.5 py-0.5 font-proof text-[10px] text-receipt-grey">
-                Upcoming · quote preview
+                Quote guarantee
               </span>
             </div>
             <p className="font-proof text-[11px] text-receipt-grey">
@@ -156,6 +204,11 @@ export function AirtimePreviewCard({
               <Loader2 className="h-3 w-3 animate-spin" />
               Fetching quote...
             </span>
+          ) : isPreparing ? (
+            <span className="inline-flex items-center gap-1.5 rounded border border-quote-blue/40 bg-quote-blue/10 px-2 py-0.5 font-proof text-xs font-semibold text-quote-blue">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Preparing payment order...
+            </span>
           ) : isExpired ? (
             <span className="inline-flex items-center gap-1.5 rounded border border-loss-red/40 bg-loss-red/10 px-2 py-0.5 font-proof tabular-nums text-xs font-semibold text-loss-red">
               <Clock className="h-3.5 w-3.5" />
@@ -164,7 +217,7 @@ export function AirtimePreviewCard({
           ) : isConfirmed ? (
             <span className="inline-flex items-center gap-1.5 rounded border border-provident-green/40 bg-provident-green/10 px-2.5 py-0.5 font-proof text-xs font-semibold text-deep-provision">
               <CheckCircle2 className="h-3.5 w-3.5 text-provident-green" />
-              Preview confirmed · payment is not available yet
+              Preview confirmed
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 rounded border border-quote-blue/40 bg-quote-blue/10 px-2 py-0.5 font-proof tabular-nums text-xs font-semibold text-quote-blue">
@@ -174,6 +227,7 @@ export function AirtimePreviewCard({
           )}
         </div>
       </div>
+
       {/* Loading Skeleton */}
       {loading && !preview ? (
         <div className="mt-4 flex flex-col items-center justify-center rounded-[10px] border border-ledger-edge bg-receipt-field/40 p-8 text-center">
@@ -197,16 +251,44 @@ export function AirtimePreviewCard({
               <p className="mt-0.5 text-receipt-grey">{error}</p>
             </div>
           </div>
-          {onRefresh ? (
+          {handleRefresh ? (
             <button
               type="button"
-              onClick={onRefresh}
+              onClick={handleRefresh}
               className="inline-flex items-center gap-1 rounded border border-loss-red/40 bg-clear-paper px-2.5 py-1 font-display text-xs font-semibold text-loss-red transition-all hover:bg-loss-red/10 active:translate-x-0.5 active:translate-y-0.5"
             >
               <RefreshCw className="h-3 w-3" />
               Retry
             </button>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* Preparation Error state */}
+      {preparationError ? (
+        <div className="mt-4 flex items-start justify-between gap-3 rounded-[10px] border border-loss-red/40 bg-loss-red/10 p-3 text-xs text-ledger-stone">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-loss-red mt-0.5" />
+            <div>
+              <p className="font-semibold text-loss-red">Payment preparation failed</p>
+              <p className="mt-0.5 text-receipt-grey">{preparationError}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Preparation Spinner Notice */}
+      {isPreparing ? (
+        <div className="mt-4 flex items-center gap-2.5 rounded-[10px] border border-quote-blue/40 bg-quote-blue/10 p-3 text-xs text-ledger-stone">
+          <Loader2 className="h-4 w-4 animate-spin text-quote-blue shrink-0" />
+          <div>
+            <span className="font-semibold text-quote-blue">
+              Preparing payment order with Paycrest
+            </span>
+            <span className="text-receipt-grey ml-1.5">
+              Locking corridor quote and generating deposit instructions...
+            </span>
+          </div>
         </div>
       ) : null}
 
@@ -295,11 +377,11 @@ export function AirtimePreviewCard({
                     {preview.expiresAt ? (
                       isExpired ? (
                         <span className="text-loss-red font-semibold">
-                          Expired ({formatClock(preview.expiresAt)})
+                          Expired
                         </span>
                       ) : (
                         <span>
-                          {formatClock(preview.expiresAt)} ({secondsRemaining}s remaining)
+                          {secondsRemaining}s remaining
                         </span>
                       )
                     ) : (
@@ -329,7 +411,7 @@ export function AirtimePreviewCard({
                 <button
                   type="button"
                   onClick={handleRefresh}
-                  disabled={loading}
+                  disabled={loading || isPreparing}
                   className="inline-flex items-center gap-1.5 rounded-[8px] border border-ledger bg-clear-paper px-3 py-1.5 font-display text-xs font-semibold text-ledger-stone shadow-none transition-all hover:bg-receipt-field active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-50"
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
@@ -345,11 +427,10 @@ export function AirtimePreviewCard({
               <ShieldCheck className="h-4 w-4 shrink-0 text-provident-green mt-0.5" />
               <div>
                 <p className="font-semibold text-deep-provision">
-                  Payment confirmed locally
+                  Payment confirmed
                 </p>
                 <p className="mt-0.5 text-receipt-grey">
-                  This quote is locked as a preview for a future payment flow. No blockchain
-                  transaction or wallet signature was dispatched.
+                  Payment preparation in progress. Deposit instructions will appear shortly.
                 </p>
               </div>
             </div>
@@ -362,7 +443,7 @@ export function AirtimePreviewCard({
                 <button
                   type="button"
                   onClick={handleEdit}
-                  disabled={loading}
+                  disabled={loading || isPreparing}
                   className="inline-flex items-center gap-1.5 rounded-[8px] border border-ledger-edge bg-clear-paper px-3 py-1.5 font-display text-xs font-semibold text-ledger-stone transition-all hover:border-ledger hover:bg-receipt-field active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-50"
                 >
                   <Edit3 className="h-3.5 w-3.5 text-receipt-grey" />
@@ -374,7 +455,7 @@ export function AirtimePreviewCard({
                 <button
                   type="button"
                   onClick={handleRefresh}
-                  disabled={loading}
+                  disabled={loading || isPreparing}
                   aria-label="Refresh quote rate"
                   title="Fetch fresh quote from Paycrest"
                   className="inline-flex items-center gap-1 rounded-[8px] border border-ledger-edge bg-clear-paper px-2.5 py-1.5 font-display text-xs font-semibold text-receipt-grey transition-all hover:border-ledger hover:text-ledger-stone active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-50"
@@ -390,41 +471,36 @@ export function AirtimePreviewCard({
                 <button
                   type="button"
                   onClick={handleRefresh}
-                  disabled={loading || !handleRefresh}
+                  disabled={loading || isPreparing || !handleRefresh}
                   className="inline-flex min-h-[38px] items-center gap-2 rounded-[8px] border border-ledger bg-provident-green px-4 py-2 font-display text-xs font-semibold text-white transition-all shadow-sticker active:translate-x-0.5 active:translate-y-0.5 hover:bg-deep-provision disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
                   <span>Refresh quote</span>
                 </button>
-              ) : isConfirmed ? (
-                <div className="inline-flex items-center gap-2">
-                  <span className="font-proof text-xs text-provident-green font-semibold">
-                    Preview complete · payment unavailable
-                  </span>
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="inline-flex items-center gap-2 rounded-[8px] border border-ledger bg-receipt-field px-4 py-2 font-display text-xs font-semibold text-receipt-grey opacity-60 cursor-not-allowed"
-                  >
-                    Payment Confirmed
-                  </button>
-                </div>
               ) : (
                 <button
                   type="button"
-                  onClick={handleConfirm}
-                  disabled={loading || !handleConfirm}
-                  aria-disabled={loading || !handleConfirm}
+                  onClick={onConfirmClick}
+                  disabled={loading || isPreparing || !handleConfirm}
+                  aria-disabled={loading || isPreparing || !handleConfirm}
                   className={cn(
                     "inline-flex min-h-[38px] items-center gap-2 rounded-[8px] border border-ledger bg-provident-green px-4 py-2 font-display text-xs font-semibold text-white transition-all shadow-sticker active:translate-x-0.5 active:translate-y-0.5",
                     "hover:bg-deep-provision",
-                    (loading || !handleConfirm) &&
+                    (loading || isPreparing || !handleConfirm) &&
                       "opacity-50 cursor-not-allowed shadow-none active:translate-x-0 active:translate-y-0",
                   )}
                 >
-                  <span>Confirm Airtime Payment</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  {isPreparing ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Preparing payment...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Confirm Airtime Payment</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </>
+                  )}
                 </button>
               )}
             </div>

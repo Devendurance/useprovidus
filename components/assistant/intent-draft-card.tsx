@@ -1,11 +1,15 @@
 "use client";
+import type { ConfirmedPaymentState } from "@/hooks/use-assistant";
 
 import type {
   PaymentIntent,
   AirtimePreview,
   ConfirmedAirtimePayment,
 } from "@/lib/assistant/types";
-import type { ConfirmedPaymentState } from "@/hooks/use-assistant";
+import type {
+  PaymentInstructions,
+  DepositProgressionStatus,
+} from "@/components/assistant/payment-instructions-card";
 import { AirtimePreviewCard } from "@/components/assistant/airtime-preview-card";
 import { cn } from "@/lib/cn";
 import {
@@ -25,12 +29,20 @@ export interface IntentDraftCardProps {
   previewError?: string | null;
   confirmed?: boolean;
   confirmedPayment?: ConfirmedPaymentState | ConfirmedAirtimePayment | null;
+  paymentInstructions?: PaymentInstructions | null;
+  preparingPayment?: boolean;
+  preparationError?: string | null;
+  depositStatus?: DepositProgressionStatus;
+  depositHash?: string | null;
+  depositError?: string | null;
   onConfirm?: () => void;
   onRefresh?: () => void;
   onEdit?: () => void;
   onConfirmPayment?: () => void;
   onRefreshPreview?: () => void;
   onEditIntent?: () => void;
+  onPayWithConnectedWallet?: () => Promise<void> | void;
+  onDepositConfirmed?: (celoTxHash: string) => Promise<{ ok: boolean; error?: string } | void>;
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -47,12 +59,20 @@ export function IntentDraftCard({
   previewError = null,
   confirmed = false,
   confirmedPayment = null,
+  paymentInstructions = null,
+  preparingPayment = false,
+  preparationError = null,
+  depositStatus = "awaiting_deposit",
+  depositHash = null,
+  depositError = null,
   onConfirm,
   onRefresh,
   onEdit,
   onConfirmPayment,
   onRefreshPreview,
   onEditIntent,
+  onPayWithConnectedWallet,
+  onDepositConfirmed,
 }: IntentDraftCardProps) {
   const handleConfirm = onConfirmPayment ?? onConfirm;
   const handleRefresh = onRefreshPreview ?? onRefresh;
@@ -66,6 +86,7 @@ export function IntentDraftCard({
     previewLoading ||
     Boolean(previewError) ||
     Boolean(confirmedPayment) ||
+    Boolean(paymentInstructions) ||
     confirmed;
 
   // When intent is complete and preview/confirmation props are passed, render AirtimePreviewCard
@@ -81,12 +102,20 @@ export function IntentDraftCard({
         error={previewError}
         confirmed={confirmed}
         confirmedPayment={confirmedPayment}
+        paymentInstructions={paymentInstructions}
+        preparingPayment={preparingPayment}
+        preparationError={preparationError}
+        depositStatus={depositStatus}
+        depositHash={depositHash}
+        depositError={depositError}
         onConfirm={handleConfirm}
         onRefresh={handleRefresh}
         onEdit={handleEdit}
         onConfirmPayment={handleConfirm}
         onRefreshPreview={handleRefresh}
         onEditIntent={handleEdit}
+        onPayWithConnectedWallet={onPayWithConnectedWallet}
+        onDepositConfirmed={onDepositConfirmed}
         className={className}
       />
     );

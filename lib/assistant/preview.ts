@@ -9,7 +9,10 @@
 
 import "server-only";
 
+import { getAddress, isAddress } from "viem";
+
 import { computeIntentFingerprint } from "@/lib/assistant/fingerprint";
+import { getPreviewRepository } from "@/lib/assistant/preview-repository";
 import type { AirtimePreview, PaymentNetwork } from "@/lib/assistant/types";
 import {
   normalizeAirtimeAmountNgn,
@@ -34,9 +37,11 @@ export const PREVIEW_USDC_DECIMALS = 6;
 export type AirtimePreviewErrorCode =
   | "INCOMPLETE_INTENT"
   | "INVALID_INTENT"
+  | "WALLET_CONTEXT_INVALID"
   | "QUOTE_UNAVAILABLE"
   | "RATE_UNAVAILABLE"
-  | "INVALID_RATE";
+  | "INVALID_RATE"
+  | "PREVIEW_STORE_UNAVAILABLE";
 
 export interface AirtimePreviewError {
   code: AirtimePreviewErrorCode;
@@ -44,8 +49,13 @@ export interface AirtimePreviewError {
   retryable: boolean;
 }
 
+/**
+ * A successful preview always carries the identifier of the persisted quote it
+ * was built from: only that row can later be consumed for payment, and only by
+ * the wallet it was issued to.
+ */
 export type AirtimePreviewResult =
-  | { ok: true; data: AirtimePreview }
+  | { ok: true; data: AirtimePreview; previewId: string }
   | { ok: false; error: AirtimePreviewError };
 
 /** Normalized airtime intent required to produce a preview. */
@@ -58,6 +68,11 @@ export interface AirtimePreviewIntent {
 export interface AirtimePreviewOptions {
   /** Injectable fetch for tests/self-checks; defaults to the global fetch. */
   fetchFn?: typeof fetch;
+  /**
+   * Wallet the quote is issued to. The preview is persisted under this
+   * normalized address, and only this wallet may later consume it.
+   */
+  walletAddress?: string;
 }
 
 function failure(
@@ -117,12 +132,27 @@ function normalizePreviewIntent(raw: {
 }
 
 /**
- * Builds the frozen `AirtimePreview` for a normalized airtime intent.
+ * Lowercases a syntactically valid EVM address, or returns null. Binding the
+ * quote to this canonical form is what lets consumption compare wallet
+ * identity without caring how the client cased it.
+ */
+function normalizePreviewWallet(value: string | undefined): string | null {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const candidate = value.trim();
+  if (!isAddress(candidate)) return null;
+  return getAddress(candidate).toLowerCase();
+}
+
+/**
+ * Builds the frozen `AirtimePreview` for a normalized airtime intent and
+ * persists it as the server-authoritative quote.
  *
  * Fetches the Paycrest sell corridor rate with a 1 USDC notional and treats it
- * as NGN per 1 USDC, computes the exact ceiling inverse quote, and stamps the
- * 60-second TTL and the intent fingerprint. Never returns a preview for an
- * incomplete intent, a failed quote, or an unusable rate.
+ * as NGN per 1 USDC, computes the exact ceiling inverse quote, stamps the
+ * 60-second TTL and the intent fingerprint, then stores the whole quote bound
+ * to the caller's wallet. Never returns a preview for an incomplete intent, an
+ * invalid wallet, a failed quote, an unusable rate, or a quote that could not
+ * be persisted — an unpersisted quote could never be consumed for payment.
  */
 export async function buildAirtimePreview(
   intent: AirtimePreviewIntent,
@@ -131,6 +161,15 @@ export async function buildAirtimePreview(
   const checked = normalizePreviewIntent(intent);
   if (!checked.ok) return { ok: false, error: checked.error };
   const { amountNgn, phone, network } = checked.intent;
+
+  const walletAddress = normalizePreviewWallet(options?.walletAddress);
+  if (walletAddress === null) {
+    return failure(
+      "WALLET_CONTEXT_INVALID",
+      "A valid wallet address is required to issue an airtime preview",
+      false,
+    );
+  }
 
   const quote = await getCorridorQuote("sell", SELL_NOTIONAL_USDC, {
     fetchFn: options?.fetchFn,
@@ -183,8 +222,32 @@ export async function buildAirtimePreview(
     network,
   });
 
+  // Persist the full quote before it is ever handed out: payment preparation
+  // re-reads these values from the stored row and never trusts the browser.
+  const persisted = await getPreviewRepository().createPreview({
+    walletAddress,
+    intentFingerprint,
+    amountNgn,
+    phone,
+    network,
+    rate,
+    amountUsdc,
+    feeUsdc,
+    totalUsdc,
+    quotedAt,
+    expiresAt,
+  });
+  if (!persisted.ok) {
+    return failure(
+      "PREVIEW_STORE_UNAVAILABLE",
+      "Airtime preview could not be persisted; no payment can be prepared",
+      true,
+    );
+  }
+
   return {
     ok: true,
+    previewId: persisted.preview.id,
     data: {
       intentFingerprint,
       amountNgn,

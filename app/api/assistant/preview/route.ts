@@ -29,10 +29,12 @@ const HTTP_STATUS_BY_CODE: Record<RouteErrorCode, number> = {
   INCOMPLETE_INTENT: 400,
   INVALID_INTENT: 400,
   INVALID_REQUEST: 400,
+  WALLET_CONTEXT_INVALID: 400,
   BODY_TOO_LARGE: 413,
   INVALID_RATE: 502,
   QUOTE_UNAVAILABLE: 503,
   RATE_UNAVAILABLE: 503,
+  PREVIEW_STORE_UNAVAILABLE: 503,
 };
 
 function errorResponse(code: RouteErrorCode, message: string, retryable?: boolean) {
@@ -49,8 +51,8 @@ function errorResponse(code: RouteErrorCode, message: string, retryable?: boolea
   );
 }
 
-async function previewResponse(intent: AirtimePreviewIntent) {
-  const result = await buildAirtimePreview(intent);
+async function previewResponse(intent: AirtimePreviewIntent, walletAddress: string) {
+  const result = await buildAirtimePreview(intent, { walletAddress });
   if (!result.ok) {
     return errorResponse(
       result.error.code,
@@ -59,22 +61,25 @@ async function previewResponse(intent: AirtimePreviewIntent) {
     );
   }
   return NextResponse.json(
-    { ok: true, preview: result.data },
+    { ok: true, previewId: result.previewId, preview: result.data },
     { status: 200, headers: NO_STORE },
   );
 }
 
-/** GET /api/assistant/preview?amountNgn=…&phone=…&network=… */
+/** GET /api/assistant/preview?amountNgn=…&phone=…&network=…&walletAddress=… */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  return previewResponse({
-    amountNgn: searchParams.get("amountNgn") ?? "",
-    phone: searchParams.get("phone") ?? "",
-    network: (searchParams.get("network") ?? "") as PaymentNetwork,
-  });
+  return previewResponse(
+    {
+      amountNgn: searchParams.get("amountNgn") ?? "",
+      phone: searchParams.get("phone") ?? "",
+      network: (searchParams.get("network") ?? "") as PaymentNetwork,
+    },
+    searchParams.get("walletAddress") ?? "",
+  );
 }
 
-/** POST /api/assistant/preview with a JSON body of the same three fields. */
+/** POST /api/assistant/preview with a JSON body of the same four fields. */
 export async function POST(request: Request) {
   let raw: string;
   try {
@@ -98,11 +103,14 @@ export async function POST(request: Request) {
 
   const body = parsed as Record<string, unknown>;
 
-  return previewResponse({
-    amountNgn: typeof body.amountNgn === "string" ? body.amountNgn : "",
-    phone: typeof body.phone === "string" ? body.phone : "",
-    network: (typeof body.network === "string"
-      ? body.network
-      : "") as PaymentNetwork,
-  });
+  return previewResponse(
+    {
+      amountNgn: typeof body.amountNgn === "string" ? body.amountNgn : "",
+      phone: typeof body.phone === "string" ? body.phone : "",
+      network: (typeof body.network === "string"
+        ? body.network
+        : "") as PaymentNetwork,
+    },
+    typeof body.walletAddress === "string" ? body.walletAddress : "",
+  );
 }

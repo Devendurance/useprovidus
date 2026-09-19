@@ -9,8 +9,10 @@
  *      amounts, fingerprint, and 60-second TTL;
  *   3. an incomplete or invalid intent fails before any network call;
  *   4. a failed, absent, or malformed provider quote never becomes a preview;
- *   5. the route exposes `{ ok: true, preview }` with `Cache-Control: no-store`
- *      and maps failures to non-200 responses without a preview.
+ *   5. the route exposes `{ ok: true, previewId, preview }` with
+ *      `Cache-Control: no-store` and maps failures to non-200 responses
+ *      without a preview (P5: the quote is issued to a wallet address and
+ *      persisted under the returned `prev_${uuid}` identifier).
  *
  * No live Paycrest calls, no wallet or blockchain transactions.
  * Run: npx tsx --conditions=react-server lib/assistant/preview-self-check.ts
@@ -24,6 +26,10 @@ import { createHash } from "node:crypto";
 import { GET, POST } from "@/app/api/assistant/preview/route";
 import { PREVIEW_TTL_MS, buildAirtimePreview } from "@/lib/assistant/preview";
 import {
+  InMemoryPreviewRepository,
+  setPreviewRepositoryForTesting,
+} from "@/lib/assistant/preview-repository";
+import {
   addDecimalStrings,
   divideDecimalStrings,
   multiplyDecimalStrings,
@@ -36,6 +42,9 @@ process.env.PAYCREST_BASE_URL = "https://api.paycrest.io/v2";
 const AMOUNT_NGN = "500";
 const PHONE = "08031234567";
 const SELL_RATE = "1500";
+
+/** P5: a preview is only issued to a wallet, and the wallet is normalized. */
+const WALLET_ADDRESS = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266";
 
 /** Exact NGN face value the ceiling quote covers: 0.333334 * 1500 >= 500. */
 const EXACT_AMOUNT_USDC = "0.333334";
@@ -90,6 +99,12 @@ function previewUrl(query: string): string {
 }
 
 async function run() {
+  // P5: every successful preview is persisted server-side and returned with a
+  // `prev_${uuid}` identifier. The in-memory repository keeps this check
+  // offline; the persisted-preview behaviour itself is covered by
+  // preview-authority-self-check.ts.
+  setPreviewRepositoryForTesting(new InMemoryPreviewRepository());
+
   /* ------------------------------------------------------------------ */
   /* 1. Exact inverse-quote division                                     */
   /* ------------------------------------------------------------------ */
@@ -134,13 +149,17 @@ async function run() {
   const previewRequests: CorridorRequest[] = [];
   const previewResult = await buildAirtimePreview(
     { amountNgn: AMOUNT_NGN, phone: PHONE, network: "mtn" },
-    { fetchFn: stubFetch(200, SELL_CORRIDOR_PAYLOAD, previewRequests) },
+    {
+      fetchFn: stubFetch(200, SELL_CORRIDOR_PAYLOAD, previewRequests),
+      walletAddress: WALLET_ADDRESS,
+    },
   );
   assert.equal(previewResult.ok, true);
   if (!previewResult.ok) {
     throw new Error("expected a preview");
   }
   const preview = previewResult.data;
+  assert.equal(/^prev_[0-9a-f-]{36}$/.test(previewResult.previewId), true);
 
   // Exactly one provider read, of the sell side, with the credential attached.
   assert.equal(previewRequests.length, 1);
@@ -197,7 +216,10 @@ async function run() {
   const normalizedRequests: CorridorRequest[] = [];
   const normalizedResult = await buildAirtimePreview(
     { amountNgn: "500", phone: "+2348031234567", network: "mtn" },
-    { fetchFn: stubFetch(200, SELL_CORRIDOR_PAYLOAD, normalizedRequests) },
+    {
+      fetchFn: stubFetch(200, SELL_CORRIDOR_PAYLOAD, normalizedRequests),
+      walletAddress: WALLET_ADDRESS,
+    },
   );
   assert.equal(normalizedResult.ok, true);
   if (!normalizedResult.ok) {
@@ -258,7 +280,10 @@ async function run() {
   const failureRequests: CorridorRequest[] = [];
   const upstreamFailure = await buildAirtimePreview(
     { amountNgn: AMOUNT_NGN, phone: PHONE, network: "mtn" },
-    { fetchFn: stubFetch(401, { message: "unauthorized" }, failureRequests) },
+    {
+      fetchFn: stubFetch(401, { message: "unauthorized" }, failureRequests),
+      walletAddress: WALLET_ADDRESS,
+    },
   );
   assert.equal(upstreamFailure.ok, false);
   assert.equal(!upstreamFailure.ok && upstreamFailure.error.code, "QUOTE_UNAVAILABLE");
@@ -269,6 +294,7 @@ async function run() {
     { amountNgn: AMOUNT_NGN, phone: PHONE, network: "mtn" },
     {
       fetchFn: stubFetch(404, { message: "no provider available" }, failureRequests),
+      walletAddress: WALLET_ADDRESS,
     },
   );
   assert.equal(noProvider.ok, false);
@@ -283,6 +309,7 @@ async function run() {
         { status: "success", data: { sell: { rate: "0", providerIds: [] } } },
         failureRequests,
       ),
+      walletAddress: WALLET_ADDRESS,
     },
   );
   assert.equal(zeroRate.ok, false);
@@ -297,6 +324,7 @@ async function run() {
         { status: "success", data: { sell: { rate: "1,500 NGN" } } },
         failureRequests,
       ),
+      walletAddress: WALLET_ADDRESS,
     },
   );
   assert.equal(malformedRate.ok, false);
@@ -313,17 +341,21 @@ async function run() {
 
     const okResponse = await GET(
       new Request(
-        previewUrl(`?amountNgn=${AMOUNT_NGN}&phone=${PHONE}&network=mtn`),
+        previewUrl(
+          `?amountNgn=${AMOUNT_NGN}&phone=${PHONE}&network=mtn&walletAddress=${WALLET_ADDRESS}`,
+        ),
       ),
     );
     assert.equal(okResponse.status, 200);
     assert.equal(okResponse.headers.get("cache-control"), "no-store");
     const okBody = (await okResponse.json()) as {
       ok: boolean;
+      previewId: string;
       preview: typeof preview;
     };
-    assert.deepEqual(Object.keys(okBody).sort(), ["ok", "preview"]);
+    assert.deepEqual(Object.keys(okBody).sort(), ["ok", "preview", "previewId"]);
     assert.equal(okBody.ok, true);
+    assert.equal(/^prev_[0-9a-f-]{36}$/.test(okBody.previewId), true);
     assert.equal(okBody.preview.amountUsdc, EXACT_AMOUNT_USDC);
     assert.equal(okBody.preview.totalUsdc, EXACT_AMOUNT_USDC);
     assert.equal(okBody.preview.rate, SELL_RATE);
@@ -340,13 +372,18 @@ async function run() {
           amountNgn: AMOUNT_NGN,
           phone: PHONE,
           network: "mtn",
+          walletAddress: WALLET_ADDRESS,
         }),
       }),
     );
     assert.equal(postResponse.status, 200);
     assert.equal(postResponse.headers.get("cache-control"), "no-store");
-    const postBody = (await postResponse.json()) as { ok: boolean };
+    const postBody = (await postResponse.json()) as {
+      ok: boolean;
+      previewId: string;
+    };
     assert.equal(postBody.ok, true);
+    assert.equal(/^prev_[0-9a-f-]{36}$/.test(postBody.previewId), true);
 
     const incompleteResponse = await GET(
       new Request(previewUrl(`?amountNgn=${AMOUNT_NGN}`)),
@@ -377,7 +414,9 @@ async function run() {
     globalThis.fetch = stubFetch(401, { message: "unauthorized" }, routeRequests);
     const upstreamResponse = await GET(
       new Request(
-        previewUrl(`?amountNgn=${AMOUNT_NGN}&phone=${PHONE}&network=mtn`),
+        previewUrl(
+          `?amountNgn=${AMOUNT_NGN}&phone=${PHONE}&network=mtn&walletAddress=${WALLET_ADDRESS}`,
+        ),
       ),
     );
     assert.equal(upstreamResponse.status, 503);
