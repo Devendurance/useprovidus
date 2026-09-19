@@ -33,10 +33,12 @@ export function Card({
 export function CardTitle({
   className,
   children,
+  as = "h2",
   ...props
-}: HTMLAttributes<HTMLHeadingElement>) {
+}: HTMLAttributes<HTMLHeadingElement> & { as?: "h2" | "h3" }) {
+  const Heading = as;
   return (
-    <h3
+    <Heading
       className={cn(
         "font-display text-xl font-semibold tracking-tight text-ledger-stone sm:text-[1.25rem]",
         className,
@@ -44,7 +46,7 @@ export function CardTitle({
       {...props}
     >
       {children}
-    </h3>
+    </Heading>
   );
 }
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   usePublicClient,
+  useSendTransaction,
   useWaitForTransactionReceipt,
-  useWriteContract,
 } from "wagmi";
 import type { Address, Hash } from "viem";
 import { CANONICAL_CELO_USDC } from "@/lib/celo/usdc";
@@ -16,8 +16,8 @@ import {
   type NormalizedCashOutOrder,
 } from "@/lib/paycrest/order";
 import { CELO_CHAIN_ID } from "@/lib/wallet/celo";
-import { erc20BalanceOfAbi, erc20TransferAbi } from "@/lib/wallet/erc20";
-
+import { erc20BalanceOfAbi } from "@/lib/wallet/erc20";
+import { buildTaggedTransferCalldata } from "@/lib/celo/attribution";
 export type DepositUiState =
   | { kind: "idle" }
   | { kind: "confirming" }
@@ -27,16 +27,16 @@ export type DepositUiState =
   | { kind: "reverted"; message: string; hash?: Hash }
   | { kind: "error"; message: string; hash?: Hash };
 
-export function useUsdcDeposit(onConfirmed?: () => void) {
+export function useUsdcDeposit(onConfirmed?: (hash: Hash) => void) {
   const [uiPhase, setUiPhase] = useState<
     "idle" | "confirming" | "submitting" | "locked"
   >("idle");
   const [localError, setLocalError] = useState<string | null>(null);
 
   const publicClient = usePublicClient({ chainId: CELO_CHAIN_ID });
-  const { writeContract, data: hash, error, reset: resetWrite, isPending } =
-    useWriteContract();
-
+  const { sendTransaction, data: hash, error, reset: resetSend, isPending } =
+    useSendTransaction();
+  const confirmedHashRef = useRef<Hash | null>(null);
   const receipt = useWaitForTransactionReceipt({
     hash,
     chainId: CELO_CHAIN_ID,
@@ -84,18 +84,22 @@ export function useUsdcDeposit(onConfirmed?: () => void) {
     return { kind: "idle" };
   }, [error, hash, isPending, localError, receipt.isSuccess, receipt.data, uiPhase]);
 
-  // Hook to call onConfirmed exactly once when receipt is successful
+  // Hook to call onConfirmed exactly once per confirmed transaction hash
   useEffect(() => {
     if (state.kind === "confirmed" && onConfirmed) {
-      onConfirmed();
+      if (confirmedHashRef.current !== state.hash) {
+        confirmedHashRef.current = state.hash;
+        onConfirmed(state.hash);
+      }
     }
-  }, [state.kind, onConfirmed]);
+  }, [state, onConfirmed]);
 
   const reset = useCallback(() => {
-    resetWrite();
+    confirmedHashRef.current = null;
+    resetSend();
     setLocalError(null);
     setUiPhase("idle");
-  }, [resetWrite]);
+  }, [resetSend]);
 
   const beginConfirm = useCallback(() => {
     setLocalError(null);
@@ -162,13 +166,17 @@ export function useUsdcDeposit(onConfirmed?: () => void) {
           return;
         }
 
-        // d. CELO Native Gas Check
+        // d. Build tagged calldata with active ERC-8021 attribution tag (fails early if invalid)
+        const taggedCalldata = buildTaggedTransferCalldata(
+          receiveAddress as Address,
+          value,
+        );
+
+        // e. CELO Native Gas Check with tagged calldata
         const celoBalance = await publicClient.getBalance({ address: walletAddress });
-        const gasEstimate = await publicClient.estimateContractGas({
-          address: CANONICAL_CELO_USDC.address,
-          abi: erc20TransferAbi,
-          functionName: "transfer",
-          args: [receiveAddress as Address, value],
+        const gasEstimate = await publicClient.estimateGas({
+          to: CANONICAL_CELO_USDC.address,
+          data: taggedCalldata,
           account: walletAddress,
         });
         const gasPrice = await publicClient.getGasPrice();
@@ -180,16 +188,14 @@ export function useUsdcDeposit(onConfirmed?: () => void) {
           return;
         }
 
-        // e. Explicit Simulation
-        const { request } = await publicClient.simulateContract({
-          address: CANONICAL_CELO_USDC.address,
-          abi: erc20TransferAbi,
-          functionName: "transfer",
-          args: [receiveAddress as Address, value],
+        // f. Explicit Simulation with tagged calldata
+        await publicClient.call({
+          to: CANONICAL_CELO_USDC.address,
+          data: taggedCalldata,
           account: walletAddress,
         });
 
-        // f. Post-simulation Expiry Recheck
+        // g. Post-simulation Expiry Recheck
         const winCheck2 = isPaymentWindowOpen(validUntil, Date.now());
         if (!winCheck2.open || (winCheck2.msRemaining && winCheck2.msRemaining <= PAYMENT_EXPIRY_SAFETY_MS)) {
           setLocalError("Order expired during simulation preparation");
@@ -197,14 +203,18 @@ export function useUsdcDeposit(onConfirmed?: () => void) {
           return;
         }
 
-        // g. Wallet Execution
-        writeContract(request);
+        // h. Wallet Execution with tagged calldata
+        sendTransaction({
+          to: CANONICAL_CELO_USDC.address,
+          data: taggedCalldata,
+          chainId: CELO_CHAIN_ID,
+        });
       } catch (err) {
         setLocalError(err instanceof Error ? err.message : "Simulation failed");
         setUiPhase("idle");
       }
     },
-    [hash, isPending, publicClient, writeContract],
+    [hash, isPending, publicClient, sendTransaction],
   );
 
   return {

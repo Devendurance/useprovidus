@@ -4,40 +4,37 @@ import { RouteStepper } from "@/components/providus/route-stepper";
 import { ValueLine } from "@/components/providus/value-line";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
-import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
 
 export const metadata: Metadata = {
-  title: "Route Verdict",
+  title: "Cash-out review",
   description:
-    "Full Route Verdict shell. Unlocks after a paid Route Check.",
+    "The cash-out review is available from an active Move Money session.",
 };
 
 const REQUIRED_FIELDS = [
-  { label: "Estimated received amount", hint: "Largest figure when unlocked" },
-  { label: "Target asset", hint: "e.g. cUSD, USDC, CELO" },
-  { label: "Provider / route", hint: "Selected path name" },
-  { label: "Payment method", hint: "How you pay locally" },
-  { label: "Total fee", hint: "Explicit fee breakdown" },
-  { label: "Estimated FX spread", hint: "Assumptions disclosed" },
-  { label: "Settlement range", hint: "Expected timing" },
-  { label: "Reliability / confidence", hint: "With quote state" },
-  { label: "Capture time & expiry", hint: "Freshness, never stale as final" },
-  { label: "Saving vs baseline", hint: "Estimate language only" },
+  { label: "Estimated NGN receive", hint: "Current Paycrest quote" },
+  { label: "Celo USDC total", hint: "Amount plus returned fees" },
+  { label: "Verified bank recipient", hint: "Institution and account name" },
+  { label: "Celo network", hint: "Mainnet · chain 42220" },
+  { label: "Quote freshness", hint: "Capture time and expiry" },
+  { label: "Wallet approval", hint: "Explicit signature required" },
+  { label: "Celo deposit", hint: "On-chain confirmation" },
+  { label: "Nigerian payout", hint: "Shown only after finality" },
 ] as const;
 
 export default function CheckVerdictPage() {
   return (
     <div className="container-providus py-10 sm:py-14">
       <div className="max-w-2xl">
-        <p className="font-proof text-receipt-grey">Route Verdict</p>
+        <p className="font-proof text-receipt-grey">Review unavailable</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
-          Best route for your money
+          No active cash-out review
         </h1>
         <p className="mt-3 text-receipt-grey leading-relaxed">
-          Full Route Verdict unlocks after a Route Check payment. Functionality
-          is not connected yet.
+          Providus only shows a review after a live quote and verified Nigerian
+          bank recipient are available. Start from Move Money to create that
+          state; this legacy URL never fabricates an amount, provider or result.
         </p>
       </div>
 
@@ -48,11 +45,11 @@ export default function CheckVerdictPage() {
           <EmptyState
             variant="surface"
             icon={<FileSearch className="h-5 w-5" />}
-            title="Verdict not unlocked"
-            description="Full Route Verdict unlocks after a Route Check payment. Functionality is not connected yet. Required fields below show structure only—no fabricated amounts or providers."
+            title="Review is not ready"
+            description="No active cash-out session was found. Enter an amount, request a current Paycrest quote and verify the recipient before approving a Celo USDC transfer."
             action={
-              <LinkButton href="/check/preview" variant="ghost" size="md">
-                Back to preview
+              <LinkButton href="/check" variant="ghost" size="md">
+                Open Move Money
               </LinkButton>
             }
           />
@@ -60,11 +57,11 @@ export default function CheckVerdictPage() {
           <Card variant="verdict">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-proof text-receipt-grey">Recommended route</p>
-                <CardTitle className="mt-1">Not available yet</CardTitle>
+                <p className="font-proof text-receipt-grey">Cash-out review</p>
+                <CardTitle className="mt-1">No review to display</CardTitle>
               </div>
               <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 font-proof text-[12px] text-receipt-grey">
-                NOT UNLOCKED
+                NOT AVAILABLE
               </span>
             </div>
 
@@ -93,12 +90,12 @@ export default function CheckVerdictPage() {
             </div>
 
             <div className="mt-6 flex flex-col gap-3 border-t border-ledger-edge pt-6 sm:flex-row sm:items-center">
-              <Button type="button" variant="primary" disabled>
-                Continue with provider
-              </Button>
+              <p className="rounded-[10px] border border-ledger-edge bg-receipt-field px-3 py-3 text-sm font-semibold text-ledger-stone">
+                Bank payout status appears after a verified payment
+              </p>
               <p className="text-sm text-receipt-grey">
-                Handoff enables after unlock. Providus does not hold or move
-                your funds.
+                The Celo deposit and Nigerian bank settlement are separate
+                states. Providus does not label a deposit as delivery.
               </p>
             </div>
           </Card>
@@ -106,39 +103,28 @@ export default function CheckVerdictPage() {
 
         <aside className="space-y-4">
           <Card variant="surface">
-            <CardTitle>Alternatives</CardTitle>
+            <CardTitle>What review requires</CardTitle>
             <CardDescription>
-              Eligible alternatives appear here after unlock—ranked by outcome,
-              never by placement.
+              A current quote, a verified Nigerian bank recipient, a Celo wallet
+              on mainnet and enough USDC for the exact total.
             </CardDescription>
-            <div className="mt-4 space-y-2">
-              {[1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="rounded-[10px] border border-dashed border-ledger-edge px-3 py-4 text-sm text-receipt-grey"
-                >
-                  Alternative route slot {i} — empty
-                </div>
-              ))}
+            <div className="mt-5">
+              <LinkButton href="/check" variant="ghost" size="md" fullWidth>
+                Start cash-out
+              </LinkButton>
             </div>
           </Card>
 
           <Card variant="flat">
-            <CardTitle className="text-base">Unlock</CardTitle>
+            <CardTitle className="text-base">Settlement boundary</CardTitle>
             <CardDescription>
-              Connect a wallet when payment is enabled, then unlock the full
-              verdict.
+              Celo confirms the on-chain deposit first. Paycrest bank delivery
+              needs its own finality check before Providus can call it complete.
             </CardDescription>
-            <div className="mt-4 space-y-3">
-              <ConnectWalletButton fullWidth />
-              <Button type="button" variant="secondary" fullWidth disabled>
-                Unlock full route — coming soon
-              </Button>
-            </div>
           </Card>
 
           <LinkButton href="/receipt" variant="ghost" size="md" fullWidth>
-            View receipt shell
+            View receipt status
           </LinkButton>
         </aside>
       </div>

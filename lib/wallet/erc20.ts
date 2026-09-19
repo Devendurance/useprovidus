@@ -23,3 +23,22 @@ export const erc20TransferAbi = [
     outputs: [{ name: "", type: "bool" }],
   },
 ] as const;
+
+/** ERC-20 Transfer event ABI for server-side deposit verification. */
+export const erc20TransferEventAbi = [
+  {
+    type: "event",
+    name: "Transfer",
+    inputs: [
+      { indexed: true, name: "from", type: "address" },
+      { indexed: true, name: "to", type: "address" },
+      { indexed: false, name: "value", type: "uint256" },
+    ],
+  },
+] as const;
+
+export const erc20Abi = [
+  ...erc20BalanceOfAbi,
+  ...erc20TransferAbi,
+  ...erc20TransferEventAbi,
+] as const;

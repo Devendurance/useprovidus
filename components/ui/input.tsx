@@ -16,8 +16,15 @@ export function Input({
   suffix,
   id,
   className,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
   ...props
 }: InputProps) {
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const describedBy = [ariaDescribedBy, hint ? hintId : null, error ? errorId : null]
+    .filter(Boolean)
+    .join(" ");
   return (
     <div className="flex w-full flex-col gap-1.5">
       {label ? (
@@ -32,11 +39,13 @@ export function Input({
         <input
           id={id}
           className={cn(
-            "h-12 w-full rounded-[10px] border-ledger bg-clear-paper px-4 text-base text-ledger-stone placeholder:text-receipt-grey/80 shadow-base transition-[box-shadow,transform] duration-100 focus:outline-none focus:shadow-elevated focus:translate-x-px focus:translate-y-px disabled:cursor-not-allowed disabled:bg-ledger-edge/40 disabled:opacity-70",
+            "min-h-12 w-full rounded-[10px] border-ledger bg-clear-paper px-4 py-3 text-base text-ledger-stone placeholder:text-receipt-grey/80 shadow-base transition-[box-shadow,transform] duration-100 focus:outline-none focus:shadow-elevated focus:translate-x-px focus:translate-y-px disabled:cursor-not-allowed disabled:bg-ledger-edge/40 disabled:opacity-70",
             suffix && "pr-16",
             error && "border-loss-red",
             className,
           )}
+          aria-describedby={describedBy || undefined}
+          aria-invalid={error ? true : ariaInvalid}
           {...props}
         />
         {suffix ? (
@@ -46,12 +55,11 @@ export function Input({
         ) : null}
       </div>
       {error ? (
-        <p className="text-sm text-loss-red" role="alert">
+        <p id={errorId} className="text-sm text-loss-red" role="alert">
           {error}
         </p>
-      ) : hint ? (
-        <p className="text-sm text-receipt-grey">{hint}</p>
       ) : null}
+      {hint ? <p id={hintId} className="text-sm text-receipt-grey">{hint}</p> : null}
     </div>
   );
 }

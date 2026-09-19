@@ -34,12 +34,12 @@ export const metadata: Metadata = {
     template: "%s · Providus",
   },
   description:
-    "The Celo route-intelligence agent for smarter on-ramp decisions. Compare local routes into Celo by what you actually receive after fees, FX, limits and settlement time.",
+    "A Celo-native Nigerian payments agent that turns approved Celo USDC into a reviewed bank cash-out through Paycrest.",
   keywords: [
     "Providus",
     "Celo",
-    "route intelligence",
-    "on-ramp",
+    "Nigerian payments",
+    "bank cash-out",
     "cUSD",
     "stablecoin",
     "fees",
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Providus — Know what arrives before you pay",
     description:
-      "The Celo route-intelligence agent for smarter on-ramp decisions.",
+      "Turn Celo USDC into a reviewed Nigerian bank cash-out with Providus.",
     type: "website",
   },
 };
@@ -72,7 +72,9 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-receipt-field text-ledger-stone">
         <WalletProviders initialState={initialState}>
           <SiteHeader />
-          <main className="flex flex-1 flex-col">{children}</main>
+          <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
+            {children}
+          </main>
           <SiteFooter />
         </WalletProviders>
       </body>

@@ -194,23 +194,20 @@ export function normalizeCashOutOrderResponse(
     };
   }
   const amountCheck = validateUsdcAmount(amount);
-  if (!amountCheck.ok && !isNonNegativeUsdcDecimal(amount, 6)) {
-    if (!isNonNegativeUsdcDecimal(amount, 6) || amount === "0") {
-      return {
-        ok: false,
-        code: "ORDER_RESPONSE_UNSAFE",
-        message: "Invalid order amount",
-      };
-    }
+  if (!amountCheck.ok) {
+    return {
+      ok: false,
+      code: "ORDER_RESPONSE_UNSAFE",
+      message: amountCheck.message,
+    };
   }
+
   if (!decimalStringsEqual(amount, expected.amount)) {
-    if (!isNonNegativeUsdcDecimal(amount, 6)) {
-      return {
-        ok: false,
-        code: "ORDER_RESPONSE_UNSAFE",
-        message: "Order amount mismatch",
-      };
-    }
+    return {
+      ok: false,
+      code: "ORDER_RESPONSE_UNSAFE",
+      message: `Order amount mismatch (returned ${amount}, expected ${expected.amount})`,
+    };
   }
 
   const senderFeeRaw = dig(data, "senderFee", "sender_fee");

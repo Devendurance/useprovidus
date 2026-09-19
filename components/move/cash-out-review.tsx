@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { CashOutPayment } from "@/components/move/cash-out-payment";
-import { useCashOutOrder } from "@/hooks/use-cash-out-order";
+import type { CashOutOrderFlow } from "@/hooks/use-cash-out-order";
 import { formatDecimalForDisplay } from "@/lib/money/decimal";
 import {
   isQuoteFresh,
@@ -31,6 +30,7 @@ type CashOutReviewProps = {
   onRefreshQuote: () => void;
   onRecipientInvalidate: () => void;
   onStartAgain: () => void;
+  orderFlow: CashOutOrderFlow;
 };
 
 export function CashOutReview({
@@ -49,24 +49,22 @@ export function CashOutReview({
   onRefreshQuote,
   onRecipientInvalidate,
   onStartAgain,
+  orderFlow,
 }: CashOutReviewProps) {
   const fresh = isQuoteFresh(quoteCheckedAt);
-  const orderFlow = useCashOutOrder();
-  const [locked, setLocked] = useState(false);
-
-  const formLocked = locked || orderFlow.order != null || orderFlow.isCreating;
+  const formLocked = orderFlow.order != null || orderFlow.isCreating;
 
   if (orderFlow.order) {
     return (
       <CashOutPayment
         order={orderFlow.order}
+        transactionId={orderFlow.transactionId}
         walletAddress={walletAddress}
         isCeloMainnet={isCeloMainnet}
         usdcBalanceRaw={usdcBalanceRaw}
         usdcBalanceDisplay={usdcBalanceDisplay}
         onStartAgain={() => {
           orderFlow.reset();
-          setLocked(false);
           onStartAgain();
         }}
       />
@@ -74,12 +72,14 @@ export function CashOutReview({
   }
 
   return (
-    <Card variant="verdict">
+    <Card variant="verdict" role="region" aria-labelledby="cash-out-review-heading">
       <p className="font-proof text-receipt-grey">Cash-out review</p>
-      <CardTitle className="mt-1">Create order & deposit USDC</CardTitle>
+      <CardTitle id="cash-out-review-heading" className="mt-1">
+        Review your cash-out
+      </CardTitle>
       <CardDescription className="mt-2">
-        Pre-order quote is an estimate. Creating an order starts a time-limited
-        Paycrest payment window. Continue immediately after creation.
+        Check the amount, recipient, fees, and expiry before creating the order.
+        This estimate is not a guaranteed payout.
       </CardDescription>
 
       <dl className="mt-5 grid gap-3 sm:grid-cols-2 text-sm">
@@ -91,7 +91,7 @@ export function CashOutReview({
         </div>
         <div>
           <dt className="text-xs text-receipt-grey">
-            Pre-order estimated NGN (not final)
+            Estimated NGN to receive (not final)
           </dt>
           <dd className="font-display text-xl font-semibold tabular-nums text-provident-green">
             ₦{formatDecimalForDisplay(estimatedNgn, { maxFractional: 2 })}
@@ -102,7 +102,7 @@ export function CashOutReview({
           <dd className="font-medium">Celo mainnet</dd>
         </div>
         <div>
-          <dt className="text-xs text-receipt-grey">Pre-order rate (estimate)</dt>
+          <dt className="text-xs text-receipt-grey">Rate (estimate)</dt>
           <dd className="font-proof tabular-nums">{rate}</dd>
         </div>
         <div>
@@ -125,7 +125,7 @@ export function CashOutReview({
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-receipt-grey">Canonical USDC</dt>
+          <dt className="text-xs text-receipt-grey">Celo USDC token</dt>
           <dd className="text-sm font-medium">
             {tokenCompatible ? "Compatible" : "Mismatch"}
           </dd>
@@ -152,7 +152,7 @@ export function CashOutReview({
         </div>
       </dl>
 
-      <p className="mt-4 rounded-[10px] border border-rate-amber/40 bg-receipt-field px-3 py-2 text-xs text-rate-amber">
+      <p className="mt-4 rounded-[10px] border border-rate-amber/40 bg-receipt-field px-3 py-2 text-xs text-ledger-stone">
         Creating an order starts a time-limited payment window. Paycrest returns
         final rate, fees, receive address and expiry. Pre-order quote (refresh
         every {Math.round(PROVIDUS_QUOTE_FRESHNESS_MS / 1000)}s) is not
@@ -181,16 +181,22 @@ export function CashOutReview({
       ) : null}
 
       {orderFlow.state.kind === "unknown_outcome" ? (
-        <div className="mt-4 rounded-[10px] border border-loss-red/40 bg-receipt-field px-4 py-3">
+        <div className="mt-4 rounded-[10px] border border-loss-red/40 bg-receipt-field px-4 py-3" role="alert">
           <p className="text-sm font-semibold text-loss-red">
             Order creation outcome unknown
           </p>
           <p className="mt-1 text-xs text-receipt-grey">
-            {orderFlow.state.message} Do not press Create again immediately.
-            {orderFlow.state.reference
-              ? ` Reference: ${orderFlow.state.reference}`
-              : ""}
+            {orderFlow.state.message} Do not press Create again immediately. We
+            need to reconcile this attempt before another payment can be made.
           </p>
+          {orderFlow.state.reference ? (
+            <details className="mt-2 text-xs text-receipt-grey">
+              <summary className="cursor-pointer font-semibold text-ledger-stone focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green">
+                Show technical reference
+              </summary>
+              <p className="mt-2 break-all font-proof">{orderFlow.state.reference}</p>
+            </details>
+          ) : null}
         </div>
       ) : null}
 
@@ -217,15 +223,32 @@ export function CashOutReview({
               reason.
             </p>
           ) : null}
-          {orderFlow.state.diagnosticId ? (
-            <p className="text-xs text-receipt-grey font-proof">
-              Diagnostic: {orderFlow.state.diagnosticId}
-            </p>
-          ) : null}
-          {orderFlow.state.reference ? (
-            <p className="text-xs text-receipt-grey font-proof">
-              Reference: {orderFlow.state.reference}
-            </p>
+          {orderFlow.state.diagnosticId || orderFlow.state.reference || orderFlow.state.code ? (
+            <details className="text-xs text-receipt-grey">
+              <summary className="cursor-pointer font-semibold text-ledger-stone focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green">
+                Show technical details
+              </summary>
+              <dl className="mt-2 space-y-1 font-proof">
+                {orderFlow.state.code ? (
+                  <div>
+                    <dt className="inline font-sans">Error code: </dt>
+                    <dd className="inline break-all">{orderFlow.state.code}</dd>
+                  </div>
+                ) : null}
+                {orderFlow.state.diagnosticId ? (
+                  <div>
+                    <dt className="inline font-sans">Diagnostic: </dt>
+                    <dd className="inline break-all">{orderFlow.state.diagnosticId}</dd>
+                  </div>
+                ) : null}
+                {orderFlow.state.reference ? (
+                  <div>
+                    <dt className="inline font-sans">Reference: </dt>
+                    <dd className="inline break-all">{orderFlow.state.reference}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </details>
           ) : null}
           {orderFlow.state.code === "RECIPIENT_CHANGED" ? (
             <Button
@@ -262,7 +285,6 @@ export function CashOutReview({
               disabled={!walletAddress || orderFlow.isCreating}
               onClick={() => {
                 if (!walletAddress) return;
-                setLocked(true);
                 void orderFlow.createOrder({
                   amount,
                   recipient,
@@ -286,7 +308,7 @@ export function CashOutReview({
       ) : null}
 
       {orderFlow.state.kind === "creating" ? (
-        <p className="mt-4 text-sm text-receipt-grey">Creating Paycrest order…</p>
+        <p className="mt-4 text-sm text-receipt-grey" role="status" aria-live="polite">Creating the cash-out order… Keep this page open.</p>
       ) : null}
 
       {orderFlow.state.kind === "idle" ||

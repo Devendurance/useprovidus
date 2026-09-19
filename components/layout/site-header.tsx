@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
 import { cn } from "@/lib/cn";
@@ -10,8 +10,6 @@ import { cn } from "@/lib/cn";
 const NAV = [
   { href: "/how-it-works", label: "How it works" },
   { href: "/check", label: "Move Money" },
-  { href: "/receipt", label: "Receipt" },
-  { href: "/dashboard", label: "Dashboard" },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -24,9 +22,34 @@ function isActive(pathname: string, href: string) {
 export function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (wasOpenRef.current && !open) menuButtonRef.current?.focus();
+    wasOpenRef.current = open;
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-ledger-edge bg-receipt-field/95 backdrop-blur-sm">
+      <a
+        href="#main-content"
+        className="sr-only absolute left-3 top-3 z-50 rounded-[8px] bg-clear-paper px-3 py-2 text-sm font-semibold text-ledger-stone shadow-base focus:not-sr-only focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-provident-green"
+      >
+        Skip to main content
+      </a>
       <div className="container-providus flex h-16 items-center justify-between gap-4">
         <Link
           href="/"
@@ -52,6 +75,7 @@ export function SiteHeader() {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive(pathname, item.href) ? "page" : undefined}
               className={cn(
                 "rounded-[10px] px-3 py-2 text-sm font-semibold tracking-tight transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green",
                 isActive(pathname, item.href)
@@ -75,6 +99,7 @@ export function SiteHeader() {
         </div>
 
         <button
+          ref={menuButtonRef}
           type="button"
           className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border-ledger bg-clear-paper shadow-base md:hidden"
           aria-expanded={open}
@@ -100,6 +125,7 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
+                aria-current={isActive(pathname, item.href) ? "page" : undefined}
                 className={cn(
                   "rounded-[10px] px-3 py-3 text-sm font-semibold",
                   isActive(pathname, item.href)

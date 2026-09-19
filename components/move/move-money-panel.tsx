@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { CashOutPayment } from "@/components/move/cash-out-payment";
 import { CashOutRecipient } from "@/components/move/cash-out-recipient";
 import { CashOutReview } from "@/components/move/cash-out-review";
 import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useCorridorQuote } from "@/hooks/use-corridor-quote";
+import { useCashOutOrder } from "@/hooks/use-cash-out-order";
 import { usePaycrestSupport } from "@/hooks/use-paycrest-support";
 import { useProvidusWallet } from "@/hooks/use-providus-wallet";
 import { CANONICAL_CELO_USDC } from "@/lib/celo/usdc";
@@ -33,14 +35,26 @@ import { cn } from "@/lib/cn";
 
 export function MoveMoneyPanel() {
   const [direction, setDirection] = useState<MoveDirection>("cash-out");
+  const [intentChosen, setIntentChosen] = useState(false);
   const [amount, setAmount] = useState("");
   const [verifiedRecipient, setVerifiedRecipient] =
     useState<VerifiedRecipientBinding | null>(null);
   const wallet = useProvidusWallet();
+  const orderFlow = useCashOutOrder();
   const support = usePaycrestSupport(true);
   const side = directionToSide(direction);
 
+  const effectiveIntentChosen = intentChosen || Boolean(orderFlow.order);
+  const effectiveDirection = orderFlow.order ? "cash-out" : direction;
+
+  const transactionLocked =
+    orderFlow.order != null ||
+    orderFlow.isCreating ||
+    orderFlow.state.kind === "confirming" ||
+    orderFlow.state.kind === "unknown_outcome";
+
   const quoteEnabled =
+    effectiveIntentChosen &&
     support.state.kind === "ready" &&
     amount.trim() !== "" &&
     validateUsdcAmount(amount.trim()).ok;
@@ -141,6 +155,7 @@ export function MoveMoneyPanel() {
 
   function handleDirectionChange(next: MoveDirection) {
     setDirection(next);
+    setIntentChosen(true);
     setVerifiedRecipient(null);
   }
 
@@ -150,14 +165,15 @@ export function MoveMoneyPanel() {
         <Card variant="surface">
           <CardTitle>Direction</CardTitle>
           <CardDescription>
-            Live quotes for Celo USDC and NGN. Order execution is not available
-            in this step.
+            {effectiveIntentChosen
+              ? "Live Paycrest estimates for Celo USDC and NGN. No money moves until you review and approve."
+              : "Choose what you want to do first. You can change this before any payment begins."}
           </CardDescription>
 
           <div
             className="mt-5 grid grid-cols-2 gap-2"
-            role="tablist"
-            aria-label="Move Money direction"
+            role="radiogroup"
+            aria-label="What do you want to do?"
           >
             {(
               [
@@ -165,20 +181,27 @@ export function MoveMoneyPanel() {
                 { id: "cash-out" as const, hint: "USDC → NGN" },
               ] as const
             ).map((opt) => {
-              const selected = direction === opt.id;
+              const selected = effectiveIntentChosen && effectiveDirection === opt.id;
               return (
                 <button
                   key={opt.id}
                   type="button"
-                  role="tab"
-                  aria-selected={selected}
+                  role="radio"
+                  aria-checked={selected}
+                  tabIndex={selected || (!effectiveIntentChosen && opt.id === "cash-out") ? 0 : -1}
                   className={cn(
                     "rounded-[10px] border-ledger px-3 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green",
                     selected
                       ? "bg-provident-green text-white shadow-elevated"
                       : "bg-receipt-field text-ledger-stone hover:bg-ledger-edge/50",
                   )}
+                  onKeyDown={(event) => {
+                    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                    event.preventDefault();
+                    handleDirectionChange(opt.id === "buy-usdc" ? "cash-out" : "buy-usdc");
+                  }}
                   onClick={() => handleDirectionChange(opt.id)}
+                  disabled={transactionLocked}
                 >
                   <span className="block text-sm font-semibold">
                     {directionLabel(opt.id)}
@@ -196,7 +219,7 @@ export function MoveMoneyPanel() {
             })}
           </div>
 
-          <dl className="mt-5 grid gap-3 border-t border-ledger-edge pt-4 text-sm">
+          {effectiveIntentChosen ? <dl className="mt-5 grid gap-3 border-t border-ledger-edge pt-4 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-receipt-grey">Corridor</dt>
               <dd className="font-medium text-ledger-stone text-right">
@@ -212,21 +235,21 @@ export function MoveMoneyPanel() {
             <div className="flex justify-between gap-4">
               <dt className="text-receipt-grey">Wallet role</dt>
               <dd className="text-right text-ledger-stone font-medium">
-                {walletRoleForDirection(direction)}
+                {walletRoleForDirection(effectiveDirection)}
               </dd>
             </div>
-          </dl>
+          </dl> : null}
         </Card>
 
-        <Card variant="surface">
+        {effectiveIntentChosen ? <Card variant="surface">
           <CardTitle>
-            {direction === "buy-usdc"
+            {effectiveDirection === "buy-usdc"
               ? "USDC you want to receive"
               : "USDC you want to cash out"}
           </CardTitle>
           <CardDescription>
-            Amount is a USDC crypto notional (not NGN). Max 1,000,000 · up to 6
-            decimals.
+            Enter the USDC amount for this estimate. Maximum 1,000,000 USDC, up
+            to 6 decimal places.
           </CardDescription>
 
           <div className="mt-5">
@@ -238,32 +261,30 @@ export function MoveMoneyPanel() {
               placeholder="e.g. 100"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              disabled={transactionLocked}
               hint={
-                direction === "buy-usdc"
+                effectiveDirection === "buy-usdc"
                   ? "How much USDC should arrive on Celo."
                   : "How much USDC to convert to NGN."
               }
+              error={amountValidation !== null && !amountValidation.ok ? amountValidation.message : undefined}
               aria-invalid={
                 amountValidation !== null && !amountValidation.ok
                   ? true
                   : undefined
               }
             />
-            {amountValidation && !amountValidation.ok ? (
-              <p className="mt-2 text-sm text-loss-red" role="alert">
-                {amountValidation.message}
-              </p>
-            ) : null}
           </div>
-        </Card>
+        </Card> : null}
 
         <CashOutRecipient
-          enabled={direction === "cash-out"}
+          enabled={effectiveIntentChosen && effectiveDirection === "cash-out"}
+          locked={transactionLocked}
           onVerifiedChange={setVerifiedRecipient}
         />
 
-        <QuotePanel
-          direction={direction}
+        {effectiveIntentChosen ? <QuotePanel
+          direction={effectiveDirection}
           quoteState={quote.state}
           onRefresh={() => quote.refresh()}
           onRefreshSupport={() => support.refresh()}
@@ -272,9 +293,26 @@ export function MoveMoneyPanel() {
           isReady={wallet.isReady}
           balanceCheck={balanceCheck}
           quoteFresh={quoteFresh}
-        />
+        /> : null}
 
-        {direction === "cash-out" &&
+        {orderFlow.order ? (
+          <CashOutPayment
+            order={orderFlow.order}
+            transactionId={orderFlow.transactionId}
+            walletAddress={wallet.address}
+            isCeloMainnet={wallet.isCeloMainnet}
+            usdcBalanceRaw={wallet.usdcBalanceRaw}
+            usdcBalanceDisplay={
+              wallet.usdcBalance ? `${wallet.usdcBalance.value} USDC` : null
+            }
+            onStartAgain={() => {
+              orderFlow.reset();
+              setVerifiedRecipient(null);
+              setAmount("");
+            }}
+          />
+        ) : intentChosen &&
+        direction === "cash-out" &&
         verifiedRecipient &&
         quote.state.kind === "available" ? (
           <CashOutReview
@@ -298,6 +336,7 @@ export function MoveMoneyPanel() {
               setVerifiedRecipient(null);
               setAmount("");
             }}
+            orderFlow={orderFlow}
           />
         ) : null}
       </div>
@@ -306,23 +345,24 @@ export function MoveMoneyPanel() {
         <Card variant="standard">
           <CardTitle>Wallet</CardTitle>
           <CardDescription>
-            {walletRoleForDirection(direction)}. MetaMask, Rabby, or OKX on
-            Celo mainnet.
+            {intentChosen
+              ? `${walletRoleForDirection(direction)}. MetaMask, Rabby, or OKX on Celo mainnet.`
+              : "Connect only when your review is ready. MetaMask, Rabby, or OKX on Celo mainnet."}
           </CardDescription>
 
-          <div className="mt-4">
+          {intentChosen ? <div className="mt-4">
             <ConnectWalletButton fullWidth showBalances={false} />
-          </div>
+          </div> : null}
 
-          {wallet.status === "disconnected" ? (
+          {intentChosen && wallet.status === "disconnected" ? (
             <p className="mt-3 text-sm text-receipt-grey">
               Connect a wallet before cash-out review is ready.
             </p>
           ) : null}
 
-          {wallet.status === "wrong-network" ? (
+          {intentChosen && wallet.status === "wrong-network" ? (
             <div className="mt-3 space-y-2">
-              <p className="text-sm text-rate-amber" role="status">
+              <p className="text-sm text-ledger-stone" role="status">
                 Switch to Celo mainnet. This flow is not ready on other
                 networks.
               </p>
@@ -339,7 +379,7 @@ export function MoveMoneyPanel() {
             </div>
           ) : null}
 
-          {wallet.status === "connected" ? (
+          {intentChosen && wallet.status === "connected" ? (
             <dl className="mt-4 space-y-2 border-t border-ledger-edge pt-4 text-sm">
               <div className="flex justify-between gap-2">
                 <dt className="text-receipt-grey">Address</dt>
@@ -362,7 +402,7 @@ export function MoveMoneyPanel() {
                 </dd>
               </div>
               {wallet.balancesError ? (
-                <p className="text-xs text-rate-amber" role="status">
+                <p className="text-xs text-ledger-stone" role="status">
                   {wallet.balancesError}
                 </p>
               ) : null}
@@ -371,11 +411,12 @@ export function MoveMoneyPanel() {
         </Card>
 
         <Card variant="flat">
-          <CardTitle className="text-base">No order yet</CardTitle>
+          <CardTitle className="text-base">Order boundary</CardTitle>
           <CardDescription>
             Recipient verification does not create a Paycrest order, request a
-            receive address, or move funds. P4B will add order creation and USDC
-            payment.
+            receive address, or move funds. After a fresh quote and verified
+            recipient, Providus asks for explicit confirmation before creating
+            the order and opening the wallet payment step.
           </CardDescription>
         </Card>
       </aside>
@@ -412,7 +453,7 @@ function QuotePanel({
   if (supportState.kind === "loading") {
     return (
       <Card variant="surface">
-        <div className="flex items-center gap-2 text-sm text-receipt-grey">
+        <div className="flex items-center gap-2 text-sm text-receipt-grey" role="status" aria-live="polite">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Verifying Celo USDC with Paycrest…
         </div>
@@ -453,8 +494,9 @@ function QuotePanel({
           <div>
             <CardTitle className="text-base">Token configuration mismatch</CardTitle>
             <CardDescription className="mt-1">
-              Paycrest USDC on Celo does not match the canonical Circle contract.
-              Quotes are disabled.
+              Paycrest’s Celo USDC configuration does not match Providus’s
+              supported token. Quotes are disabled until compatibility is
+              confirmed.
             </CardDescription>
             <Button
               type="button"
@@ -496,7 +538,7 @@ function QuotePanel({
         </p>
       ) : null}
       {walletStatus === "wrong-network" ? (
-        <p className="mt-3 text-sm text-rate-amber" role="status">
+        <p className="mt-3 text-sm text-ledger-stone" role="status">
           Wrong network — switch to Celo. Not executable.
         </p>
       ) : null}
@@ -514,7 +556,7 @@ function QuotePanel({
       ) : null}
 
       {quoteState.kind === "loading" ? (
-        <div className="mt-4 flex items-center gap-2 text-sm text-receipt-grey">
+        <div className="mt-4 flex items-center gap-2 text-sm text-receipt-grey" role="status" aria-live="polite">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Fetching live quote for {quoteState.amount} USDC…
         </div>
@@ -524,7 +566,7 @@ function QuotePanel({
         <div className="mt-4 space-y-3">
           {direction === "buy-usdc" ? (
             <>
-              <p className="text-sm font-semibold text-rate-amber">
+              <p className="text-sm font-semibold text-ledger-stone">
                 Buying USDC on Celo is temporarily unavailable
               </p>
               <p className="text-sm text-receipt-grey">
@@ -535,7 +577,7 @@ function QuotePanel({
             </>
           ) : (
             <>
-              <p className="text-sm font-semibold text-rate-amber">
+              <p className="text-sm font-semibold text-ledger-stone">
                 Cash out temporarily unavailable
               </p>
               <p className="text-sm text-receipt-grey">
@@ -591,12 +633,14 @@ function QuotePanel({
             <div>
               <dt className="text-xs text-receipt-grey">Quote freshness</dt>
               <dd className="text-sm font-medium">
-                {quoteFresh ? "Within Providus refresh window" : "Refresh needed"}
+                {quoteFresh
+                  ? `Updated ${formatQuoteTime(quoteState.quote.checkedAt)} · refreshes after 60s`
+                  : "Stale · refresh before review"}
               </dd>
             </div>
           </dl>
 
-          <p className="rounded-[10px] border border-rate-amber/40 bg-receipt-field px-3 py-2 text-xs text-rate-amber">
+          <p className="rounded-[10px] border border-rate-amber/40 bg-receipt-field px-3 py-2 text-xs text-ledger-stone">
             Rates change. No funds have moved. Fees are not final until order
             creation (next step).
           </p>
@@ -616,4 +660,10 @@ function QuotePanel({
       ) : null}
     </Card>
   );
+}
+
+function formatQuoteTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "recently";
+  return `${date.toISOString().slice(11, 16)} UTC`;
 }

@@ -44,8 +44,8 @@ export function PreviewQuerySummary() {
       <Card variant="flat">
         <CardTitle className="text-base">Your inputs</CardTitle>
         <CardDescription>
-          No Route Check inputs in this session. Start from the form to carry
-          country, amount, method and asset into this preview.
+          No cash-out details in this session. Start from Move Money to request
+          a live quote and verify a Nigerian bank recipient.
         </CardDescription>
       </Card>
     );
@@ -56,13 +56,13 @@ export function PreviewQuerySummary() {
       label: "Country",
       value: resolveLabel(LABELS.country, country),
     },
-    { label: "Amount", value: amount || "—" },
+    { label: "Entered amount", value: amount || "—" },
     {
       label: "Payment method",
       value: resolveLabel(LABELS.method, method),
     },
     {
-      label: "Target asset",
+      label: "Asset",
       value: resolveLabel(LABELS.asset, asset),
     },
   ];
@@ -71,7 +71,8 @@ export function PreviewQuerySummary() {
     <Card variant="flat">
       <CardTitle className="text-base">Your inputs</CardTitle>
       <CardDescription>
-        Carried from the Route Check form. Labels only—no quote calculated.
+        Carried from a legacy link. These labels are not a live quote and do
+        not authorize a transfer.
       </CardDescription>
       <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         {rows.map((row) => (

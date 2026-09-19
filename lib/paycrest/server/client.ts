@@ -542,6 +542,156 @@ export async function createOfframpOrder(payload: {
   }
 }
 
+export interface PaycrestOrderDetails {
+  id: string;
+  reference: string;
+  status: string;
+  amount?: string;
+  amountIn?: string;
+  rate?: string;
+  receiveAddress?: string;
+  validUntil?: string;
+  transactionFee?: string;
+  senderFee?: string;
+  raw: unknown;
+}
+
+/**
+ * Fetches current Paycrest order status: GET /v2/sender/orders/:id.
+ * Read-only authenticated query. Never mutates order or logs secrets.
+ */
+export async function getOfframpOrder(
+  orderId: string,
+): Promise<PaycrestResult<PaycrestOrderDetails>> {
+  if (!orderId || typeof orderId !== "string" || orderId.trim() === "") {
+    return {
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "Order ID is required",
+    };
+  }
+
+  const cleanId = orderId.trim();
+  const config = getPaycrestConfig();
+  if (!config.ok) return config;
+
+  const url = resolvePaycrestUrl(
+    config.data.baseUrl,
+    `/sender/orders/${encodeURIComponent(cleanId)}`,
+  );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "API-Key": config.data.apiKey,
+      },
+      cache: "no-store",
+    });
+
+    const status = response.status;
+    let json: UpstreamJson | null = null;
+    try {
+      json = (await response.json()) as UpstreamJson;
+    } catch {
+      return {
+        ok: false,
+        code: "PARSE_ERROR",
+        message: "Upstream response was not valid JSON",
+        httpStatus: status,
+      };
+    }
+
+    if (status === 200 || status === 201) {
+      const data = isRecord(json?.data) ? (json.data as Record<string, unknown>) : null;
+      if (!data) {
+        return {
+          ok: false,
+          code: "PARSE_ERROR",
+          message: "Paycrest get-order response missing data envelope",
+          httpStatus: status,
+        };
+      }
+
+      const id = asString(data.id) ?? cleanId;
+      const reference = asString(data.reference) ?? "";
+      const rawStatus = asString(data.status)?.toLowerCase().trim() ?? "unknown";
+      const amount = asString(data.amount) ?? undefined;
+      const amountIn = asString(data.amountIn) ?? undefined;
+      const rate = asString(data.rate) ?? undefined;
+      const receiveAddress = asString(data.receiveAddress) ?? undefined;
+      const validUntil = asString(data.validUntil) ?? undefined;
+      const transactionFee = asString(data.transactionFee) ?? undefined;
+      const senderFee = asString(data.senderFee) ?? undefined;
+
+      return {
+        ok: true,
+        data: {
+          id,
+          reference,
+          status: rawStatus,
+          amount,
+          amountIn,
+          rate,
+          receiveAddress,
+          validUntil,
+          transactionFee,
+          senderFee,
+          raw: json,
+        },
+      };
+    }
+
+    if (status === 404) {
+      return {
+        ok: false,
+        code: "UPSTREAM_ERROR",
+        message: `Order ${cleanId} not found upstream`,
+        httpStatus: 404,
+      };
+    }
+
+    if (status === 401 || status === 403) {
+      return {
+        ok: false,
+        code: "AUTH_FAILED",
+        message: "Paycrest authentication failed",
+        httpStatus: status,
+      };
+    }
+
+    return {
+      ok: false,
+      code: "UPSTREAM_ERROR",
+      message: json?.message ?? `Upstream returned status ${status}`,
+      httpStatus: status,
+    };
+  } catch (err) {
+    const name =
+      err && typeof err === "object" && "name" in err
+        ? String((err as { name?: unknown }).name)
+        : "";
+    if (name === "AbortError") {
+      return {
+        ok: false,
+        code: "UPSTREAM_TIMEOUT",
+        message: "Paycrest order status request timed out",
+      };
+    }
+    return {
+      ok: false,
+      code: "UPSTREAM_UNAVAILABLE",
+      message: "Unable to connect to Paycrest",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Live Paycrest account name resolution for NGN bank accounts.
  * POST /v2/verify-account — no retries, no caching, no logging of PII.

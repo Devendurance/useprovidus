@@ -55,11 +55,11 @@ export function RouteCheckForm() {
 
   return (
     <Card variant="surface" className="w-full">
-      <CardTitle>Route Check inputs</CardTitle>
+      <CardTitle>Cash-out details</CardTitle>
       <CardDescription>
-        Enter where you are, how much you pay, how you pay, and what you want
-        to receive. Providus will compare eligible routes by effective received
-        amount—once quote comparison is connected.
+        This legacy form carries basic details into the review shell. The live
+        Move Money flow is the source of truth for Celo USDC bank cash-outs,
+        recipient verification and Paycrest quotes.
       </CardDescription>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-5" noValidate>
@@ -108,18 +108,18 @@ export function RouteCheckForm() {
         />
 
         {submittedNote ? (
-          <p className="text-sm text-rate-amber" role="status">
+          <p className="text-sm text-ledger-stone" role="status">
             {submittedNote}
           </p>
         ) : null}
 
         <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center">
-          <Button type="submit" variant="primary" disabled={!canContinue}>
-            Compare routes
+            <Button type="submit" variant="primary" disabled={!canContinue}>
+            Continue to review shell
           </Button>
           <p className="text-sm text-receipt-grey">
-            Next: locked preview. Full Route Verdict unlocks after payment
-            (not connected yet).
+            No transfer starts here. Review and explicit wallet approval happen
+            in Move Money.
           </p>
         </div>
       </form>

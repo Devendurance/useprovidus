@@ -8,14 +8,14 @@ export default function NotFound() {
         Page not found
       </h1>
       <p className="mt-3 max-w-md text-receipt-grey leading-relaxed">
-        That path is not on the map. Return home or start a Route Check.
+        That path is not available. Return home or start a Celo USDC cash-out.
       </p>
       <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <LinkButton href="/" variant="primary" size="lg">
+        <LinkButton href="/" variant="ghost" size="lg">
           Home
         </LinkButton>
-        <LinkButton href="/check" variant="ghost" size="lg">
-          Check my route
+        <LinkButton href="/check" variant="primary" size="lg">
+          Start a cash-out
         </LinkButton>
       </div>
     </div>

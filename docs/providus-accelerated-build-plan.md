@@ -1,457 +1,734 @@
-# Providus Accelerated Mainnet Build Plan
+# Providus Accelerated Agents at Work Build Plan
 
-**Prepared:** July 30, 2026  
-**Submission deadline:** August 3, 2026 at 09:00 UTC / 10:00 WAT  
-**Network:** Celo mainnet (`42220`)  
-**Primary track:** Most x402 Payments  
-**Build style:** Small sequential prompts, real data only, no public mock states  
+**Updated:** September 19, 2026 — conversational assistant architecture correction<br/>
+**Submission deadline:** September 21, 2026 at **09:00 UTC / 10:00 WAT**<br/>
+**Network:** Celo mainnet (`42220`)<br/>
+**Primary track:** Real World Adoption
+**Build style:** Small sequential prompts; repo is source of truth; no broad refactors; no live mutation without explicit approval.
 
 ---
 
 ## 1. Shipping decision
 
-Providus will ship as one coherent product with two connected modules:
+Providus will submit as a **Celo-native Nigerian payments agent**.
 
-### Move Money
+### Already proven
 
-A real Paycrest-powered on-ramp that lets a Nigerian user deposit NGN and receive USDC in a connected Celo wallet.
-
-### Stop Leaks
-
-An x402-powered recovery agent that inspects connected Gmail evidence for recurring charges, shows likely financial leaks, and sells useful recovery actions.
-
-The product story is:
-
-> Providus helps people recover money lost to forgotten subscriptions and move value into Celo through a transparent local rail.
-
-The working hackathon core is not a multi-provider quote comparison. Paycrest is currently the executable provider. Providus may show Paycrest's current rate and delivery estimate, but must not claim it compared the whole market.
-
----
-
-## 2. Non-negotiable boundaries
-
-1. No API key, API secret, Gmail client secret, private key, or seed phrase enters Git, frontend bundles, screenshots, coding prompts, or chat.
-2. `PAYCREST_API_KEY` and `PAYCREST_API_SECRET` are server-only environment variables. Never prefix them with `NEXT_PUBLIC_`.
-3. Paycrest is mainnet-only. No live order is created without explicit builder approval.
-4. Begin the real transaction test at Paycrest's minimum order size. Do not create repeated orders to debug ordinary UI or schema problems.
-5. Do not simulate quotes, provider bank accounts, Paycrest IDs, order states, Gmail results, x402 receipts, or successful USDC delivery in production.
-6. Fixtures are allowed only in automated tests and clearly isolated development stories.
-7. The basic on-ramp is not blocked by x402. A first-time on-ramp user may have no USDC yet.
-8. Paycrest's `senderFeePercent` is a Paycrest-integrated fee, not an x402 settlement. Keep it at zero for the first end-to-end test unless deliberately configured later.
-9. x402 monetizes separate agent work: Leak Scan, Recovery Plan, supported recovery execution, and confirmation checks.
-10. Never mark a subscription cancelled or an on-ramp settled without provider or email/onchain evidence.
-
----
-
-## 3. Product flows
-
-### 3.1 NGN to Celo USDC
+**Move Money — Bank cash-out**
 
 ```text
-Connect Celo wallet
-→ Enter NGN amount
-→ Enter Nigerian refund-bank details
-→ Verify refund account
-→ Preview current Paycrest buy rate
-→ Confirm destination wallet and order
-→ Create Paycrest on-ramp order
-→ Show exact provider bank-transfer instructions and expiry
-→ User transfers exact NGN amount
-→ Webhook or polling updates order
-→ Paycrest settles USDC to connected Celo wallet
-→ Providus shows receipt and transaction evidence
+Celo USDC
+→ Paycrest
+→ Nigerian bank account
 ```
 
-Paycrest v2 request direction:
+This has been exercised successfully in real usage.
+
+### New deadline-critical vertical slice
+
+**Conversational Payment Agent — Airtime**
 
 ```text
-source.type = fiat
-source.currency = NGN
-destination.type = crypto
-destination.currency = USDC
-destination.recipient.network = celo
-destination.recipient.address = connected wallet
-amountIn = fiat
+Natural-language conversation
+→ structured payment intent
+→ clarification of missing/ambiguous fields
+→ exact confirmation card
+→ explicit user approval
+→ Celo USDC
+→ Paycrest
+→ confirmed NGN settlement
+→ ClubKonnect
+→ airtime
+→ conversational status + receipt
 ```
 
-### 3.2 Stop Leaks
+The conversational layer is a first-class product surface, not a thin regex command box.
+
+Providus should feel like a normal AI chat assistant that also has safe payment capabilities. Conversational language is model-generated, not hardcoded. A user can say `hey`, ask what Providus can do, ask a general payment question, continue a multi-turn conversation, or begin a payment task naturally.
+
+The assistant operates in two broad modes:
+
+1. **Conversation mode** — ordinary natural conversation, greetings, explanations, help, and payment-related questions. No financial action is implied merely because the assistant is chatting.
+2. **Payment-intent mode** — when the user asks Providus to perform a supported payment action, the model produces a structured candidate intent that must pass deterministic validation and explicit confirmation before execution.
+
+The assistant may:
+
+- respond naturally to greetings and ordinary conversation using the configured LLM;
+- explain Providus, payments, fees, supported actions and transaction state;
+- understand natural-language payment requests;
+- remember the current conversation;
+- ask follow-up questions for missing fields;
+- turn payment language into a typed candidate intent;
+- answer status questions from persisted transaction state.
+
+The assistant must **not**:
+
+- invent recipients, amounts, networks or bill identifiers;
+- silently change an already-confirmed payment intent;
+- authorize or execute a payment;
+- decide that a provider succeeded;
+- bypass deterministic validation, state transitions or explicit user approval.
+
+Architecture rule:
+
+> **Conversation layer → structured intent → deterministic validation → confirmation → execution.**
+
+### If airtime is stable
+
+Add data bundles.
+
+### Do not expand before the first slice works
+
+- electricity;
+- cable;
+- IPO payments;
+- cNGN pivot;
+- remittances;
+- broad utility catalogue;
+- Kotani;
+- custom contracts.
+
+---
+
+## 2. Hackathon registration lock
 
 ```text
-Connect wallet
-→ Connect Gmail with read-only OAuth
-→ Explain scan scope and privacy
-→ Request Leak Scan
-→ Pay 0.01 USDC through x402
-→ Scan only relevant receipt/renewal/trial/cancellation messages
-→ Normalize merchants and recurrence evidence
-→ Show evidence-backed subscription candidates
-→ Select a merchant
-→ Pay for a Recovery Plan or supported recovery action
-→ Monitor Gmail for cancellation confirmation
+Hackathon: agents-at-work
+Submission status: draft
+Repo: https://github.com/Devendurance/useprovidus
+
+Primary: real-world-adoption
+Additional:
+- value-moved
+- askbots-growth
+- judges-favorite
+- cpay-feedback
+
+ERC-8004 Agent ID: 9851
+ERC-8004 URL: https://8004scan.io/agents/celo/9851
+Agent wallet: 0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa
+
+Locked attribution tag:
+celo_8190b99392a2
 ```
 
-Classification labels:
-
-- Confirmed recurring charge
-- Likely active subscription
-- Trial or upcoming renewal
-- Needs user verification
-- Cancellation confirmed
+The previous tag `celo_91fed90b97fc` is obsolete for this hackathon.
 
 ---
 
-## 4. Architecture lock
+## 3. Non-negotiable boundaries
 
-Use the existing Next.js App Router repository and UI shell.
-
-| Layer | Decision |
-|---|---|
-| Frontend | Existing Next.js + TypeScript UI |
-| Wallet | Existing wagmi/viem connection, Celo mainnet only |
-| Server | Next.js route handlers and server-only services |
-| Database | Supabase Postgres with row-level protection |
-| On-ramp | Paycrest Sender API v2 |
-| Fiat corridor | NGN |
-| Destination | USDC on Celo |
-| On-ramp status | Webhook first, authenticated polling fallback |
-| Agent payments | Celo facilitator at `https://x402.celo.org` |
-| x402 asset | Celo mainnet USDC |
-| Gmail | Google OAuth + Gmail API, read-only |
-| Detection | Deterministic rules and evidence; no paid LLM |
-| Deployment | Existing Vercel target |
-
-Do not add Fastify, SvelteKit, Redis, BullMQ, custom escrow contracts, an LLM provider, or another on-ramp aggregator during this sprint.
+1. Repository is the source of truth.
+2. Preserve the existing Paycrest bank cash-out.
+3. No live Paycrest order without explicit builder approval.
+4. No Celo mainnet transaction without explicit builder approval.
+5. No ClubKonnect purchase without explicit builder approval.
+6. Never print API keys, bank details, full credential-bearing URLs or private keys.
+7. Do not blindly retry provider mutations.
+8. Do not mark ClubKonnect acknowledgement as completion.
+9. Do not mark Paycrest Celo deposit as fiat delivery.
+10. Persist before irreversible multi-provider orchestration.
+11. Keep prompts small and scoped.
+12. Bring every milestone report back before starting the next.
+13. No broad refactor during the deadline sprint.
+14. No fake provider success or public mock states.
+15. The conversational AI is never the authority over money movement: it can interpret and explain, but deterministic code validates and the user explicitly approves execution.
 
 ---
 
-## 5. Environment contract
+## 4. Verified current repository baseline
 
-```env
-# Server only
-PAYCREST_API_KEY=
-PAYCREST_API_SECRET=
-PAYCREST_BASE_URL=https://api.paycrest.io/v2
-SUPABASE_SERVICE_ROLE_KEY=
-GOOGLE_CLIENT_SECRET=
+Current stack:
 
-# Public only where appropriate
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-NEXT_PUBLIC_GOOGLE_CLIENT_ID=
-NEXT_PUBLIC_CELO_CHAIN_ID=42220
-NEXT_PUBLIC_CELO_USDC_ADDRESS=0xcEBA9300f2b948710d2653dD7B07f33A8B32118C
-NEXT_PUBLIC_CELO_ATTRIBUTION_TAG=celo_91fed90b97fc
+- Next.js App Router + TypeScript;
+- wagmi + viem;
+- Celo mainnet;
+- canonical Celo USDC;
+- Paycrest server integration;
+- live quote;
+- institution/account verification;
+- Paycrest off-ramp order creation;
+- direct ERC-20 transfer to per-order receive address.
 
-# Server payment configuration
-CELO_X402_FACILITATOR_URL=https://x402.celo.org
-CELO_X402_PAY_TO=0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=
-GMAIL_TOKEN_ENCRYPTION_KEY=
+Current gaps:
+
+- no database/persistence;
+- no Paycrest post-deposit status tracking;
+- no webhook/reconciliation layer;
+- no ClubKonnect integration;
+- no airtime/data/utility code;
+- no conversational payment assistant / structured AI intent layer;
+- attribution tag not currently appended to transaction calldata.
+
+Existing bugs from audit:
+
+1. upstream amount mismatch can pass validation;
+2. unknown create-order outcome can lead to duplicate retry risk;
+3. deposit-confirmed callback can repeat;
+4. definite create-order failure can leave UI locked;
+5. page refresh loses order state.
+
+---
+
+## 5. Pre-build requirement — AskBots baseline
+
+Before P0 code changes:
+
+- register/use the current Providus repo in AskBots according to the live track instructions;
+- complete the required baseline review round;
+- preserve project URL, review IDs, scores, findings and screenshots/evidence;
+- do **not** fix issues before baseline capture.
+
+Only after the baseline is safely recorded should P0 implementation begin.
+
+---
+
+## 6. Milestones
+
+### P0 — Financial integrity + Celo attribution hardening
+
+**Purpose:** Make the existing cash-out foundation safe enough to extend.
+
+Work:
+
+- resolve `.env` tracking/history safely without printing values;
+- fix Paycrest returned-amount equality invariant;
+- distinguish definite create-order failure from unknown outcome;
+- prevent blind retry after unknown create-order outcome;
+- ensure deposit-confirmed side effect fires once per tx;
+- clear create-order lock after definite failure;
+- install/use `@celo/attribution-tags`;
+- update active attribution configuration to `celo_8190b99392a2`;
+- append ERC-8021 suffix to final USDC transfer calldata;
+- verify encoded calldata preserves transfer recipient + amount;
+- no live transaction.
+
+Gate:
+
+- existing five self-check suites pass;
+- new financial-integrity tests pass;
+- attribution encoding tests pass;
+- typecheck/lint/build/diff checks pass;
+- no mainnet transaction sent.
+
+---
+
+### P1 — Durable persistence + Paycrest finality
+
+**Purpose:** Make transaction state survive refresh/restart and prove fiat delivery.
+
+Preferred target:
+
+- Supabase Postgres;
+- Drizzle ORM if current repo rules still require it.
+
+Work:
+
+- introduce minimal `agent_transactions`/payment orchestration persistence;
+- unique idempotency key;
+- persist Paycrest order/reference and Celo tx hash;
+- add Paycrest authenticated get-order/status boundary;
+- add idempotent reconciliation;
+- signed webhook only if current docs + deployment setup support it safely;
+- polling remains recovery/fallback;
+- expose truthful status endpoint;
+- do not touch existing cash-out API contract unless strictly additive.
+
+Target states:
+
+```text
+pending
+settling
+settled
+processing
+completed
+failed
+refunded
 ```
 
-The final names should follow existing repository conventions if equivalent variables already exist. Do not create duplicate sources of truth.
+Gate:
+
+- transaction survives refresh/server restart;
+- duplicate reconciliation signals are safe;
+- Paycrest fiat-delivery state can be distinguished from on-chain deposit;
+- no ClubKonnect call yet.
 
 ---
 
-## 6. Delivery milestones and coding prompts
+### P2 — ClubKonnect server boundary
 
-Each prompt ends with:
-
-- scope of files changed;
-- verification commands run;
-- exact pass/fail results;
-- unresolved blockers;
-- no broad cleanup or unrelated refactors.
-
-Do not begin the next prompt until the current gate passes.
-
-### P0 — Repository and credential-safe feasibility audit
-
-**Purpose:** Discover the actual repository state and prove the Paycrest corridor without mutations.
+**Purpose:** Integrate provider reads and state handling without charging anyone.
 
 Work:
 
-- inspect current routes, wallet stack, Supabase setup, environment validation, test commands, and existing API handlers;
-- identify existing on-ramp UI screens and their state boundaries;
-- call only safe Paycrest reads;
-- confirm API credential authentication without printing credentials;
-- confirm `NGN`, `celo`, and Celo `USDC` support from live endpoints;
-- confirm a buy-side rate can be returned;
-- report exact response shapes with personal/provider-sensitive values redacted;
-- make no application changes unless a tiny non-secret diagnostic script is explicitly approved.
+- verify current environment variable names without printing values;
+- add server-only config;
+- add strict redaction;
+- implement safe wallet/readiness query;
+- implement typed airtime request builder;
+- implement query/reconciliation method;
+- map documented statuses conservatively;
+- generate unique RequestID;
+- no live purchase yet.
 
-**Gate:** A written audit proves the repository baseline and Paycrest support. No order is created.
+Important:
 
-### P1 — Configuration and Paycrest server adapter
+- audit previously found no `CLUBKONNECT_*` environment entries; re-check current local state because this may have changed since the audit;
+- if IP whitelisting blocks Vercel/serverless egress, report it immediately;
+- do not invent a static-IP solution silently.
 
-**Purpose:** Add a secure, typed integration boundary.
+Gate:
 
-Work:
-
-- central environment validation;
-- server-only Paycrest client;
-- timeouts, error normalization, and redacted logging;
-- typed methods for tokens, rate, institutions, verify-account, create-order, get-order;
-- no frontend imports from secret-bearing modules;
-- unit tests using fixtures only.
-
-**Gate:** Tests prove request/response normalization, secret isolation, and failure handling.
-
-### P2 — Wallet identity and database foundation
-
-**Purpose:** Give real orders and payments durable ownership.
-
-Work:
-
-- preserve the existing wallet connector;
-- require Celo mainnet;
-- validate and normalize wallet addresses;
-- create wallet challenge/signature session if no secure wallet session exists;
-- add database tables for users, on-ramp orders, order events, x402 payments, Gmail connections, scan jobs, subscription candidates, and recovery actions;
-- add uniqueness/idempotency constraints;
-- add Supabase row-level policies or keep privileged access server-only.
-
-**Gate:** One wallet can access only its own order, scan, and payment records.
-
-### P3 — Live quote and refund-account verification
-
-**Purpose:** Replace any on-ramp shell data with Paycrest responses.
-
-Work:
-
-- live Paycrest buy-rate endpoint for NGN/USDC/Celo;
-- rate freshness and unavailable states;
-- Nigerian institutions from Paycrest;
-- refund-bank input;
-- account verification and canonical account name;
-- connected wallet as immutable default destination, with explicit confirmation;
-- no order creation yet.
-
-**Gate:** The UI renders a real current rate and verified refund account with no mock fallback.
-
-### P4 — Paycrest order creation
-
-**Purpose:** Create a durable real on-ramp order safely.
-
-Work:
-
-- server-side validated `POST /v2/sender/orders`;
-- client-supplied idempotency key mapped to one Providus reference;
-- revalidate wallet session, amount, account and destination;
-- ignore client-supplied provider instructions or status;
-- persist sanitized request and response data;
-- show exact `providerAccount` bank details, `amountToTransfer`, currency and `validUntil`;
-- prevent duplicate submission on refresh or double click.
-
-**Gate:** Automated tests pass. One explicitly approved minimum-size mainnet order returns real transfer instructions.
-
-### P5 — Status tracking, webhook and receipt
-
-**Purpose:** Turn a created order into an end-to-end product.
-
-Work:
-
-- raw-body Paycrest webhook handler;
-- `X-Paycrest-Signature` HMAC-SHA256 verification using timing-safe comparison;
-- idempotent event storage;
-- legal state transitions;
-- authenticated polling fallback;
-- expiry countdown;
-- receipt states for initiated, pending, fulfilling, settling, settled, expired, refunding and refunded;
-- show onchain transaction hash only when returned by Paycrest;
-- settled is the success condition for on-ramp.
-
-**Gate:** A minimum-size real order reaches its truthful terminal state and survives page refresh.
-
-### P6 — x402 payment primitive
-
-**Purpose:** Establish the track-counting payment path once and reuse it.
-
-Work:
-
-- one reusable server protection layer for paid resources;
-- Celo mainnet `eip155:42220`;
-- USDC `0xcEBA...118C`, 6 decimals, EIP-712 name `USDC`, version `2`;
-- amount `10000` base units = `0.01 USDC`;
-- pay-to wallet from server configuration;
-- facilitator `https://x402.celo.org`;
-- connected wallet signs the authorization;
-- server verifies and settles before returning the paid resource;
-- record payer, resource type, amount, settlement status and transaction hash;
-- make payment retries idempotent and restore already-paid resources.
-
-**Gate:** At least one genuine `0.01 USDC` mainnet payment reaches the pay-to wallet and the protected resource is returned once.
-
-### P7 — Gmail OAuth and privacy boundary
-
-**Purpose:** Connect a real mailbox without over-collecting data.
-
-Work:
-
-- Google OAuth in testing mode;
-- Gmail read-only scope;
-- state and PKCE protections where supported;
-- encrypted refresh-token storage;
-- disconnect and token-revocation path;
-- privacy disclosure before connection;
-- query only relevant receipt, invoice, renewal, trial, payment and cancellation messages;
-- do not persist complete email bodies or attachments.
-
-**Gate:** The builder connects Gmail, reconnects after refresh, and can revoke access.
-
-### P8 — Real Leak Scan
-
-**Purpose:** Produce useful evidence-backed subscription candidates.
-
-Work:
-
-- protect scan execution with the shared x402 primitive;
-- deterministic Gmail search windows;
-- parse merchant, sender domain, amount, currency, billing date, renewal language, cancellation evidence and candidate management links;
-- group repeated evidence into a merchant candidate;
-- compute monthly equivalents only where interval evidence exists;
-- attach confidence reason codes;
-- allow ignore/not-a-subscription feedback;
-- no LLM-generated claims.
-
-**Gate:** A paid scan finds real messages in the connected mailbox and every candidate links to redacted evidence.
-
-### P9 — Recovery actions
-
-**Purpose:** Create repeated legitimate paid agent work.
-
-Work:
-
-- per-merchant x402-paid Recovery Plan;
-- show verified management/cancellation link where extracted;
-- support one-click unsubscribe only when a standards-compliant unsubscribe action exists;
-- otherwise prepare exact manual steps or a cancellation email draft;
-- never log into third-party accounts on the user's behalf;
-- monitor later Gmail messages for cancellation confirmation;
-- sell a confirmation check only when it performs a new mailbox check.
-
-**Gate:** One real candidate receives an evidence-backed recovery plan and a later confirmation status.
-
-### P10 — Dashboard and product coherence
-
-**Purpose:** Join both modules without inventing financial claims.
-
-Work:
-
-- real wallet USDC balance;
-- real Paycrest order history;
-- real x402 receipt history;
-- real subscription candidates and recovery states;
-- distinguish estimated recoverable value from confirmed savings;
-- home navigation presents `Move Money` and `Stop Leaks` under one Providus promise;
-- remove obsolete multi-provider comparison and cUSD copy.
-
-**Gate:** Every visible number has a live source or is explicitly labelled as a deterministic estimate.
-
-### P11 — Mainnet hardening and submission
-
-**Purpose:** Protect the demo from ordinary failure.
-
-Work:
-
-- mobile and MiniPay checks;
-- loading, empty, expiry, 401, 402, 429, 500 and provider-unavailable states;
-- rate limiting and abuse controls;
-- sensitive-log audit;
-- build, typecheck, lint and targeted tests;
-- production environment validation;
-- Vercel webhook URL check;
-- one full screen-recorded rehearsal;
-- README, architecture, setup, privacy and demo documentation;
-- submission links and ERC-8004 requirement check.
-
-**Gate:** Production deployment passes the full mainnet demo checklist.
+- mocked provider tests pass;
+- secrets absent from client build/logs;
+- safe read confirms credentials/readiness only if explicitly permitted.
 
 ---
 
-## 7. Four-day execution schedule
+### P3 — Conversational Payment Assistant + Intent Engine
 
-### July 30 — Prove and wire Paycrest
+**Purpose:** Make Providus feel like an actual payments agent while keeping financial authority deterministic.
 
-- P0 audit
-- P1 Paycrest adapter
-- P2 wallet/database foundation
-- P3 live rate and account verification
+This milestone creates the conversation layer only. It does **not** move money.
 
-End-of-day proof: live Paycrest data reaches the existing UI with secrets confined to the server.
+Work:
 
-### July 31 — Complete the on-ramp
+- add a conversational payment assistant surface to the dashboard;
+- maintain short-lived conversation state for the current payment task;
+- support multi-turn clarification;
+- define a strict structured `PaymentIntent` schema;
+- first executable intent: `airtime`;
+- recognize future intents (`data`, `electricity`, `cable`) as unsupported/not-yet-executable rather than pretending they work;
+- extract/maintain action, NGN amount, phone number and mobile network;
+- expose `missingFields`;
+- expose `readyForConfirmation`;
+- make network suggestions editable and never treat prefix detection as certainty;
+- answer simple status/explanation questions using known transaction state where available;
+- keep the AI/model server-side;
+- use schema-constrained structured output;
+- validate all model output again with deterministic code;
+- no provider mutation;
+- no wallet submission.
 
-- P4 order creation
-- explicitly approved minimum-size live order
-- P5 webhook/polling, receipt and dashboard history
+Target interaction:
 
-End-of-day proof: NGN instructions are real and USDC delivery status is traceable.
+```text
+User: Buy ₦500 airtime for my brother.
+Providus: Sure — what phone number should I send it to?
+User: 0803...
+Providus: That looks like it may be MTN, but numbers can be ported. Is MTN correct?
+User: Yes.
+Providus: Got it. I’ll prepare ₦500 MTN airtime for 0803... and show you the exact USDC cost before anything moves.
+```
 
-### August 1 — Establish x402 and Gmail
+Suggested structured result:
 
-- P6 x402 primitive
-- one real settlement
-- P7 Gmail OAuth
-- P8 first paid Leak Scan
+```ts
+type PaymentIntent = {
+  type: "airtime" | "data" | "electricity" | "cable" | "unsupported"
+  amountNgn?: string
+  phone?: string
+  network?: "mtn" | "airtel" | "glo" | "9mobile"
+  missingFields: string[]
+  readyForConfirmation: boolean
+}
+```
 
-End-of-day proof: a wallet pays for a scan and receives real mailbox-derived candidates.
+AI safety invariant:
 
-### August 2 — Recovery, hardening and demo
+> The model may interpret language and ask questions, but it cannot authorize, mutate provider state, or decide payment success.
 
-- P9 recovery actions
-- P10 coherent dashboard/copy
-- P11 production hardening
-- demo video, README and submission assets
-- code freeze by 18:00 WAT
+Gate:
 
-### August 3 — Submission buffer
-
-- smoke test production;
-- verify public links and transaction evidence;
-- publish before 10:00 WAT;
-- make no broad feature changes.
+- multi-turn airtime conversation works;
+- missing fields trigger clarification;
+- ambiguous network requires confirmation;
+- unsupported requests fail honestly;
+- model output cannot bypass schema validation;
+- zero Paycrest/ClubKonnect/blockchain mutation;
+- conversation tests pass.
 
 ---
 
-## 8. Cut line
+### P4 — Airtime Preview + Confirmation UX
 
-If the schedule slips, preserve this order:
+**Purpose:** Convert a complete conversational intent into a deterministic, reviewable payment proposal.
+
+Work:
+
+- take only a validated `PaymentIntent`;
+- fetch current Paycrest quote;
+- calculate user-facing USDC amount/fees with exact decimals;
+- quote TTL / stale state;
+- render confirmation card inline in the conversation;
+- show action, recipient, confirmed network, NGN face value, quoted USDC amount, fees, total, network and expiry;
+- allow user to edit payment-critical fields;
+- any edit invalidates the previous confirmation/quote where necessary;
+- explicit approval gate;
+- no Paycrest order creation yet.
+
+Gate:
+
+- zero provider mutation before approval;
+- stale quote cannot be approved silently;
+- amount/phone/network shown in card exactly match validated intent;
+- user can correct fields;
+- mobile UI usable;
+- money/preview tests pass.
+
+---
+
+### P5 — Airtime Payment Orchestration
+
+**Purpose:** Connect an explicitly approved intent to the existing Paycrest payment primitive.
+
+Work:
+
+- create durable internal transaction first;
+- bind it to the approved intent snapshot;
+- use unique idempotency;
+- create dedicated Paycrest off-ramp order for the utility flow;
+- keep existing user-bank cash-out isolated;
+- use configured Providus NGN settlement destination;
+- return payment instructions to client;
+- user signs Celo USDC transfer with active attribution tag;
+- persist tx hash;
+- transition to `settling`;
+- conversational UI may explain current state but must read it from persisted deterministic state.
+
+Blocker that must be resolved before a live run:
+
+> Which verified Nigerian bank account receives the Paycrest fiat proceeds for the airtime operating flow?
+
+Do not hardcode sensitive bank values into source or docs.
+
+Gate:
+
+- mocked E2E through Celo submission boundary;
+- duplicate click does not create duplicate order;
+- approved intent cannot be mutated after payment starts;
+- no live transaction until exact amount/recipient/expected outcome are reviewed.
+
+---
+
+### P6 — Paycrest → ClubKonnect Settlement Bridge
+
+**Purpose:** Complete the actual real-world airtime payment.
+
+Work:
+
+- reconcile Paycrest to documented fiat-delivery milestone;
+- only after that, acquire an idempotent fulfilment right;
+- check ClubKonnect readiness/float where possible;
+- call airtime purchase once;
+- persist RequestID/order ID;
+- treat received/processing states as `processing`;
+- query until verified terminal result;
+- only terminal success → `completed`;
+- terminal provider failure → `failed` / reconciliation-required;
+- do not invent a refund;
+- conversational assistant reports status from the persisted state machine, never from model inference.
+
+Example status responses:
+
+```text
+"Your Celo payment is confirmed. Paycrest is still settling the NGN leg, so I have not sent the airtime request yet."
+
+"The airtime request was received and is still processing. I will not create another purchase while this request is unresolved."
+```
+
+Gate:
+
+- mock all partial-failure paths;
+- server restart can resume;
+- duplicate poll/callback cannot buy airtime twice;
+- assistant status text matches deterministic state;
+- first live test requires explicit approval and minimum safe amount.
+
+---
+
+### P7 — Data Bundles (only if P6 is stable)
+
+**Purpose:** Reuse the same conversational + orchestration architecture with a second fulfilment type.
+
+Work:
+
+- extend the intent schema for `data`;
+- conversationally resolve phone/network/plan;
+- product/catalog lookup;
+- explicit data-plan confirmation;
+- same persistence/idempotency/finality rules;
+- no electricity/cable in this phase.
+
+Cut immediately if it threatens demo stability.
+
+---
+
+### P8 — Evidence, AskBots Round 2, submission polish
+
+**Purpose:** Turn shipped work into judge-verifiable evidence.
+
+Work:
+
+- run AskBots second review according to current track timing/rules;
+- preserve before/after score and review evidence;
+- complete buy/cPay beta feedback workstream separately;
+- verify first tagged transaction after attribution implementation;
+- add real receipt/history evidence;
+- production smoke test;
+- mobile conversational demo rehearsal;
+- README/architecture/PRD update;
+- record walkthrough;
+- prepare X submission post;
+- fill final Celo Builders submission fields;
+- final publish only after explicit review.
+
+Gate:
+
+- no misleading claims;
+- public repo/deployment/video/social links work;
+- all selected track evidence is present;
+- conversational assistant behavior shown truthfully;
+- final API schema re-fetched immediately before publish.
+
+---
+
+## 7. Conversational assistant architecture lock
+
+The conversational assistant is a **presentation + interpretation layer** over deterministic payment infrastructure.
+
+```text
+User message
+→ conversational model
+→ structured PaymentIntent
+→ schema validation
+→ deterministic business validation
+→ clarification OR confirmation card
+→ explicit user approval
+→ payment orchestrator
+→ persisted state machine
+→ provider reconciliation
+→ conversational status/receipt
+```
+
+### Model responsibilities
+
+Allowed:
+
+- generate normal conversational replies (for example greetings, help and explanations);
+- answer ordinary in-scope questions without forcing every message into a payment intent;
+- interpret natural language;
+- preserve current task context;
+- ask clarifying questions;
+- explain fees and states;
+- transform a genuine payment request into a typed candidate intent;
+- summarize persisted transaction status.
+
+Forbidden:
+
+- authorizing money movement;
+- inventing missing payment-critical values;
+- bypassing confirmation;
+- deciding provider success/failure independently;
+- changing an approved intent during execution;
+- directly calling Paycrest, ClubKonnect or wallet mutation code.
+
+### Implementation rule
+
+The assistant should use a pluggable server-side model provider (a low-cost model such as DeepSeek can be the default) so conversational responses are generated dynamically rather than hardcoded.
+
+A useful assistant response contract can distinguish normal chat from financial intent, for example:
+
+```ts
+type AssistantTurn =
+  | {
+      mode: "chat"
+      message: string
+      intent: null
+    }
+  | {
+      mode: "payment_intent"
+      message: string
+      intent: PaymentIntent
+    }
+```
+
+Only the `payment_intent` branch can enter deterministic payment validation. Even then, the model does not execute anything.
+
+The assistant must return structured data validated by a schema. Payment execution code consumes only validated deterministic state, never raw assistant prose.
+
+If the model is unavailable, Providus should fail gracefully or fall back to structured/manual field entry. Model availability must never determine whether a previously approved payment is safe to reconcile.
+
+---
+
+## 8. Test matrix
+
+
+### Existing cash-out regression
+
+Run and keep passing:
+
+- `test:wallet-helpers`
+- `test:money-helpers`
+- `test:recipient-helpers`
+- `test:order-helpers`
+- `test:order-route`
+
+### P0 tests
+
+- exact Paycrest amount accepted;
+- valid but larger/smaller amount rejected;
+- malformed/negative/excess precision rejected;
+- definite failure unlocks retry;
+- unknown create outcome blocks unsafe retry;
+- confirmation callback once per tx;
+- ERC-8021 suffix appended;
+- transfer calldata still decodes to intended recipient/amount;
+- missing tag fails before wallet.
+
+### Persistence/finality
+
+- idempotency;
+- refresh recovery;
+- duplicate provider event;
+- out-of-order event;
+- server restart;
+- Paycrest deposit vs fiat-delivery distinction.
+
+### ClubKonnect
+
+- acknowledgement ≠ success;
+- processing remains processing;
+- only terminal documented success completes;
+- insufficient float;
+- timeout/unknown;
+- duplicate query/callback;
+- Paycrest succeeds + ClubKonnect fails;
+- no fake refund.
+
+### Conversational assistant
+
+- multi-turn context retains current intent without leaking across sessions;
+- missing amount/phone/network produces clarification, not execution;
+- unsupported intent remains non-executable;
+- malformed model output is rejected by schema validation;
+- user correction replaces the proposed field before confirmation;
+- confirmation snapshot cannot be silently changed after approval;
+- assistant status text is derived from persisted state;
+- prompt/model failure cannot trigger provider or wallet mutation.
+
+### Security
+
+- provider secrets absent from client bundle;
+- logs redact PII/secrets;
+- `.env` ignored;
+- no raw bank/phone/provider URLs in logs.
+
+---
+
+## 9. Deadline schedule
+
+### September 19
+
+- capture AskBots baseline;
+- P0;
+- start P1 immediately if P0 gate passes.
+
+### September 20
+
+- finish P1;
+- P2 ClubKonnect boundary;
+- P3 conversational assistant + intent engine;
+- P4 confirmation UX;
+- P5/P6 mocked payment + fulfilment integration;
+- one explicitly approved minimum live run if gates pass;
+- AskBots Round 2 when allowed by current track rules;
+- buy feedback workstream in parallel.
+
+### September 21 — buffer only
+
+Before **09:00 UTC / 10:00 WAT**:
+
+- production smoke test;
+- verify tagged transaction evidence;
+- verify Airtime receipt / cash-out evidence;
+- finalize demo/video;
+- finalize X post;
+- re-fetch submission schema;
+- populate all track fields;
+- publish only after explicit approval.
+
+No broad new feature work on submission morning.
+
+---
+
+## 10. Cut line
+
+If time slips:
 
 ### Must ship
 
-1. Real Paycrest NGN → USDC/Celo order and truthful status.
-2. Real Celo x402 settlement.
-3. Real Gmail connection and evidence-backed paid scan.
-4. Mobile production deployment and receipt evidence.
+1. P0 financial integrity + active Celo attribution.
+2. Durable Paycrest finality.
+3. One coherent multi-turn conversational payment assistant with deterministic confirmation UX.
+4. One safe airtime vertical slice or, if a provider blocker prevents live fulfilment, a truthful demo that clearly distinguishes the blocked external step.
+5. Existing bank cash-out still works.
+6. AskBots before/after evidence.
+7. Submission evidence and production stability.
 
-### Ship if stable
+### Nice to have
 
-1. Per-merchant Recovery Plan.
-2. Cancellation-confirmation monitoring.
-3. Unified dashboard.
+- data bundles;
+- richer history;
+- shareable receipts;
+- advanced command phrasing.
 
 ### Cut first
 
-1. Multiple fiat corridors.
-2. Off-ramp.
-3. Multiple stablecoins.
-4. Automated third-party account cancellation.
-5. Advanced analytics.
-6. Multi-provider ranking.
-7. Custom smart contracts.
+- electricity;
+- cable;
+- cNGN detour;
+- remittances;
+- multiple providers;
+- autonomous spending;
+- custom contracts;
+- general-purpose autonomous agent framework.
 
 ---
 
-## 9. Working method with the coding agent
+## 11. Working method with the coding agent
 
-1. Feed only one prompt at a time.
-2. Bring the agent's complete report back before requesting the next prompt.
-3. If a prompt fails, use a small recovery prompt; do not restart the milestone.
-4. The coding agent must inspect before editing and preserve the existing visual system.
-5. Any mainnet mutation requires explicit approval and an exact amount/target.
-6. Never let the agent silently substitute mock data when an external service fails.
-7. Keep commits scoped by prompt ID where practical.
+Every implementation prompt must:
 
-The immediate next action is **P0**, not UI implementation and not a live order.
+1. stay narrowly scoped;
+2. inspect relevant current files first;
+3. preserve unrelated work;
+4. state allowed files/areas;
+5. prohibit live provider/blockchain mutations unless explicitly approved;
+6. require tests before commit;
+7. report exact files changed;
+8. report exact commands/results;
+9. report unresolved assumptions;
+10. stop at the milestone gate.
+
+Do not allow the coding agent to jump ahead because it “already knows the next step.”
+
+---
+
+## 12. Immediate next action
+
+Current order:
+
+```text
+AskBots baseline
+→ P0 financial integrity + attribution
+→ P1 persistence + Paycrest finality
+→ P2 ClubKonnect boundary
+→ P3 conversational assistant + intent engine
+→ P4 airtime preview + confirmation UX
+→ P5 airtime payment orchestration
+→ P6 fulfilment/reconciliation
+→ P8 evidence + submission
+```
+
+P7 data is optional and only starts if the first airtime slice is stable.

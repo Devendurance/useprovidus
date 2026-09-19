@@ -16,11 +16,13 @@ import { cn } from "@/lib/cn";
 
 type CashOutRecipientProps = {
   enabled: boolean;
+  locked?: boolean;
   onVerifiedChange: (recipient: VerifiedRecipientBinding | null) => void;
 };
 
 export function CashOutRecipient({
   enabled,
+  locked = false,
   onVerifiedChange,
 }: CashOutRecipientProps) {
   const institutions = useNgnInstitutions(enabled);
@@ -28,6 +30,8 @@ export function CashOutRecipient({
   const [institutionCode, setInstitutionCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankQuery, setBankQuery] = useState("");
+  const [bankOpen, setBankOpen] = useState(false);
+  const [activeBankIndex, setActiveBankIndex] = useState(0);
 
   const selectedInstitution = useMemo(() => {
     if (institutions.state.kind !== "ready") return null;
@@ -59,6 +63,12 @@ export function CashOutRecipient({
 
   function handleBankChange(code: string) {
     setInstitutionCode(code);
+    const selected = institutions.state.kind === "ready"
+      ? institutions.state.institutions.find((institution) => institution.code === code)
+      : null;
+    setBankQuery(selected?.name ?? "");
+    setBankOpen(false);
+    setActiveBankIndex(0);
     verification.clear();
     onVerifiedChange(null);
   }
@@ -81,7 +91,7 @@ export function CashOutRecipient({
       </CardDescription>
 
       {institutions.state.kind === "loading" ? (
-        <div className="mt-4 flex items-center gap-2 text-sm text-receipt-grey">
+        <div className="mt-4 flex items-center gap-2 text-sm text-receipt-grey" role="status" aria-live="polite">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading NGN banks…
         </div>
@@ -104,7 +114,7 @@ export function CashOutRecipient({
       ) : null}
 
       {institutions.state.kind === "empty" ? (
-        <p className="mt-4 text-sm text-rate-amber" role="status">
+        <p className="mt-4 text-sm text-ledger-stone" role="status">
           No supported NGN banks are available right now. Cash-out recipient
           setup is temporarily unavailable.
         </p>
@@ -121,13 +131,55 @@ export function CashOutRecipient({
             </label>
             <input
               id="bank-search"
-              className="mt-1.5 h-12 w-full rounded-[10px] border-ledger bg-clear-paper px-4 text-base text-ledger-stone shadow-base focus:outline-none focus:shadow-elevated"
+              role="combobox"
+              aria-controls="bank-options"
+              aria-expanded={bankOpen}
+              aria-autocomplete="list"
+              aria-activedescendant={bankOpen && filteredBanks[activeBankIndex] ? `bank-option-${filteredBanks[activeBankIndex].code}` : undefined}
+              className="mt-1.5 min-h-12 w-full rounded-[10px] border-ledger bg-clear-paper px-4 py-3 text-base text-ledger-stone shadow-base focus:outline-none focus:shadow-elevated"
               placeholder="Search banks…"
               value={bankQuery}
-              onChange={(e) => setBankQuery(e.target.value)}
+              disabled={locked}
+              onFocus={() => setBankOpen(true)}
+              onChange={(e) => {
+                setBankQuery(e.target.value);
+                setBankOpen(true);
+                setActiveBankIndex(0);
+                if (institutionCode) {
+                  setInstitutionCode("");
+                  verification.clear();
+                  onVerifiedChange(null);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (!filteredBanks.length) return;
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  setBankOpen(true);
+                  setActiveBankIndex((index) => Math.min(index + 1, filteredBanks.length - 1));
+                } else if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  setBankOpen(true);
+                  setActiveBankIndex((index) => Math.max(index - 1, 0));
+                } else if (event.key === "Home") {
+                  event.preventDefault();
+                  setActiveBankIndex(0);
+                } else if (event.key === "End") {
+                  event.preventDefault();
+                  setActiveBankIndex(filteredBanks.length - 1);
+                } else if (event.key === "Enter" && bankOpen) {
+                  event.preventDefault();
+                  const bank = filteredBanks[activeBankIndex];
+                  if (bank) handleBankChange(bank.code);
+                } else if (event.key === "Escape") {
+                  event.preventDefault();
+                  setBankOpen(false);
+                }
+              }}
               autoComplete="off"
             />
-            <div
+            {bankOpen ? <div
+              id="bank-options"
               className="mt-2 max-h-48 overflow-y-auto rounded-[10px] border-ledger bg-receipt-field"
               role="listbox"
               aria-label="Nigerian banks"
@@ -137,28 +189,32 @@ export function CashOutRecipient({
                   No banks match your search.
                 </p>
               ) : (
-                filteredBanks.map((bank) => {
+                filteredBanks.map((bank, index) => {
                   const selected = bank.code === institutionCode;
                   return (
                     <button
                       key={bank.code}
                       type="button"
+                      id={`bank-option-${bank.code}`}
                       role="option"
                       aria-selected={selected}
+                      tabIndex={-1}
                       className={cn(
                         "flex w-full items-center justify-between gap-2 border-b border-ledger-edge px-3 py-2.5 text-left text-sm last:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-provident-green",
                         selected
                           ? "bg-provident-green text-white"
                           : "text-ledger-stone hover:bg-ledger-edge/50",
                       )}
+                      onMouseEnter={() => setActiveBankIndex(index)}
                       onClick={() => handleBankChange(bank.code)}
+                      disabled={locked}
                     >
                       <span className="font-semibold">{bank.name}</span>
                     </button>
                   );
                 })
               )}
-            </div>
+            </div> : null}
             {selectedInstitution ? (
               <p className="mt-2 text-xs text-receipt-grey">
                 Selected: {selectedInstitution.name}
@@ -179,17 +235,13 @@ export function CashOutRecipient({
               placeholder="10 digits"
               value={accountNumber}
               onChange={(e) => handleAccountChange(e.target.value)}
-              disabled={!institutionCode}
+              disabled={locked || !institutionCode}
               hint="Exactly 10 digits. Leading zeroes are kept."
+              error={accountCheck && !accountCheck.ok ? accountCheck.message : undefined}
               aria-invalid={
                 accountCheck !== null && !accountCheck.ok ? true : undefined
               }
             />
-            {accountCheck && !accountCheck.ok ? (
-              <p className="mt-2 text-sm text-loss-red" role="alert">
-                {accountCheck.message}
-              </p>
-            ) : null}
           </div>
 
           <Button
@@ -197,7 +249,7 @@ export function CashOutRecipient({
             variant="secondary"
             size="sm"
             disabled={
-              !institutionCode || !accountCheck?.ok || verification.isVerifying
+              locked || !institutionCode || !accountCheck?.ok || verification.isVerifying
             }
             onClick={() => {
               void (async () => {

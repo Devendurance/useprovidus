@@ -24,8 +24,15 @@ export function Select({
   id,
   placeholder,
   className,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
   ...props
 }: SelectProps) {
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const describedBy = [ariaDescribedBy, hint ? hintId : null, error ? errorId : null]
+    .filter(Boolean)
+    .join(" ");
   return (
     <div className="flex w-full flex-col gap-1.5">
       {label ? (
@@ -40,10 +47,12 @@ export function Select({
         <select
           id={id}
           className={cn(
-            "h-12 w-full appearance-none rounded-[10px] border-ledger bg-clear-paper px-4 pr-10 text-base text-ledger-stone shadow-base transition-[box-shadow,transform] duration-100 focus:outline-none focus:shadow-elevated focus:translate-x-px focus:translate-y-px disabled:cursor-not-allowed disabled:bg-ledger-edge/40 disabled:opacity-70",
+            "min-h-12 w-full appearance-none rounded-[10px] border-ledger bg-clear-paper px-4 py-3 pr-10 text-base text-ledger-stone shadow-base transition-[box-shadow,transform] duration-100 focus:outline-none focus:shadow-elevated focus:translate-x-px focus:translate-y-px disabled:cursor-not-allowed disabled:bg-ledger-edge/40 disabled:opacity-70",
             error && "border-loss-red",
             className,
           )}
+          aria-describedby={describedBy || undefined}
+          aria-invalid={error ? true : ariaInvalid}
           {...props}
         >
           {placeholder ? (
@@ -73,12 +82,11 @@ export function Select({
         </span>
       </div>
       {error ? (
-        <p className="text-sm text-loss-red" role="alert">
+        <p id={errorId} className="text-sm text-loss-red" role="alert">
           {error}
         </p>
-      ) : hint ? (
-        <p className="text-sm text-receipt-grey">{hint}</p>
       ) : null}
+      {hint ? <p id={hintId} className="text-sm text-receipt-grey">{hint}</p> : null}
     </div>
   );
 }

@@ -1,196 +1,422 @@
-# Providus Agent PRD
+# Providus PRD
 
-**Product:** Providus  
-**Category:** Celo route-intelligence agent  
-**Core paid action:** Providus Route Check  
-**Hackathon focus:** Celo Agentic Payments & DeFAI Hackathon  
-**Product principle:** Show the outcome before the money moves.
+**Product:** Providus<br/>
+**Category:** Celo-native Nigerian payments agent<br/>
+**Primary hackathon:** Celo Agents at Work<br/>
+**Primary track:** Real World Adoption
+**Product principle:** **Say the payment. Review it. Approve it. Prove the result.**
+
+---
 
 ## 1. Executive summary
 
-Providus helps mobile-first users in high-fee markets choose a better route from local fiat into Celo assets. A user enters country, amount, payment method and target asset; Providus compares a deliberately limited set of supported routes by **effective received amount**, fee, FX spread, limits, settlement time and reliability.
+Providus turns Celo stablecoins into useful Nigerian financial actions.
 
-The user sees a useful locked preview, then pays a small x402 stablecoin fee to unlock the full **Route Verdict**: the recommended route, its assumptions, alternatives and provider handoff.
+Today, the product already supports a real **Celo USDC → Nigerian bank cash-out** path through Paycrest.
 
-Providus does not custody funds or make the fiat purchase. It makes the decision legible before money moves.
+The next hackathon experience adds a command-first payment layer so a user can type requests such as:
+
+- “Send ₦500 airtime to this number.”
+- “Buy 1GB MTN data for me.”
+- “Pay my electricity bill.”
+- “Renew my GOtv subscription.”
+
+Providus interprets the request, shows the exact recipient/service/amount and estimated USDC cost, requires explicit approval, then coordinates the underlying payment rails.
+
+For the deadline, the first complete new vertical slice is:
+
+> **Celo USDC → Paycrest → confirmed NGN settlement → ClubKonnect → airtime.**
+
+Data is next only if airtime is stable. Electricity and cable remain later because they need stronger verification and reconciliation.
+
+---
 
 ## 2. Problem
 
-The same local-currency purchase can yield materially different amounts of cUSD, USDC or CELO depending on provider, payment method, FX spread, local liquidity, limits and settlement speed. Wallets typically surface a single partner route; users cannot reliably tell what will arrive until after choosing.
+Celo stablecoins are useful onchain, but everyday Nigerian spending still happens through local bank and utility rails.
 
-The primary job is:
+A user who holds USDC should not need to understand:
 
-> When I buy a Celo asset, tell me which supported route leaves me with the most usable value for my exact country, amount and payment method.
+- off-ramp APIs;
+- exchange-rate endpoints;
+- bank settlement state;
+- VTU network codes;
+- provider retries;
+- payment references;
+- multiple dashboards.
 
-## 3. Priority market
+The user’s job should be to express the desired outcome and approve the exact payment.
 
-### Primary user
+Providus handles the rail complexity without hiding what is happening.
 
-Mobile-first Celo or stablecoin users in **one or two verified target markets** with meaningful local on-ramp fee variation.
+---
 
-### Secondary users
+## 3. Current shipped product
 
-- Remittance receivers comparing conversion/settlement options.
-- Crypto-curious buyers asking for the cheapest supported route in their country.
-- Apps or agents that pay x402 for a validated route quote.
+### Live
 
-### Non-goal
+- Celo mainnet wallet connection.
+- Celo USDC balance/payment flow.
+- Paycrest live sell quote.
+- Nigerian institution/account verification.
+- Paycrest off-ramp order creation.
+- Direct USDC transfer to the Paycrest per-order receive address.
+- Real USDC → NGN bank cash-out has been successfully exercised.
 
-Do not claim global coverage in the MVP. Narrow coverage with timestamped, explainable routes is more credible than unreliable comparisons everywhere.
+### Known current limitation
 
-## 4. Core experience
+The app currently treats the Celo transaction receipt as its last programmatic checkpoint.
 
-### Flow
+It does not yet durably track Paycrest through final NGN delivery.
 
-1. User opens Providus.
-2. User selects country, fiat currency, amount, payment method and target asset.
-3. Providus fetches and normalises eligible provider/manual quotes.
-4. User receives locked preview: likely saving range and number of routes compared.
-5. User pays x402 through the Celo facilitator for a Route Check.
-6. Providus returns the unlocked Route Verdict.
-7. User opens the provider deep link or clear manual execution instructions.
-8. Providus records a savings estimate and user-visible receipt.
+That gap must be fixed before automatic utility fulfilment is allowed.
 
-### Route Verdict requirements
+### On-ramp
 
-- estimated received amount;
-- asset and route/provider;
-- payment method;
-- explicit fee;
-- estimated FX spread;
-- network cost where relevant;
-- settlement range;
-- route reliability / quote confidence;
-- eligibility and amount-limit caveats;
-- quote capture time and expiry;
-- estimated saving versus stated baseline;
-- provider handoff;
-- alternative eligible routes;
-- transparent ranking rationale.
+Naira → Celo USDC architecture exists conceptually/partially, but provider support is not ready enough to make it the current hackathon focus.
 
-No payment unlock is complete until the result includes an actionable route, not just an abstract score.
+---
 
-## 5. MVP scope
+## 4. Target user
 
-### Must have
+### Primary
 
-- one or two supported countries;
-- two to four real or transparently manual/timestamped route sources per market;
-- country, amount, payment method and asset input;
-- quote normalisation and effective-received calculation;
-- locked preview;
-- x402-paid Route Check;
-- server-side payment verification;
-- Route Verdict and provider handoff;
-- Celo attribution-tag implementation for technically eligible Track 1 transactions;
-- configured payTo / agent wallet for Track 2 settlement attribution;
-- savings receipt;
-- mobile-first empty, stale and failed states;
-- tests for quote calculations and payment verification.
+A Nigerian stablecoin user who has Celo USDC and wants to turn it into an everyday local payment without manually navigating multiple providers.
 
-### Should have
+### Secondary
 
-- route reliability score;
-- quote refresh/expiry;
-- public, data-minimised stats for genuine usage;
-- paid quote API for apps/agents after consumer Route Check works;
-- Askbots-compatible explainability endpoint.
+- freelancers/remote workers receiving stablecoins;
+- family members paying airtime/data for someone else;
+- crypto-native users who want simple NGN utility payments;
+- agents/apps that may later invoke a safe Providus payment action.
+
+---
+
+## 5. Core experience
+
+### Command flow
+
+1. User opens the Providus dashboard.
+2. User enters a natural command.
+3. Providus parses the payment intent.
+4. Providus asks for any missing critical field.
+5. Providus fetches the current Paycrest quote/fee information.
+6. Providus shows a confirmation card.
+7. User explicitly approves.
+8. Providus creates a durable transaction record and Paycrest order.
+9. User signs the Celo USDC transfer.
+10. Providus tracks Paycrest until the documented fiat-delivery condition.
+11. Providus triggers ClubKonnect airtime fulfilment.
+12. Providus reconciles ClubKonnect to a final result.
+13. User receives a truthful receipt.
+
+---
+
+## 6. Airtime confirmation card
+
+Must show:
+
+- action: airtime;
+- recipient phone number;
+- mobile network;
+- NGN face value;
+- estimated/quoted USDC amount;
+- provider/payment fees separately where available;
+- total USDC to be sent;
+- quote freshness / expiry;
+- Celo mainnet;
+- explicit confirmation CTA.
+
+The user must be able to correct the network before payment.
+
+A phone prefix may be used only as a suggestion because mobile number portability can make prefix-based detection wrong.
+
+---
+
+## 7. MVP scope
+
+### Must have before a real airtime demo
+
+- existing bank cash-out remains working;
+- financial amount-integrity bug fixed;
+- active ERC-8021 hackathon attribution tag wired correctly;
+- durable transaction persistence;
+- Paycrest post-deposit reconciliation;
+- deterministic airtime intent parser;
+- command box + confirmation card;
+- server-only ClubKonnect client;
+- provider readiness/balance check where available;
+- unique ClubKonnect RequestID;
+- ClubKonnect final-state reconciliation;
+- receipt/history state;
+- explicit approval before money movement;
+- no blind payment retries;
+- mobile-usable flow;
+- test coverage for duplicate and partial-failure paths.
+
+### Should have if time remains
+
+- data bundle purchase;
+- richer natural-language aliases;
+- transaction history on dashboard;
+- polished progress timeline;
+- shareable payment receipt.
 
 ### Defer
 
-- Gmail subscription scanning;
-- unsubscribe execution;
-- XION/Verona proof layer;
-- global route coverage;
-- affiliate revenue mechanics;
-- success-fee pricing;
-- custody, fiat purchase execution, swapping or trading;
-- broad dashboard analytics.
+- electricity;
+- cable TV;
+- every VTU category;
+- IPO payments;
+- cNGN redesign solely to chase a bounty;
+- remittance expansion;
+- broad multi-country support;
+- autonomous payment without confirmation;
+- Kotani integration;
+- custody;
+- broad LLM agent framework;
+- custom smart contracts.
 
-## 6. Ranking policy
+---
 
-The recommendation ranks user outcome, never provider placement.
+## 8. Intent model
 
-```text
-score =
-  normalized_received_amount * 0.50 +
-  low_fee_score              * 0.20 +
-  reliability_score          * 0.15 +
-  speed_score                * 0.10 +
-  celo_native_bonus          * 0.05
+Executable MVP intent:
+
+```ts
+type AirtimeIntent = {
+  type: "airtime"
+  amountNgn: string
+  phone: string
+  network?: "mtn" | "airtel" | "glo" | "9mobile"
+}
 ```
 
-Effective received amount includes explicit fee, estimated FX spread, network fee, route limits, payment-method eligibility and stale-quote penalty.
+The parser can be deterministic for reliability.
 
-Manual or estimated quotes must be visibly marked with assumption source and capture time. Affiliate/sponsored links, if ever present, must be disclosed and cannot improve ranking.
+If an LLM is later added:
 
-## 7. x402 and Celo requirements
+- it may interpret language;
+- it may not silently invent recipients;
+- it may not change amount/network after confirmation;
+- it may not authorize a transaction;
+- payment-critical fields must be schema validated.
 
-### Route Check payment
+Unsupported commands should return a clear “not available yet” state rather than pretending to execute.
 
-1. `POST /api/quotes/preview` returns preview and 402 payment requirements.
-2. User/client pays through `x402.celo.org`.
-3. Backend validates amount, token, recipient, network and request/action binding.
-4. Backend prevents replay and unlocks the Route Verdict.
-5. Payment record stores settlement reference and action ID.
+---
 
-### Attribution discipline
+## 9. Settlement model
 
-- Register the hackathon project early and obtain the assigned `celo_...` attribution tag.
-- Add the tag to every eligible non-x402 project transaction according to the attribution SDK.
-- Register the actual payTo/agent wallet for x402 Track 2 counting.
-- Do not claim that x402 facilitator settlements themselves carry the attribution tag.
-- Never manufacture payment count through non-useful calls; manual review screens for sybil behaviour and expects genuine utility.
+### Provider roles
 
-## 8. Trust, safety and privacy
+**Paycrest**
+- crypto → NGN off-ramp;
+- quote/order/settlement rail.
 
-- Providus recommends and deep-links; it does not custody or directly move the user’s fiat funds.
-- Quote results are estimates, not price guarantees.
-- Every result discloses freshness and expiry.
-- Validate all request fields with a schema layer and enforce rate limits.
-- Store provider keys server-side; never expose secrets or wallet keys in client bundles.
-- Bind x402 payments to a specific quote/action ID and verify server-side.
-- Store only what is necessary for quote history, payment proof and user receipts.
-- If the post-hackathon Monitor module uses Gmail, it must use read-only OAuth, avoid full-message-body retention, provide deletion, and remain optional.
+**ClubKonnect**
+- local VTU/utility fulfilment;
+- first target: airtime.
 
-## 9. Success metrics
+### Critical assumption
+
+Paycrest does **not** automatically fund ClubKonnect.
+
+Hackathon operating model:
+
+1. Providus maintains a small prepaid NGN ClubKonnect float.
+2. User payment settles through Paycrest.
+3. Providus confirms the Paycrest fiat-delivery condition.
+4. Providus spends from the prepaid ClubKonnect balance to fulfil airtime.
+5. Paycrest NGN proceeds economically replenish the operating float through an external process unless a direct integration is later proven.
+
+Do not claim an automatic Paycrest → ClubKonnect transfer unless it is actually implemented and verified.
+
+A designated Providus NGN payout destination must exist before a live airtime order is attempted.
+
+---
+
+## 10. Transaction states
+
+Internal state must be more truthful than a single “success” flag.
+
+Recommended:
+
+```text
+pending
+settling
+settled
+processing
+completed
+failed
+refunded
+```
+
+Interpretation:
+
+- `pending` — intent/order exists; payment not yet confirmed;
+- `settling` — Celo payment sent/confirmed, Paycrest fiat delivery pending;
+- `settled` — required Paycrest fiat-delivery milestone reached (`validated` fiat delivery confirmed); for `cash_out` this is the effective terminal business outcome, while for utility transactions it enables downstream fulfilment;
+- `processing` — ClubKonnect fulfilment submitted/reconciling;
+- `completed` — airtime final success verified;
+- `failed` — terminal failure requiring user-facing explanation/review;
+- `refunded` — refund actually occurred.
+
+Never write `refunded` merely because fulfilment failed.
+
+---
+
+## 11. Reliability rules
+
+- Initial provider acknowledgement is not final success.
+- Unknown request outcome is not permission to create another order.
+- Duplicate callbacks/polls must not trigger duplicate airtime.
+- Quote expiry forces a fresh confirmation when economics change materially.
+- Persist an orchestration before crossing irreversible provider boundaries.
+- Upstream amount returned by Paycrest must exactly match the approved amount.
+- Every provider mutation gets a unique/idempotent reference.
+- No full account numbers/API keys in logs.
+- Payment and provider calls stay server-side except the user’s wallet signature.
+
+---
+
+## 12. Celo / hackathon requirements
+
+Current Agents at Work identity:
+
+```text
+ERC-8004: https://8004scan.io/agents/celo/9851
+Agent ID: 9851
+```
+
+Current locked attribution tag:
+
+```text
+celo_8190b99392a2
+```
+
+Registered tracks:
+
+- `real-world-adoption` — primary;
+- `value-moved`;
+- `askbots-growth`;
+- `judges-favorite`;
+- `cpay-feedback`.
+
+All eligible new Celo transactions intended for hackathon attribution must use the active tag once ERC-8021 support is correctly implemented.
+
+Do not use the old hackathon tag `celo_91fed90b97fc`.
+
+---
+
+## 13. Track strategy
+
+### Real World Adoption
+
+The product itself should prove the track:
+
+- stablecoin holder;
+- real Nigerian need;
+- user approval;
+- real local payout/fulfilment;
+- truthful receipt.
+
+### Value Moved
+
+Use real economic activity only.
+
+Prefer transactions involving genuine usage/independent participants rather than self-generated volume.
+
+### AskBots Growth
+
+Baseline review must happen before the P0 hardening changes. Preserve findings and scores, implement improvements, then complete the second review.
+
+### Judges’ Favorite
+
+Win attention through one coherent end-to-end experience, not feature count:
+
+> command → confirm → Celo → local rail → proof.
+
+### buy feedback
+
+Treat beta testing/feedback as a separate track workstream. Do not distort the core Providus architecture merely to satisfy it.
+
+---
+
+## 14. Security & privacy
+
+- Paycrest and ClubKonnect keys are server-only.
+- `.env` must stay out of git.
+- If a secret is found in git history, rotate it.
+- Never print credential values in diagnostics.
+- Bank account details should be minimized and masked in logs.
+- Phone numbers should be minimized in logs.
+- Use exact decimal arithmetic.
+- Validate all provider payloads.
+- Never blindly retry a payment.
+- User approval is required before wallet submission.
+- No autonomous background spending in this MVP.
+
+---
+
+## 15. Success metrics
 
 ### Product north star
 
-> **Verified estimated savings produced through completed Celo-routed actions.**
+> **Completed real-world payments from Celo stablecoins with truthful end-to-end proof.**
 
-### Hackathon metrics
+### Hackathon evidence
 
-- genuine x402 Route Check settlements;
-- payment conversion from preview to unlock;
-- tagged eligible Celo transaction volume;
-- route checks completed per target market;
-- freshness and coverage of displayed routes;
-- user-reported recommendation usefulness;
-- failed/stale quote rate.
+- successful tagged Celo mainnet payment activity after attribution implementation;
+- real Paycrest settlement;
+- completed airtime fulfilment;
+- number of genuine users/signers;
+- repeat usage if achieved organically;
+- zero duplicate fulfilment incidents;
+- AskBots baseline-to-round-2 improvement;
+- public demo quality;
+- useful buy feedback submission.
 
-## 10. Demo script
+Do not optimize metrics through spam or meaningless transactions.
 
-1. A user wants to buy cUSD in a supported market.
-2. They enter local amount and payment method.
-3. Providus compares three clear options.
-4. The locked preview shows potential saving.
-5. The user completes a small x402 Route Check payment on Celo.
-6. The Route Verdict reveals: `You receive an estimated 96.42 cUSD`.
-7. The user sees fee, FX, settlement time, confidence and route alternatives.
-8. They continue to the selected provider.
-9. Providus records a clear receipt: `You kept an estimated 3.42 cUSD by choosing this route.`
+---
 
-## 11. Definition of done
+## 16. Demo script
 
-The MVP is complete only when:
+Ideal submission demo:
 
-- a public repository exists;
-- the project is registered and attribution/payout wallet setup is recorded;
-- at least one real user-facing Route Check can be paid through x402 on Celo;
-- the full Route Verdict is generated from actual or explicitly labelled manual quote data;
-- the quote calculation and route ranking are tested;
-- stale/no-route/low-confidence states are accurate;
-- mobile flow is usable;
-- no financial outcome is presented as guaranteed when estimated;
-- demo and README distinguish shipped behaviour from the deferred Monitor module.
+1. User connects a Celo wallet holding USDC.
+2. User types: `Send ₦500 airtime to 080...`
+3. Providus parses the command.
+4. Confirmation card shows phone, network, NGN amount, USDC total and fee.
+5. User corrects/accepts the network and approves.
+6. Wallet signs the tagged Celo USDC transaction.
+7. Providus shows `Settling with Paycrest`.
+8. Paycrest fiat delivery is reconciled.
+9. Providus moves to `Delivering airtime`.
+10. ClubKonnect final success is reconciled.
+11. Receipt shows completed airtime and transaction evidence.
+12. Existing bank cash-out remains available as a separate proven flow.
+
+If final provider settlement cannot be demonstrated safely before the deadline, do not fake a completed state.
+
+---
+
+## 17. Definition of done
+
+The airtime MVP is done only when:
+
+- existing cash-out regressions pass;
+- repo secrets are not exposed;
+- active attribution tag is correctly encoded;
+- transaction survives page refresh/server restart;
+- user intent is validated;
+- approval is explicit;
+- Paycrest order amount integrity is enforced;
+- Paycrest settlement is programmatically reconciled;
+- ClubKonnect fulfilment is idempotent;
+- provider acknowledgement is not treated as final success;
+- a terminal completed/failed state is truthful;
+- one explicitly approved mainnet demo can run end to end;
+- README/docs distinguish shipped functionality from future categories;
+- project remains ready for final Celo Builders submission.

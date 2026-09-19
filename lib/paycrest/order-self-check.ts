@@ -90,6 +90,65 @@ function run() {
     assert.equal(norm.order.providerAccount.network, "celo");
     assert.equal(norm.order.senderFee, "0.1");
   }
+  // Amount integrity tests (Task 3)
+  // 1. Equivalent allowed decimal forms are accepted
+  const equivDecimal = JSON.parse(JSON.stringify(validResponse));
+  equivDecimal.data.amount = "50.0";
+  const normEquiv = normalizeCashOutOrderResponse(equivDecimal, expectedInfo);
+  assert.equal(normEquiv.ok, true);
+
+  const equivZeros = JSON.parse(JSON.stringify(validResponse));
+  equivZeros.data.amount = "50.000000";
+  const normZeros = normalizeCashOutOrderResponse(equivZeros, expectedInfo);
+  assert.equal(normZeros.ok, true);
+
+  // 2. Larger valid amount rejected
+  const largerAmount = JSON.parse(JSON.stringify(validResponse));
+  largerAmount.data.amount = "51";
+  const normLarger = normalizeCashOutOrderResponse(largerAmount, expectedInfo);
+  assert.equal(normLarger.ok, false);
+  if (!normLarger.ok) {
+    assert.equal(normLarger.code, "ORDER_RESPONSE_UNSAFE");
+    assert.ok(normLarger.message.includes("Order amount mismatch"));
+  }
+
+  // 3. Smaller valid amount rejected
+  const smallerAmount = JSON.parse(JSON.stringify(validResponse));
+  smallerAmount.data.amount = "49";
+  const normSmaller = normalizeCashOutOrderResponse(smallerAmount, expectedInfo);
+  assert.equal(normSmaller.ok, false);
+  if (!normSmaller.ok) {
+    assert.equal(normSmaller.code, "ORDER_RESPONSE_UNSAFE");
+    assert.ok(normSmaller.message.includes("Order amount mismatch"));
+  }
+
+  // 4. Malformed amount rejected
+  const malformedAmount = JSON.parse(JSON.stringify(validResponse));
+  malformedAmount.data.amount = "abc";
+  const normMalformed = normalizeCashOutOrderResponse(malformedAmount, expectedInfo);
+  assert.equal(normMalformed.ok, false);
+  if (!normMalformed.ok) {
+    assert.equal(normMalformed.code, "ORDER_RESPONSE_UNSAFE");
+  }
+
+  // 5. Negative amount rejected
+  const negativeAmount = JSON.parse(JSON.stringify(validResponse));
+  negativeAmount.data.amount = "-50";
+  const normNegative = normalizeCashOutOrderResponse(negativeAmount, expectedInfo);
+  assert.equal(normNegative.ok, false);
+  if (!normNegative.ok) {
+    assert.equal(normNegative.code, "ORDER_RESPONSE_UNSAFE");
+  }
+
+  // 6. Over-precision amount rejected (> 6 decimal places)
+  const overPrecisionAmount = JSON.parse(JSON.stringify(validResponse));
+  overPrecisionAmount.data.amount = "50.1234567";
+  const normOverPrecision = normalizeCashOutOrderResponse(overPrecisionAmount, expectedInfo);
+  assert.equal(normOverPrecision.ok, false);
+  if (!normOverPrecision.ok) {
+    assert.equal(normOverPrecision.code, "ORDER_RESPONSE_UNSAFE");
+  }
+
 
   // Missing senderFee or transactionFee blocks payment
   const missingSenderFee = JSON.parse(JSON.stringify(validResponse));

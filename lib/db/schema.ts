@@ -1,0 +1,77 @@
+import {
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+/**
+ * Supported internal transaction statuses across Providus transaction lifecycles:
+ *
+ * cash_out:
+ *   pending -> settling -> settled
+ *   ('settled' represents confirmed fiat delivery and serves as effective terminal business outcome)
+ *
+ * future utility (e.g. airtime / data):
+ *   pending -> settling -> settled -> processing -> completed
+ *   ('settled' represents confirmed fiat delivery into utility liquidity/escrow rail,
+ *    which then transitions to 'processing' for third-party fulfilment and 'completed' on final success)
+ *
+ * terminal failure modes:
+ *   failed: order creation, deposit, or fulfilment definitely failed (universally terminal)
+ *   refunded: deposit refunded to user refund address on Celo (universally terminal)
+ */
+export const TRANSACTION_STATUSES = [
+  "pending",
+  "settling",
+  "settled",
+  "processing",
+  "completed",
+  "failed",
+  "refunded",
+] as const;
+
+export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
+
+export const TRANSACTION_TYPES = ["cash_out", "airtime"] as const;
+export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+
+export const agentTransactions = pgTable(
+  "agent_transactions",
+  {
+    id: text("id").primaryKey(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    type: text("type").notNull().default("cash_out"),
+    status: text("status").notNull().default("pending"),
+    walletAddress: text("wallet_address").notNull(),
+    amountUsdc: text("amount_usdc").notNull(),
+    amountNgn: text("amount_ngn"),
+    celoTxHash: text("celo_tx_hash"),
+    paycrestOrderId: text("paycrest_order_id"),
+    paycrestReference: text("paycrest_reference").notNull(),
+    paycrestStatus: text("paycrest_status"),
+    receiveAddress: text("receive_address"),
+    validUntil: timestamp("valid_until", { withTimezone: true, mode: "string" }),
+    failureCode: text("failure_code"),
+    failureReason: text("failure_reason"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("agent_tx_idempotency_idx").on(table.idempotencyKey),
+    uniqueIndex("agent_tx_paycrest_ref_idx").on(table.paycrestReference),
+    index("agent_tx_wallet_idx").on(table.walletAddress),
+    index("agent_tx_order_id_idx").on(table.paycrestOrderId),
+    index("agent_tx_status_idx").on(table.status),
+  ],
+);
+
+export type AgentTransaction = typeof agentTransactions.$inferSelect;
+export type NewAgentTransaction = typeof agentTransactions.$inferInsert;

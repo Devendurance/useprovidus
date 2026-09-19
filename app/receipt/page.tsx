@@ -7,9 +7,9 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { LinkButton } from "@/components/ui/link-button";
 
 export const metadata: Metadata = {
-  title: "Savings receipt",
+  title: "Payment receipt",
   description:
-    "Complete a Route Check to get a timestamped savings receipt.",
+    "A truthful payment receipt for a verified Providus cash-out.",
 };
 
 export default function ReceiptPage() {
@@ -18,11 +18,12 @@ export default function ReceiptPage() {
       <div className="max-w-2xl">
         <p className="font-proof text-receipt-grey">Proof surface</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
-          Savings receipt
+          Payment receipt
         </h1>
         <p className="mt-3 text-receipt-grey leading-relaxed">
-          Complete a Route Check to get a savings receipt. Estimates only—never
-          presented as a guaranteed saving.
+          A receipt appears only after Providus has evidence for the relevant
+          payment state. Celo deposit confirmation alone is not Nigerian bank
+          delivery.
         </p>
       </div>
 
@@ -32,32 +33,33 @@ export default function ReceiptPage() {
         <EmptyState
           variant="surface"
           icon={<Receipt className="h-5 w-5" />}
-          title="No receipt yet"
-          description="Complete a Route Check to get a savings receipt. When available, it will show the estimated amount you kept, the path taken, and capture time—without wallet balances or provider personal data."
+          title="No verified payment receipt yet"
+          description="Start a Celo USDC cash-out from Move Money. Providus will keep the quote, recipient, wallet approval and settlement states distinct instead of inventing a completed payout."
           action={
             <LinkButton href="/check" variant="primary" size="lg">
-              Check my route
+              Start a cash-out
             </LinkButton>
           }
         />
 
         <Card variant="verdict" className="flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle>Receipt shell</CardTitle>
+            <CardTitle>Receipt status</CardTitle>
             <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 font-proof text-[12px] text-receipt-grey">
               EMPTY
             </span>
           </div>
           <CardDescription className="mt-2">
-            Structure for a shareable, data-minimised proof surface.
+            A data-minimised proof surface will be populated from verified
+            payment evidence.
           </CardDescription>
 
           <div className="mt-8 rounded-[10px] border border-dashed border-ledger-edge bg-receipt-field px-4 py-8 text-center">
             <p className="font-display text-2xl font-semibold tracking-tight text-receipt-grey/80 sm:text-3xl">
-              Estimated keep
+              Verified result
             </p>
             <p className="mt-2 font-proof text-receipt-grey">
-              — · no Route Check completed
+              — · no verified cash-out completed
             </p>
           </div>
 
@@ -67,10 +69,10 @@ export default function ReceiptPage() {
 
           <dl className="mt-6 grid gap-3 border-t border-ledger-edge pt-6 sm:grid-cols-2">
             {[
-              "Path",
-              "Capture time",
-              "Quote state",
-              "Baseline comparison",
+              "Payment",
+              "Celo deposit",
+              "Nigerian settlement",
+              "Receipt state",
             ].map((label) => (
               <div key={label}>
                 <dt className="font-proof text-receipt-grey">{label}</dt>

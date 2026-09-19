@@ -5,28 +5,27 @@ import { RouteStepper } from "@/components/providus/route-stepper";
 import { ValueLine } from "@/components/providus/value-line";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
-import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
 import { PreviewQuerySummary } from "@/components/check/preview-query-summary";
 
 export const metadata: Metadata = {
-  title: "Route preview",
+  title: "Cash-out review",
   description:
-    "Locked Route Check preview. Full verdict unlocks after payment.",
+    "A truthful placeholder for an active Providus cash-out review.",
 };
 
 export default function CheckPreviewPage() {
   return (
     <div className="container-providus py-10 sm:py-14">
       <div className="max-w-2xl">
-        <p className="font-proof text-receipt-grey">Locked preview</p>
+        <p className="font-proof text-receipt-grey">Review not started</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
-          Route comparison preview
+          No active cash-out review
         </h1>
         <p className="mt-3 text-receipt-grey leading-relaxed">
-          Preview will appear here once route comparison is connected. No
-          estimate to show yet.
+          This page only displays a review when a cash-out session has supplied
+          a current quote and verified bank recipient. No amount, provider or
+          settlement result is being invented here.
         </p>
       </div>
 
@@ -48,12 +47,12 @@ export default function CheckPreviewPage() {
           <EmptyState
             variant="surface"
             icon={<Lock className="h-5 w-5" />}
-            title="No live preview yet"
-            description="Preview will appear here once route comparison is connected. No estimate to show yet. Saving range, routes compared and quote freshness stay empty until the quote API is wired."
+            title="Start from Move Money"
+            description="Enter a Celo USDC amount, choose a Nigerian bank account and request a current Paycrest quote before reviewing the transfer."
             action={
               <LinkButton href="/check" variant="ghost" size="md">
                 <ArrowLeft className="h-4 w-4" aria-hidden />
-                Edit inputs
+                Start cash-out
               </LinkButton>
             }
           />
@@ -72,42 +71,25 @@ export default function CheckPreviewPage() {
               <ValueLine compact />
             </div>
             <CardDescription className="mt-5">
-              Amounts, fees and receive figures appear after a connected quote
-              comparison—never invented for display.
+              Amounts, fees and estimated NGN receive appear only after a live
+              quote is available. A quote is an estimate, not proof of bank
+              delivery.
             </CardDescription>
           </Card>
         </div>
 
         <aside className="space-y-4">
-          <Card variant="surface">
-            <CardTitle>Unlock full route</CardTitle>
-            <CardDescription>
-              A small x402 payment unlocks the complete Route Verdict. Payment
-              and quote unlock are not connected yet.
-            </CardDescription>
-            <div className="mt-5 space-y-3">
-              <Button type="button" variant="primary" fullWidth disabled>
-                Unlock full route — coming soon
-              </Button>
-              <ConnectWalletButton fullWidth label="Connect wallet to pay" />
-              <p className="text-sm text-receipt-grey">
-                Full Route Verdict unlocks after a Route Check payment.
-                Functionality is not connected yet.
-              </p>
-            </div>
-          </Card>
-
           <Card variant="flat">
-            <CardTitle className="text-base">What unlocks</CardTitle>
+            <CardTitle className="text-base">What review will show</CardTitle>
             <ul className="mt-3 space-y-2 text-sm text-receipt-grey">
-              <li>Recommended route and estimated receive</li>
-              <li>Fee, FX, limits, settlement, reliability</li>
-              <li>Alternatives and ranking rationale</li>
-              <li>Continue with provider handoff</li>
+              <li>Verified bank recipient and account name</li>
+              <li>Current USDC amount, NGN estimate and fees</li>
+              <li>Quote freshness, expiry and Celo network</li>
+              <li>Explicit wallet approval before transfer</li>
             </ul>
             <div className="mt-5">
-              <LinkButton href="/check/verdict" variant="ghost" size="md">
-                View verdict shell
+              <LinkButton href="/check" variant="ghost" size="md">
+                Open Move Money
               </LinkButton>
             </div>
           </Card>

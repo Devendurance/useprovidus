@@ -8,7 +8,7 @@ import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
 export const metadata: Metadata = {
   title: "Dashboard",
   description:
-    "Your Route Check history. No checks yet—start one to see history here.",
+    "Your Providus payment history, available when durable transaction storage is connected.",
 };
 
 export default function DashboardPage() {
@@ -16,19 +16,20 @@ export default function DashboardPage() {
     <div className="container-providus py-10 sm:py-14">
       <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-2xl">
-          <p className="font-proof text-receipt-grey">History</p>
+          <p className="font-proof text-receipt-grey">Payment history</p>
           <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
             Dashboard
           </h1>
           <p className="mt-3 text-receipt-grey leading-relaxed">
-            Thin history of Route Checks and receipts. Improve later
-            recommendations with real use—once storage is connected.
+            Durable payment history is not connected yet. Start a Celo USDC
+            cash-out from Move Money; this page will show verified payment
+            evidence when storage and settlement reconciliation are available.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
           <ConnectWalletButton />
           <LinkButton href="/check" variant="primary" size="md">
-            Check my route
+            Start a cash-out
           </LinkButton>
         </div>
       </div>
@@ -37,11 +38,11 @@ export default function DashboardPage() {
         <EmptyState
           variant="surface"
           icon={<History className="h-5 w-5" />}
-          title="No route checks yet"
-          description="No route checks yet. Check a route to see history here. When connected, each row will show capture time, path and estimated keep—never fake balances or invented providers."
+          title="No payment history yet"
+          description="No verified Providus cash-outs are stored in this browser. Start a cash-out to review a live quote and approve the exact Celo transfer. History will not be fabricated from wallet balances or provider guesses."
           action={
             <LinkButton href="/check" variant="primary" size="lg">
-              Check my route
+              Start a cash-out
             </LinkButton>
           }
         />
@@ -50,20 +51,20 @@ export default function DashboardPage() {
           <Card variant="flat">
             <CardTitle className="text-base">What will appear</CardTitle>
             <CardDescription>
-              After Route Checks are stored, expect:
+              After durable transaction storage is connected, expect:
             </CardDescription>
             <ul className="mt-3 space-y-2 text-sm text-receipt-grey">
-              <li>Timestamped Route Check entries</li>
-              <li>Selected route labels (not balances)</li>
-              <li>Estimated keep language, marked as estimate</li>
-              <li>Links back to receipt shells you own</li>
+              <li>Timestamped cash-out entries</li>
+              <li>Recipient and quote evidence</li>
+              <li>Celo deposit and Nigerian settlement states</li>
+              <li>Receipts only for verified terminal results</li>
             </ul>
           </Card>
           <Card variant="standard">
             <CardTitle className="text-base">Keep control</CardTitle>
             <CardDescription>
-              Providus does not custody funds. History is for your decisions—not
-              a portfolio dashboard.
+              Providus does not custody funds. History is payment evidence for
+              your decisions—not a portfolio or balance dashboard.
             </CardDescription>
           </Card>
         </aside>

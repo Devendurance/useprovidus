@@ -4,7 +4,7 @@ import { MoveMoneyPanel } from "@/components/move/move-money-panel";
 export const metadata: Metadata = {
   title: "Move Money",
   description:
-    "Live quotes for buying USDC on Celo with NGN or cashing out Celo USDC to NGN via Paycrest.",
+    "Cash out Celo USDC to a verified Nigerian bank account through Paycrest.",
 };
 
 export default function MoveMoneyPage() {
@@ -13,11 +13,12 @@ export default function MoveMoneyPage() {
       <div className="max-w-2xl">
         <p className="font-proof text-receipt-grey">Providus · Move Money</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
-          Know what arrives before you pay
+          Move Celo USDC to a Nigerian bank account
         </h1>
         <p className="mt-3 text-receipt-grey leading-relaxed">
-          Check a live Celo USDC route quote. Buy USDC (NGN → USDC) or cash out
-          (USDC → NGN). Quotes are time-sensitive and do not move funds.
+          Review a live Paycrest quote, verify the recipient and approve the
+          exact Celo USDC transfer yourself. Quotes are time-sensitive; Celo
+          confirmation does not by itself prove Nigerian bank delivery.
         </p>
       </div>
 

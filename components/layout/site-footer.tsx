@@ -3,8 +3,8 @@ import Link from "next/link";
 const FOOTER_LINKS = [
   { href: "/how-it-works", label: "How it works" },
   { href: "/check", label: "Move Money" },
-  { href: "/receipt", label: "Savings receipt" },
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/receipt", label: "Payment receipt" },
+  { href: "/dashboard", label: "Payment history" },
 ] as const;
 
 export function SiteFooter() {
@@ -25,9 +25,9 @@ export function SiteFooter() {
               </span>
             </div>
             <p className="max-w-md text-sm leading-relaxed text-receipt-grey">
-              The Celo route-intelligence agent for smarter on-ramp decisions.
-              Compare local routes by what you actually receive—not the
-              headline fee.
+              A Celo-native Nigerian payments agent. Turn Celo USDC into a
+              reviewed bank cash-out, with approval and settlement states kept
+              visible.
             </p>
             <p className="font-proof text-receipt-grey">
               pro-VEE-dus · from Latin providus: foreseeing, prudent, prepared
@@ -59,7 +59,8 @@ export function SiteFooter() {
               </h2>
               <ul className="mt-3 space-y-2 text-sm text-receipt-grey">
                 <li>No custody of user funds</li>
-                <li>No fiat purchase execution</li>
+                <li>No wallet custody or silent approval</li>
+                <li>Celo deposit is not bank delivery</li>
                 <li>Estimates, not guarantees</li>
                 <li>You keep control of every transfer</li>
               </ul>
@@ -69,7 +70,7 @@ export function SiteFooter() {
 
         <div className="mt-10 flex flex-col gap-3 border-t border-ledger-edge pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-receipt-grey">
-            Providus does not hold or move your funds. Route results are
+            Providus does not hold or move your funds. Payment quotes are
             estimates with disclosed assumptions and freshness.
           </p>
           <p className="font-proof text-xs text-receipt-grey">

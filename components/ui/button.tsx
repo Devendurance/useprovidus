@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 type ButtonVariant = "primary" | "secondary" | "tertiary" | "ghost";
 type ButtonSize = "md" | "sm" | "lg";
@@ -28,19 +28,23 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: "min-h-[52px] h-[52px] px-7 text-base",
 };
 
-export function Button({
-  variant = "primary",
-  size = "md",
-  fullWidth = false,
-  className,
-  type = "button",
-  children,
-  ...props
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    variant = "primary",
+    size = "md",
+    fullWidth = false,
+    className,
+    type = "button",
+    children,
+    ...props
+  },
+  ref,
+) {
   const resolvedSize = variant === "primary" && size === "md" ? "lg" : size;
 
   return (
     <button
+      ref={ref}
       type={type}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-[10px] font-semibold tracking-tight transition-[transform,box-shadow,background-color] duration-100 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green disabled:cursor-not-allowed",
@@ -54,4 +58,4 @@ export function Button({
       {children}
     </button>
   );
-}
+});

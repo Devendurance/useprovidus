@@ -16,6 +16,7 @@ import {
   verifyNgnAccountName,
 } from "@/lib/paycrest/server";
 import { NextResponse } from "next/server";
+import { getTransactionRepository } from "@/lib/transactions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
     "accountIdentifier",
     "refundAddress",
     "reviewedAccountName",
+    "idempotencyKey",
   ]);
   for (const key of Object.keys(rec)) {
     if (!allowed.has(key)) {
@@ -109,6 +111,11 @@ export async function POST(request: Request) {
   const reviewedName =
     typeof rec.reviewedAccountName === "string"
       ? rec.reviewedAccountName
+      : null;
+
+  const idempotencyKey =
+    typeof rec.idempotencyKey === "string" && rec.idempotencyKey.trim() !== ""
+      ? rec.idempotencyKey.trim()
       : null;
 
   if (
@@ -138,6 +145,80 @@ export async function POST(request: Request) {
     return err("INVALID_REFUND_ADDRESS", "refundAddress must be a valid EVM address", 400);
   }
   const refundAddress = getAddress(refundRaw);
+  const repo = getTransactionRepository();
+
+  // Idempotency: check if an order already exists for this idempotency key
+  // Checked BEFORE upstream calls so retries never make unnecessary network calls
+  if (idempotencyKey) {
+    const existing = await repo.findByIdempotencyKey(idempotencyKey);
+    if (existing) {
+      if (existing.paycrestOrderId && existing.receiveAddress) {
+        return NextResponse.json(
+          {
+            ok: true,
+            order: {
+              id: existing.paycrestOrderId,
+              status: existing.paycrestStatus || "initiated",
+              amount: existing.amountUsdc,
+              rate: existing.metadata?.rate ?? null,
+              senderFee: existing.metadata?.senderFee ?? "0",
+              transactionFee: existing.metadata?.transactionFee ?? "0",
+              totalUsdcToSend:
+                existing.metadata?.totalUsdcToSend ?? existing.amountUsdc,
+              providerAccount: {
+                network: "celo",
+                receiveAddress: getAddress(existing.receiveAddress),
+                validUntil: existing.validUntil ?? "",
+              },
+              recipient: {
+                institution:
+                  existing.metadata?.institution ?? institutionRaw,
+                institutionName:
+                  existing.metadata?.institutionName ?? "Bank",
+                accountName:
+                  existing.metadata?.accountName ?? reviewedName ?? "Recipient",
+                accountIdentifierMasked:
+                  existing.metadata?.accountIdentifierMasked ??
+                  maskAccountIdentifier(accountCheck.data),
+              },
+              refundAddress,
+              reference: existing.paycrestReference,
+              createdAt: existing.createdAt,
+            },
+            transactionId: existing.id,
+            reused: true,
+          },
+          { status: 200, headers: NO_STORE },
+        );
+      }
+
+      if (existing.status === "failed") {
+        return err(
+          "PAYCREST_ORDER_REJECTED",
+          existing.failureReason || "Previous order creation failed",
+          400,
+          {
+            reference: existing.paycrestReference,
+            transactionId: existing.id,
+          },
+        );
+      }
+
+      // Pre-order row exists but has no paycrestOrderId (timeout or unknown outcome previously).
+      // CRITICAL: NEVER call createOfframpOrder again!
+      return err(
+        "ORDER_CREATION_OUTCOME_UNKNOWN",
+        "A previous order creation request was initiated with this idempotency key and its outcome remains unknown. Do not submit again immediately.",
+        504,
+        {
+          reference: existing.paycrestReference,
+          transactionId: existing.id,
+          recoveryRequired: true,
+          paymentBlocked: true,
+        },
+      );
+    }
+  }
 
   const institutionsResult = await listNgnBankInstitutions();
   if (!institutionsResult.ok) {
@@ -198,7 +279,89 @@ export async function POST(request: Request) {
     );
   }
 
+
   const reference = generateOrderReference();
+  const effectiveIdempotencyKey = idempotencyKey || reference;
+
+  // Persist pre-order transaction row before calling Paycrest
+  const txInit = await repo.create({
+    idempotencyKey: effectiveIdempotencyKey,
+    type: "cash_out",
+    walletAddress: refundAddress,
+    amountUsdc: amountCheck.data,
+    paycrestReference: reference,
+    metadata: {
+      institution: institutionCheck.data.code,
+      institutionName: institutionCheck.data.name,
+      accountIdentifierMasked: maskAccountIdentifier(accountCheck.data),
+      accountName: freshName,
+      refundAddress,
+    },
+  });
+
+  if (!txInit.ok) {
+    if (txInit.code === "DATABASE_UNAVAILABLE") {
+      return err("CONFIGURATION_ERROR", txInit.message, 500);
+    }
+    return err("UPSTREAM_ERROR", txInit.message, 500);
+  }
+
+  const transaction = txInit.record;
+  if (txInit.reused) {
+    // A concurrent request won the race or row already existed
+    const existing = txInit.record;
+    if (existing.paycrestOrderId && existing.receiveAddress) {
+      return NextResponse.json(
+        {
+          ok: true,
+          order: {
+            id: existing.paycrestOrderId,
+            status: existing.paycrestStatus || "initiated",
+            amount: existing.amountUsdc,
+            rate: existing.metadata?.rate ?? null,
+            senderFee: existing.metadata?.senderFee ?? "0",
+            transactionFee: existing.metadata?.transactionFee ?? "0",
+            totalUsdcToSend:
+              existing.metadata?.totalUsdcToSend ?? existing.amountUsdc,
+            providerAccount: {
+              network: "celo",
+              receiveAddress: getAddress(existing.receiveAddress),
+              validUntil: existing.validUntil ?? "",
+            },
+            recipient: {
+              institution:
+                existing.metadata?.institution ?? institutionCheck.data.code,
+              institutionName:
+                existing.metadata?.institutionName ?? institutionCheck.data.name,
+              accountName: existing.metadata?.accountName ?? freshName,
+              accountIdentifierMasked:
+                existing.metadata?.accountIdentifierMasked ??
+                maskAccountIdentifier(accountCheck.data),
+            },
+            refundAddress,
+            reference: existing.paycrestReference,
+            createdAt: existing.createdAt,
+          },
+          transactionId: existing.id,
+          reused: true,
+        },
+        { status: 200, headers: NO_STORE },
+      );
+    }
+
+    return err(
+      "ORDER_CREATION_OUTCOME_UNKNOWN",
+      "An order creation request was already processed for this idempotency key.",
+      504,
+      {
+        reference: existing.paycrestReference,
+        transactionId: existing.id,
+        recoveryRequired: true,
+        paymentBlocked: true,
+      },
+    );
+  }
+
 
   const createResult = await createOfframpOrder({
     amount: amountCheck.data,
@@ -209,6 +372,26 @@ export async function POST(request: Request) {
     accountName: freshName,
   });
 
+  if (!createResult.ok) {
+    if (
+      createResult.message === "ORDER_CREATION_OUTCOME_UNKNOWN" ||
+      createResult.code === "UPSTREAM_TIMEOUT"
+    ) {
+      await repo.updateStatus(transaction.id, {
+        status: "pending",
+        failureCode: "ORDER_CREATION_OUTCOME_UNKNOWN",
+        failureReason: "Order creation timed out; outcome unknown",
+      });
+    } else {
+      await repo.updateStatus(transaction.id, {
+        status: "failed",
+        failureCode: createResult.code,
+        failureReason: createResult.message,
+      });
+    }
+  }
+
+  // Remainder of error checks and normalization continues...
   if (!createResult.ok) {
     const diagnosticId = createResult.diagnosticId;
     const diagExtra = {
@@ -291,7 +474,6 @@ export async function POST(request: Request) {
         diagExtra,
       );
     }
-    // True transport / server failures only
     return err(
       "UPSTREAM_ERROR",
       createResult.message || "Order creation failed",
@@ -313,6 +495,12 @@ export async function POST(request: Request) {
   });
 
   if (!normalized.ok) {
+    await repo.updateStatus(transaction.id, {
+      status: "failed",
+      failureCode: "ORDER_RESPONSE_UNSAFE",
+      failureReason: normalized.message,
+    });
+
     return NextResponse.json(
       {
         ok: false,
@@ -320,7 +508,6 @@ export async function POST(request: Request) {
           code: "ORDER_RESPONSE_UNSAFE",
           message: normalized.message,
         },
-        // Order may exist at Paycrest — surface reference only
         reference,
         orderCreated: true,
         paymentBlocked: true,
@@ -330,10 +517,45 @@ export async function POST(request: Request) {
     );
   }
 
+  // Bind successful Paycrest order to durable transaction
+  const bindResult = await repo.bindPaycrestOrder({
+    id: transaction.id,
+    paycrestOrderId: normalized.order.id,
+    paycrestReference: reference,
+    receiveAddress: normalized.order.providerAccount.receiveAddress,
+    validUntil: normalized.order.providerAccount.validUntil,
+    paycrestStatus: normalized.order.status,
+    metadata: {
+      rate: normalized.order.rate,
+      senderFee: normalized.order.senderFee,
+      transactionFee: normalized.order.transactionFee,
+      totalUsdcToSend: normalized.order.totalUsdcToSend,
+    },
+  });
+
+  if (!bindResult.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "ORDER_BINDING_FAILED",
+          message:
+            "Order was created upstream but could not be durably recorded. Do not send payment yet.",
+        },
+        reference,
+        transactionId: transaction.id,
+        orderCreated: true,
+        paymentBlocked: true,
+      },
+      { status: 500, headers: NO_STORE },
+    );
+  }
+
   return NextResponse.json(
     {
       ok: true,
       order: normalized.order,
+      transactionId: transaction.id,
     },
     { status: 200, headers: NO_STORE },
   );

@@ -1,7 +1,7 @@
-# Celo Hackathon Registration & Attribution
+# Celo Agents at Work — Providus Registration & Attribution
 
 Private project context for **Providus** on the Celo Builders platform.  
-Do not put private keys, seed phrases, or connection API keys in this file or in git.
+Do not put private keys, seed phrases, OAuth tokens, Celo Builders API keys, Paycrest credentials, ClubKonnect credentials, bank-account details, or other secrets in this file or in git.
 
 ---
 
@@ -9,292 +9,279 @@ Do not put private keys, seed phrases, or connection API keys in this file or in
 
 | Field | Value |
 |---|---|
-| **Event** | Agentic Payments and DeFAI Hackathon |
-| **Slug** | `agentic-payments-defai` |
-| **Platform** | [celobuilders.xyz](https://celobuilders.xyz) |
-| **Network** | **Celo mainnet only** (`celo-mainnet`) |
-| **Starts** | 2026-07-07 (kickoff window from 2026-07-01 for volume counting) |
-| **Submission deadline** | **2026-08-03T09:00:00.000Z** |
-| **Winners announced** | 2026-08-07 |
-| **Leaderboard** | [Dune — Agentic Payments DeFAI](https://dune.com/celo/agentic-payments-defai-hackathon) |
-| **Skill / agent API** | `https://celobuilders.xyz` · re-fetch skill at `https://celobuilders.xyz/skill.md` if APIs fail with `skillHint` |
+| **Event** | Celo Agents at Work Hackathon |
+| **Slug** | `agents-at-work` |
+| **Platform** | `https://celobuilders.xyz` |
+| **Network** | Celo mainnet (`celo-mainnet`, chain ID `42220`) |
+| **Final submission deadline** | **2026-09-21T09:00:00Z** / **10:00 WAT** |
+| **Project** | Providus |
+| **Repository** | `https://github.com/Devendurance/useprovidus` |
+| **Registration status** | `draft` — registered, not final-published |
 
-### Tracks (entered / relevant)
-
-| Track slug | Title | Notes |
-|---|---|---|
-| `most-x402-payments` | Most x402 Payments | **Registered track** — raw count of successful x402 settlements via Celo facilitator |
-| `most-revenue-generated` | Most Revenue Generated | On-chain volume with assigned attribution tag |
-| `askbots` | Askbots | Optional partner track |
-| `track-4-tba` | Best Feedback for Aigora | Optional; needs Aigora profile + feedback issue |
-
-### Related bounties (x402 track)
-
-| Bounty slug | Prize |
-|---|---|
-| `most-x402-payments-1st` | $700 in CELO |
-| `most-x402-payments-2nd` | $300 in CELO |
-
-Revenue track: `most-revenue-generated-1st` ($2,000) / `most-revenue-generated-2nd` ($1,000).
+Registration and final publication are separate. Do not call the final publish action until the project, evidence, track fields, and public links have been reviewed.
 
 ---
 
-## 2. Project registration (current status)
+## 2. Current registration record
 
 | Field | Value |
 |---|---|
-| **Status** | `draft` (not published) |
 | **Project name** | Providus |
-| **Team name** | Providus |
-| **GitHub** | https://github.com/Devendurance/Providus |
-| **Builder** | Endurance Udoh |
-| **Email** | devendurance@gmail.com |
-| **X / Twitter** | @devendyy |
-| **Telegram** | @devendurance |
-| **Agent name** | Opencode and Grok Build |
-| **Track IDs** | `most-x402-payments` |
-| **Agent wallet (payTo)** | `0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa` |
-| **Submission ID** | `a82e5f11-f841-4f5f-9a88-6031b7a52208` |
-| **Participant ID** | `d5d8c791-0624-481e-bb09-0c21e282e240` |
-| **Registered at** | 2026-07-28T00:07:30.81Z |
+| **Participant** | Endurance Udoh |
+| **Team** | Providus |
+| **X / Twitter** | `@devendyy` |
+| **Telegram** | `@devendurance` |
+| **Submission ID** | `8e342cb6-c0bd-4059-8f8e-0a90d5567ba9` |
+| **Participant ID** | `036f52a5-f461-499a-96cd-1890dd0e8ce6` |
+| **Hackathon ID** | `9c9c1bff-8e24-4193-bd57-a91d0c963368` |
+| **ERC-8004 Agent ID** | `9851` |
+| **ERC-8004 URL** | `https://8004scan.io/agents/celo/9851` |
+| **Agent wallet** | `0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa` |
+| **buy / cPay beta opt-in** | `true` |
 
-### Attribution tag (locked)
+### Registered tracks
+
+| Track slug | Role | Intent |
+|---|---|---|
+| `real-world-adoption` | **Primary** | Real Nigerian payment utility on Celo |
+| `value-moved` | Additional | Genuine tagged Celo mainnet stablecoin value through Providus |
+| `askbots-growth` | Additional | Baseline review → implementation improvements → second review |
+| `judges-favorite` | Additional | Polished AI-native real-world payment experience |
+| `cpay-feedback` | Additional | Closed-beta testing and useful product/integration feedback |
+
+### Additional-track rationale saved at registration
+
+> Value Moved: Real mainnet stablecoin volume via USDC-to-NGN rails. AskBots: Baseline review + iterative improvement cycle. Judges Favorite: AI payment command box on Celo. buy Feedback: Closed-beta testing of agent compute payments.
+
+The registration API accepted all five track IDs.
+
+---
+
+## 3. Locked attribution tag
+
+```text
+celo_8190b99392a2
+```
+
+This is the active **Agents at Work** attribution tag for `Devendurance/useprovidus`.
+
+Treat it as immutable for this hackathon registration.
+
+### Important migration note
+
+An older local configuration used:
 
 ```text
 celo_91fed90b97fc
 ```
 
-- Format: `celo_` + 12 hex characters.
-- Derived from the **first saved** GitHub `owner/repo` slug (`Devendurance/Providus`).
-- **Locked at first registration save** — later GitHub URL edits do **not** change the tag.
-- Leaderboards credit **only this assigned tag**, not a self-derived or third-party code alone.
+That tag belongs to the previous hackathon registration and must **not** be used for Agents at Work transaction attribution.
 
-### Product one-liner (for submissions / README)
+Before the next hackathon-intended Celo mainnet transaction:
 
-> Providus is a Celo route-intelligence agent that compares local fiat-to-Celo paths by **effective received amount** and unlocks a full Route Verdict via a small **x402** payment.  
-> Roof message: **Know what arrives before you pay.**
+1. update the active local/deployment attribution configuration to `celo_8190b99392a2`;
+2. implement ERC-8021 attribution in transaction calldata;
+3. test encoding without sending a live transaction;
+4. send a live transaction only after explicit approval;
+5. verify the resulting transaction contains the expected tag.
 
-See also:
-
-- Brand / copy: `docs/providus-brand-messaging.md`
-- Product requirements: `docs/providus_PRD.md`
-- Architecture: `docs/PROVIDUS_ARCHITECTURE.md`
-- Visual system: `DESIGN.md` (repo root)
+Changing the environment variable alone is not sufficient if the wallet execution path does not append the ERC-8021 suffix.
 
 ---
 
-## 3. Fields still needed before **publish**
+## 4. ERC-8004 identity
 
-Required at **submission** stage (not yet complete on the draft):
+Providus is registered as an ERC-8004 agent on Celo:
 
-| Key / field | Type | Notes |
-|---|---|---|
-| `tagline` | text | One-line product pitch |
-| `description` | text | Short project description |
-| `socialLink` | url | Public X/Twitter post about the submission (`x.com` / `twitter.com`) |
-| `erc8004Url` | url | Agent ERC-8004 identity (`8004scan.io` or Celoscan NFT) |
-| `agentWalletAddress` | address | Already set (mainnet payTo for x402 tracking) |
-| `celoNetwork` | select | Must be `celo-mainnet` only |
-| `agentContributionNotes` | text | How the agent helped build the project |
-| Demo / video | optional | `demoUrl`, `videoUrl` if available |
-| `appDomain` | optional | Public app URL |
-| Aigora fields | optional | Only if entering Track 4 |
-
-Publish only after explicit builder approval and before the deadline:
-
-```http
-POST https://celobuilders.xyz/submissions/me/publish
-Authorization: Bearer <connection>
-{ "confirm": true }
+```text
+Agent ID: 9851
+URL: https://8004scan.io/agents/celo/9851
+Owner/creator wallet: 0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa
 ```
 
+Current metadata intentionally stays conservative:
+
+- Celo network;
+- no fake MCP/A2A endpoint;
+- no unsupported trust mechanism;
+- x402 support not claimed merely because the hackathon includes x402-related work;
+- agent can be marked active later when the actual command/orchestration layer is deployed.
+
 ---
 
-## 4. How to use the attribution tag in code
+## 5. Current product framing
 
-### Install
+### One-line description
+
+> **Providus is a Celo payments agent that turns stablecoins into everyday Nigerian financial actions — starting with bank cash-outs and expanding into user-approved airtime, data and utility payments.**
+
+### Current shipped proof
+
+- Celo USDC → Nigerian bank cash-out through Paycrest has been used successfully in real mainnet tests.
+- Wallet connection and Celo USDC transfer flow exist.
+- Paycrest quote, bank verification and order creation exist.
+
+### Current code limitations
+
+The current repository does **not yet** provide durable fiat-finality tracking after the Celo deposit.
+
+It also does not yet contain:
+
+- durable transaction persistence;
+- Paycrest post-deposit reconciliation;
+- ClubKonnect integration;
+- AI/payment command parsing;
+- airtime/data/electricity/cable orchestration.
+
+These are implementation targets, not shipped claims.
+
+---
+
+## 6. Track evidence plan
+
+### `real-world-adoption` — primary
+
+Demonstrate genuine Nigerian payment utility, not a mock:
+
+- real Celo mainnet wallet interaction;
+- real Paycrest settlement path;
+- real bank cash-out and/or completed airtime payment;
+- explicit user approval;
+- truthful state transitions and receipts;
+- tagged eligible Celo transactions after attribution is implemented.
+
+### `value-moved`
+
+Use genuine economic activity only.
+
+Evidence should include:
+
+- eligible Celo mainnet transactions carrying `celo_8190b99392a2`;
+- independent real usage where possible;
+- transaction hashes and purpose;
+- any project-controlled wallets/contracts declared where the submission schema requires it;
+- no self-transfer inflation or meaningless volume.
+
+The two earlier Providus cash-outs remain product proof, but transactions created before this tag was wired should not be presented as tagged Agents at Work volume.
+
+### `askbots-growth`
+
+Preserve a real before/after improvement story:
+
+1. run and save the current baseline review before P0 changes;
+2. preserve scores, review IDs, findings and project URL;
+3. implement substantive improvements;
+4. run the required second review;
+5. submit evidence of measurable improvement.
+
+### `judges-favorite`
+
+Focus on product coherence rather than adding unrelated features:
+
+- command-first payment UX;
+- explicit approval before money movement;
+- Celo mainnet;
+- ERC-8004 identity;
+- ERC-8021 attribution;
+- real Paycrest settlement;
+- real Nigerian fulfilment through ClubKonnect;
+- polished mobile demo and recovery/error states.
+
+### `cpay-feedback`
+
+Keep this track separate from the critical Providus payment path.
+
+Required work should be performed according to the current Celo Builders / buy beta instructions, with any resulting feedback issue/report linked at final submission. Do not falsely mark Providus itself as x402-capable unless that capability is actually implemented.
+
+---
+
+## 7. Final-submission fields to prepare
+
+The registration is saved, but the project is not published.
+
+Before final publication, re-fetch the live Celo Builders submission schema and complete all currently required fields. Expected submission-stage evidence includes:
+
+- tagline;
+- project description;
+- public social post;
+- `celoNetwork = celo-mainnet`;
+- ERC-8004 URL;
+- agent contribution notes;
+- public deployment/demo URL;
+- walkthrough video if required/available;
+- AskBots project/review evidence;
+- buy feedback evidence;
+- track-specific wallet/contract declarations where required;
+- repository must remain public.
+
+Never rely on an old cached schema if the API reports changed requirements.
+
+---
+
+## 8. Attribution implementation contract
+
+Target package:
 
 ```bash
 npm install @celo/attribution-tags
 ```
 
-### Append the tag to transaction `data`
-
-Every **eligible project-originated** Celo transaction that should count for revenue / volume attribution must include the assigned tag in the ERC-8021 data suffix:
-
-```ts
-import { toDataSuffix } from '@celo/attribution-tags'
-
-const ATTRIBUTION_TAG = process.env.NEXT_PUBLIC_CELO_ATTRIBUTION_TAG
-  ?? 'celo_91fed90b97fc'
-
-// Single tag
-await walletClient.sendTransaction({
-  to,
-  value,
-  data: toDataSuffix(ATTRIBUTION_TAG),
-})
-```
-
-### Multiple codes (keep yours + assigned tag)
-
-Leaderboards only credit the **assigned** tag. If you already suffix another app code, pass an array — both ride in the same suffix:
-
-```ts
-import { toDataSuffix } from '@celo/attribution-tags'
-
-const tag = toDataSuffix([
-  'your_existing_code',   // optional
-  'celo_91fed90b97fc',    // required for this hackathon
-])
-
-await walletClient.sendTransaction({ to, value, data: tag })
-```
-
-Do **not** add platform codes like `minipay` yourself — platforms add those.
-
-### Verify a tagged transaction
-
-After the first live tagged tx:
-
-```ts
-import { verifyTx } from '@celo/attribution-tags'
-
-const result = await verifyTx(txHash /* + provider/rpc as SDK requires */)
-// Confirm result codes include: celo_91fed90b97fc
-// Cross-check against GET https://celobuilders.xyz/submissions/me → attributionTag
-```
-
-### Environment variables (recommended)
+Target source of truth:
 
 ```env
-# Public — safe to expose in client if you only use the tag string
-NEXT_PUBLIC_CELO_ATTRIBUTION_TAG=celo_91fed90b97fc
-
-# Server-only — agent / payTo wallet for x402 settlement tracking (never commit private keys)
-CELO_AGENT_WALLET_ADDRESS=0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa
-
-# Network
-CELO_CHAIN_ID=42220
+NEXT_PUBLIC_CELO_ATTRIBUTION_TAG=celo_8190b99392a2
 ```
 
-Store private keys only in a secure secret manager or local `.env` that is gitignored.
+Do not hardcode the old tag.
+
+For the current direct ERC-20 transfer flow, the implementation must preserve the exact:
+
+- token contract;
+- recipient;
+- amount;
+- wallet;
+- Celo chain;
+
+while appending the official ERC-8021 suffix to the final transaction calldata.
+
+The implementation must be verified against the installed wagmi/viem versions. Do not assume a plain `writeContract()` call automatically appends custom suffix data.
+
+### Required pre-live tests
+
+- encoded call still decodes to the intended ERC-20 `transfer(recipient, amount)`;
+- attribution suffix contains `celo_8190b99392a2`;
+- missing/malformed tag fails before wallet submission;
+- no wallet/provider secret enters the client bundle;
+- no live mainnet transaction is sent without explicit approval.
 
 ---
 
-## 5. Where to apply the tag in Providus
+## 9. Submission safety
 
-Map tag usage to product surfaces. **x402 facilitator settlements are tracked via the registered agent wallet (payTo), not by stuffing the attribution tag into facilitator settlement txs** (per product PRD). Use the tag on **your own** eligible Celo txs.
-
-| Location in product | When | What to do |
-|---|---|---|
-| **Env / config** | Always | Single source of truth for `celo_91fed90b97fc` |
-| **Agent / backend wallet module** | Any server-side `sendTransaction` from the project agent wallet | `data: toDataSuffix(ATTRIBUTION_TAG)` (or multi-code array) |
-| **User wallet txs initiated by Providus** | If the app later constructs txs the user signs (transfers, approvals you control) | Append suffix to `data` before `sendTransaction` / `writeContract` encoding |
-| **x402 Route Check payment path** | User pays small fee for Route Verdict | Configure **payTo** = agent wallet `0x21E5…bcDa`; route payments through **Celo x402 facilitator** so Track 2 (most x402 payments) can count |
-| **Celo attribution service** | Architecture: `celo-attribution.service.ts` | Central helper: `buildTaggedData(existingData?)` / `sendTaggedTransaction(...)` so no call site forgets the tag |
-| **Quote unlock / payment records DB** | After payment | Store `attribution_tag`, `tx_hash`, `payment_type` for audit and demos |
-| **README / demo script** | Docs | Document tag + verifyTx loop for judges |
-
-### Suggested helper (backend or shared package)
-
-```ts
-// e.g. lib/celo/attribution.ts or agent/src/services/celo-attribution.service.ts
-import { toDataSuffix } from '@celo/attribution-tags'
-import { concat, type Hex } from 'viem' // if you need to append to existing calldata
-
-export const CELO_ATTRIBUTION_TAG =
-  process.env.CELO_ATTRIBUTION_TAG ??
-  process.env.NEXT_PUBLIC_CELO_ATTRIBUTION_TAG ??
-  'celo_91fed90b97fc'
-
-/** Data field for a simple value transfer (tag only). */
-export function taggedData(): Hex {
-  return toDataSuffix(CELO_ATTRIBUTION_TAG) as Hex
-}
-
-/** Append attribution suffix to existing contract calldata. */
-export function withAttribution(calldata: Hex): Hex {
-  // Prefer SDK multi-code / suffix helpers if available for your encode path.
-  // Pattern: original calldata + ERC-8021 suffix carrying celo_91fed90b97fc
-  return concat([calldata, toDataSuffix(CELO_ATTRIBUTION_TAG) as Hex])
-}
-```
-
-Wire **every** project `sendTransaction` through this helper so new features cannot ship untagged volume.
-
-### Do / don’t
-
-| Do | Don’t |
-|---|---|
-| Use the **exact** assigned tag `celo_91fed90b97fc` | Invent `codeFromHostname` and expect credit alone |
-| Tag **every** eligible volume-generating project tx | Tag only “sometimes” or only demos |
-| Keep agent wallet on file for x402 | Leave `agentWalletAddress` empty until after volume happens |
-| Verify first tx with `verifyTx` | Assume the suffix is correct without decoding |
-| Count only real Route Check utility | Sybil / spam empty x402 calls |
-
-Volume counting window (hackathon metadata): **Celo mainnet, roughly Jul 1 – Aug 3 09:00 GMT**. Confirm live rules on the hackathon page if organizers update them.
+- Registration is currently `draft`.
+- Do not final-publish silently.
+- Do not generate artificial mainnet activity for leaderboard metrics.
+- Do not send provider orders or Celo transactions merely to test UI.
+- Keep public claims aligned with what is actually shipped.
+- Preserve transaction evidence for real usage.
 
 ---
 
-## 6. Agent wallet & x402 (Track: most-x402-payments)
-
-| Item | Value |
-|---|---|
-| **Agent / payTo address** | `0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa` |
-| **Role** | Wallet the agent (or x402 payTo) receives settlements from; used for on-chain tracking of x402 payments and revenue volume |
-| **Network** | Celo mainnet |
-
-Flow (product):
-
-1. `POST /api/quotes/preview` → locked preview + payment requirements (HTTP 402).
-2. Client pays via Celo x402 facilitator (`x402.celo.org` ecosystem).
-3. Backend verifies amount, token, recipient (= agent wallet), network, and binds payment to quote/action ID.
-4. Unlock Route Verdict; store settlement reference.
-
-Attribution tag is separate from “who received the x402 fee,” but both must be configured correctly for dual-track ambition (x402 count + tagged volume).
-
----
-
-## 7. Connection credential (operational note)
-
-Registration used Google OAuth via Celo Builders (`/auth/google/start` → claim code → `apiKey`).
-
-- The connection **API key is a secret**. Do **not** commit it to this repo or this markdown file.
-- Store it only in a local secret store or password manager if you need to update/publish the submission later.
-- If lost, reconnect through the Celo Builders agent skill / auth flow.
-
----
-
-## 8. Publish checklist (before deadline)
-
-- [ ] Tagline + description finalized (brand messaging)
-- [ ] Public X post → `socialLink`
-- [ ] ERC-8004 agent URL → `erc8004Url`
-- [ ] `celoNetwork`: `celo-mainnet`
-- [ ] Agent contribution notes
-- [ ] Demo URL if live
-- [ ] Confirm GitHub repo is **public**
-- [ ] Attribution helper live on eligible txs; first tx verified with `verifyTx`
-- [ ] Agent wallet funded / receiving x402 correctly
-- [ ] Explicit builder approval → `POST /submissions/me/publish`
-
----
-
-## 9. Quick reference card
+## 10. Quick reference
 
 ```text
-Project:     Providus
-Hackathon:   agentic-payments-defai
-Track:       most-x402-payments
-Tag:         celo_91fed90b97fc
-Agent:       0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa
-Repo:        https://github.com/Devendurance/Providus
-Deadline:    2026-08-03 09:00 UTC
-Status:      draft (registered)
-```
+Project:            Providus
+Hackathon:          agents-at-work
+Primary track:      real-world-adoption
+Additional tracks:  value-moved, askbots-growth, judges-favorite, cpay-feedback
+Status:             draft / registered, not published
 
-```ts
-import { toDataSuffix } from '@celo/attribution-tags'
-data: toDataSuffix('celo_91fed90b97fc')
+Repo:               https://github.com/Devendurance/useprovidus
+
+ERC-8004 Agent ID:  9851
+ERC-8004 URL:       https://8004scan.io/agents/celo/9851
+Agent wallet:       0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa
+
+Attribution tag:    celo_8190b99392a2
+Deadline:           2026-09-21 09:00 UTC / 10:00 WAT
 ```
