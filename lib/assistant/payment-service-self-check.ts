@@ -16,9 +16,14 @@
  *      consumed preview, so a database failure never permanently burns a quote;
  *   6. a timeout or network failure records ORDER_CREATION_OUTCOME_UNKNOWN and
  *      is never retried;
- *   7. a definitive provider rejection, an unusable success body, and an
- *      under-priced provider total all fail closed without instructions;
- *   8. a repeated request for the same consumed preview cannot create a second
+ *   7. a definitive provider rejection, an unusable success body, a mismatched
+ *      provider base amount, and malformed or missing provider fees all fail
+ *      closed without instructions;
+ *   8. the provider-authoritative total (base plus Paycrest fees) is what the
+ *      instructions and the persisted transaction carry, including a non-zero
+ *      sender fee the preview never priced, and a bound row without a usable
+ *      total is refused rather than falling back to the un-fee'd base amount;
+ *   9. a repeated request for the same consumed preview cannot create a second
  *      Paycrest order.
  *
  * No live Paycrest orders, no ClubKonnect purchases, no blockchain transactions.
@@ -48,6 +53,7 @@ import {
   type AirtimePaymentResult,
   type PaymentInstructions,
 } from "@/lib/assistant/payment-service";
+import { usdcToBaseUnits } from "@/lib/money/decimal";
 import {
   InMemoryTransactionRepository,
   setTransactionRepositoryForTesting,
@@ -64,6 +70,11 @@ const NETWORK = "mtn";
 const RATE = "1500";
 const AMOUNT_USDC = "0.333334";
 const TOTAL_USDC = "0.333334";
+
+/** Provider-fee scenario: the preview prices no fee, Paycrest adds one. */
+const FEE_BASE_USDC = "0.732698";
+const FEE_SENDER_USDC = "0.0037";
+const FEE_TOTAL_USDC = "0.736398";
 
 const INSTITUTION_CODE = "PROVIDUS";
 const ACCOUNT_NUMBER = "0123456789";
@@ -189,30 +200,39 @@ function abortError(): Error {
   return error;
 }
 
+/** Sentinel: the field is absent from the provider response entirely. */
+const ABSENT = Symbol("absent");
+
+type FeeOverride = string | number | null | typeof ABSENT;
+
 function paycrestOrderPayload(overrides?: {
   amount?: string;
-  senderFee?: string;
+  senderFee?: FeeOverride;
+  transactionFee?: FeeOverride;
   orderId?: string;
   validUntil?: string;
 }): unknown {
-  return {
-    status: "success",
-    data: {
-      id: overrides?.orderId ?? "pc_ord_selfcheck_1",
-      status: "initiated",
-      amount: overrides?.amount ?? AMOUNT_USDC,
-      senderFee: overrides?.senderFee ?? "0",
-      transactionFee: "0",
-      rate: RATE,
-      token: "USDC",
-      providerAccount: {
-        network: "celo",
-        receiveAddress: RECEIVE_ADDRESS,
-        validUntil:
-          overrides?.validUntil ?? new Date(Date.now() + 600_000).toISOString(),
-      },
+  const data: Record<string, unknown> = {
+    id: overrides?.orderId ?? "pc_ord_selfcheck_1",
+    status: "initiated",
+    amount: overrides?.amount ?? AMOUNT_USDC,
+    rate: RATE,
+    token: "USDC",
+    providerAccount: {
+      network: "celo",
+      receiveAddress: RECEIVE_ADDRESS,
+      validUntil:
+        overrides?.validUntil ?? new Date(Date.now() + 600_000).toISOString(),
     },
   };
+  if (overrides?.senderFee !== ABSENT) {
+    data.senderFee = overrides?.senderFee === undefined ? "0" : overrides.senderFee;
+  }
+  if (overrides?.transactionFee !== ABSENT) {
+    data.transactionFee =
+      overrides?.transactionFee === undefined ? "0" : overrides.transactionFee;
+  }
+  return { status: "success", data };
 }
 
 type Sandbox = {
@@ -638,6 +658,10 @@ async function run() {
     assert.equal(success.receiveAddress, RECEIVE_ADDRESS);
     assert.equal(success.totalUsdcToSend, TOTAL_USDC);
     assert.equal(success.validUntil, validUntil);
+    // The breakdown is the bound provider order, not a local estimate.
+    assert.equal(success.baseUsdc, AMOUNT_USDC);
+    assert.equal(success.senderFeeUsdc, "0");
+    assert.equal(success.transactionFeeUsdc, "0");
     assert.equal(fetchCalls.length, 1);
 
     const outgoing = fetchCalls[0];
@@ -677,6 +701,8 @@ async function run() {
     assert.equal(stored.metadata?.network, NETWORK);
     assert.equal(stored.metadata?.rate, RATE);
     assert.equal(stored.metadata?.totalUsdcToSend, TOTAL_USDC);
+    assert.equal(stored.metadata?.senderFee, "0");
+    assert.equal(stored.metadata?.transactionFee, "0");
     // The settlement account itself must never be persisted on the transaction.
     assert.equal(JSON.stringify(stored.metadata).includes(ACCOUNT_NUMBER), false);
 
@@ -794,21 +820,108 @@ async function run() {
         `idem_airtime_${amountMismatchPreview.id}`,
       );
     assert.equal(amountMismatchTx?.failureCode, "ORDER_RESPONSE_UNSAFE");
+    assert.equal(amountMismatchTx?.paycrestOrderId, null);
+    assert.equal(amountMismatchTx?.receiveAddress, null);
 
-    // Provider fees would push the required total above the frozen quote: the
-    // client must not be told to send an under-funding amount.
-    const underfundedSandbox = newSandbox();
-    stubFetch(() => jsonResponse(201, paycrestOrderPayload({ senderFee: "0.01" })));
-    const underfundedPreview = await seedPreview(underfundedSandbox);
-    const underfunded = expectError(
-      await prepare(underfundedSandbox, underfundedPreview.id),
+    /* ------------------------------------------------------------------ */
+    /* 6b. Provider fees are the authority, never the preview estimate     */
+    /* ------------------------------------------------------------------ */
+
+    // The preview prices no provider fee; Paycrest finalizes one. The order must
+    // still bind, and the caller must be told the fee-inclusive total instead of
+    // the preview's under-priced estimate.
+    const feeSandbox = newSandbox();
+    stubFetch(() =>
+      jsonResponse(
+        201,
+        paycrestOrderPayload({
+          amount: FEE_BASE_USDC,
+          senderFee: FEE_SENDER_USDC,
+        }),
+      ),
     );
-    assert.equal(underfunded.code, "PAYCREST_BIND_FAILED");
-    const underfundedTx = await underfundedSandbox.transactions.findByIdempotencyKey(
-      `idem_airtime_${underfundedPreview.id}`,
+    const feePreview = await seedPreview(feeSandbox, {
+      amountUsdc: FEE_BASE_USDC,
+      feeUsdc: "0",
+      totalUsdc: FEE_BASE_USDC,
+    });
+    const feeInstructions = expectInstructions(
+      await prepare(feeSandbox, feePreview.id),
     );
-    assert.equal(underfundedTx?.failureCode, "ORDER_TOTAL_MISMATCH");
-    assert.equal(underfundedTx?.receiveAddress, null);
+    assert.equal(fetchCalls.length, 1);
+    assert.equal(feeInstructions.baseUsdc, FEE_BASE_USDC);
+    assert.equal(feeInstructions.senderFeeUsdc, FEE_SENDER_USDC);
+    assert.equal(feeInstructions.transactionFeeUsdc, "0");
+    assert.equal(feeInstructions.totalUsdcToSend, FEE_TOTAL_USDC);
+    // The announced total must stay exactly spendable at USDC's 6 decimals.
+    assert.equal(
+      usdcToBaseUnits(feeInstructions.totalUsdcToSend, 6),
+      BigInt(736398),
+    );
+
+    const feeTx = await feeSandbox.transactions.findById(
+      feeInstructions.transactionId,
+    );
+    assert.equal(feeTx?.paycrestOrderId, "pc_ord_selfcheck_1");
+    assert.equal(feeTx?.receiveAddress, RECEIVE_ADDRESS);
+    assert.equal(feeTx?.amountUsdc, FEE_BASE_USDC);
+    // The binding replaces the preview estimate with the provider's total.
+    assert.equal(feeTx?.metadata?.totalUsdcToSend, FEE_TOTAL_USDC);
+    assert.equal(feeTx?.metadata?.senderFee, FEE_SENDER_USDC);
+    assert.equal(feeTx?.metadata?.transactionFee, "0");
+
+    // An unusable fee makes the whole order unusable: negative, non-numeric,
+    // over-precise, exponent, null, and absent all fail closed with no binding.
+    const unusableFeeResponses: Array<{ label: string; payload: unknown }> = [
+      {
+        label: "negative senderFee",
+        payload: paycrestOrderPayload({ senderFee: "-0.01" }),
+      },
+      {
+        label: "negative transactionFee",
+        payload: paycrestOrderPayload({ transactionFee: "-1" }),
+      },
+      {
+        label: "non-numeric senderFee",
+        payload: paycrestOrderPayload({ senderFee: "abc" }),
+      },
+      {
+        label: "exponent senderFee",
+        payload: paycrestOrderPayload({ senderFee: "1e-3" }),
+      },
+      {
+        label: "over-precise transactionFee",
+        payload: paycrestOrderPayload({ transactionFee: "0.0000001" }),
+      },
+      {
+        label: "null senderFee",
+        payload: paycrestOrderPayload({ senderFee: null }),
+      },
+      {
+        label: "absent senderFee",
+        payload: paycrestOrderPayload({ senderFee: ABSENT }),
+      },
+      {
+        label: "absent transactionFee",
+        payload: paycrestOrderPayload({ transactionFee: ABSENT }),
+      },
+    ];
+
+    for (const { label, payload } of unusableFeeResponses) {
+      const badFeeSandbox = newSandbox();
+      stubFetch(() => jsonResponse(201, payload));
+      const badFeePreview = await seedPreview(badFeeSandbox);
+      const badFee = expectError(await prepare(badFeeSandbox, badFeePreview.id));
+      assert.equal(badFee.code, "PAYCREST_BIND_FAILED", label);
+      assert.equal(fetchCalls.length, 1, `one provider call: ${label}`);
+      const badFeeTx =
+        await badFeeSandbox.transactions.findByIdempotencyKey(
+          `idem_airtime_${badFeePreview.id}`,
+        );
+      assert.equal(badFeeTx?.failureCode, "ORDER_RESPONSE_UNSAFE", label);
+      assert.equal(badFeeTx?.paycrestOrderId, null, `unbound: ${label}`);
+      assert.equal(badFeeTx?.receiveAddress, null, `no address: ${label}`);
+    }
 
     /* ------------------------------------------------------------------ */
     /* 7. HTTP boundary: flat instructions, no-store, injected fields      */
@@ -841,15 +954,21 @@ async function run() {
     assert.equal(okResponse.headers.get("cache-control"), "no-store");
     const okBody = (await okResponse.json()) as Record<string, unknown>;
     assert.deepEqual(Object.keys(okBody).sort(), [
+      "baseUsdc",
       "ok",
       "receiveAddress",
+      "senderFeeUsdc",
       "totalUsdcToSend",
+      "transactionFeeUsdc",
       "transactionId",
       "validUntil",
     ]);
     assert.equal(okBody.ok, true);
     assert.equal(okBody.receiveAddress, RECEIVE_ADDRESS);
     assert.equal(okBody.totalUsdcToSend, TOTAL_USDC);
+    assert.equal(okBody.baseUsdc, AMOUNT_USDC);
+    assert.equal(okBody.senderFeeUsdc, "0");
+    assert.equal(okBody.transactionFeeUsdc, "0");
     assert.equal(fetchCalls.length, 1);
     const routeBody = fetchCalls[0].body as unknown as OutgoingOrderBody;
     assert.equal(routeBody.amount, AMOUNT_USDC);
@@ -885,6 +1004,43 @@ async function run() {
       error: { code: string };
     };
     assert.equal(malformedBody.error.code, "ORDER_REQUEST_INVALID");
+    assert.equal(fetchCalls.length, 1);
+
+    // The HTTP contract must carry the provider's fee-inclusive total, so a
+    // client can never send the preview's under-priced estimate.
+    const feeRouteSandbox = newSandbox();
+    setPreviewRepositoryForTesting(feeRouteSandbox.previews);
+    setTransactionRepositoryForTesting(feeRouteSandbox.transactions);
+    stubFetch(() =>
+      jsonResponse(
+        201,
+        paycrestOrderPayload({
+          amount: FEE_BASE_USDC,
+          senderFee: FEE_SENDER_USDC,
+        }),
+      ),
+    );
+    const feeRoutePreview = await seedPreview(feeRouteSandbox, {
+      amountUsdc: FEE_BASE_USDC,
+      feeUsdc: "0",
+      totalUsdc: FEE_BASE_USDC,
+    });
+    const feeRouteResponse = await POST(
+      new Request("http://localhost/api/assistant/orders", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          previewId: feeRoutePreview.id,
+          walletAddress: WALLET,
+        }),
+      }),
+    );
+    assert.equal(feeRouteResponse.status, 200);
+    const feeRouteBody = (await feeRouteResponse.json()) as Record<string, unknown>;
+    assert.equal(feeRouteBody.baseUsdc, FEE_BASE_USDC);
+    assert.equal(feeRouteBody.senderFeeUsdc, FEE_SENDER_USDC);
+    assert.equal(feeRouteBody.transactionFeeUsdc, "0");
+    assert.equal(feeRouteBody.totalUsdcToSend, FEE_TOTAL_USDC);
     assert.equal(fetchCalls.length, 1);
 
     // Missing settlement configuration is a 503 and never reaches Paycrest.
@@ -944,6 +1100,99 @@ async function run() {
     const secondInstructions = expectInstructions(secondAttempt);
     assert.deepEqual(secondInstructions, firstInstructions);
     assert.equal(fetchCalls.length, 1, "replay must not create a second order");
+    // The replay path re-derives the breakdown from the bound row.
+    assert.equal(firstInstructions.baseUsdc, AMOUNT_USDC);
+    assert.equal(firstInstructions.senderFeeUsdc, "0");
+    assert.equal(firstInstructions.transactionFeeUsdc, "0");
+    assert.equal(secondInstructions.totalUsdcToSend, TOTAL_USDC);
+
+    // A bound row without a provider-authoritative total must fail closed. The
+    // base amount is never a substitute: the fees finalized on order creation
+    // would silently go unpaid, so the client must not be handed instructions.
+    const unboundTotalSandbox = newSandbox();
+    stubFetch(() => jsonResponse(201, paycrestOrderPayload()));
+    const unboundTotalPreview = await seedPreview(unboundTotalSandbox);
+    const unboundTotalRow = await unboundTotalSandbox.transactions.create({
+      idempotencyKey: `idem_airtime_${unboundTotalPreview.id}`,
+      type: "airtime",
+      walletAddress: WALLET,
+      amountUsdc: AMOUNT_USDC,
+      amountNgn: AMOUNT_NGN,
+      paycrestReference: "p4b_bound_without_total",
+      paycrestOrderId: "pc_ord_legacy_1",
+      receiveAddress: RECEIVE_ADDRESS,
+      validUntil: new Date(Date.now() + 600_000).toISOString(),
+      metadata: { rate: RATE },
+    });
+    assert.equal(unboundTotalRow.ok, true, "bound-row seed must succeed");
+    if (!unboundTotalRow.ok) return;
+
+    const unboundTotalResult = expectError(
+      await prepareAirtimePaymentOrder({
+        previewId: unboundTotalPreview.id,
+        walletAddress: WALLET,
+        options: {
+          previewRepository: new ReplayPreviewRepository(unboundTotalPreview),
+          transactionRepository: unboundTotalSandbox.transactions,
+        },
+      }),
+    );
+    assert.equal(unboundTotalResult.code, "ORDER_CREATION_OUTCOME_UNKNOWN");
+    assert.equal(fetchCalls.length, 0, "an unusable bound row is never re-ordered");
+    const unboundTotalTx = await unboundTotalSandbox.transactions.findById(
+      unboundTotalRow.record.id,
+    );
+    assert.equal(unboundTotalTx?.status, "failed");
+    assert.equal(unboundTotalTx?.failureCode, "ORDER_CREATION_OUTCOME_UNKNOWN");
+
+    // The same refusal covers every unusable recorded total, while a padded but
+    // valid total is trimmed and honored exactly as bound.
+    const boundTotalCases: Array<{ label: string; total: unknown; usable: boolean }> = [
+      { label: "non-string total", total: 0.333334, usable: false },
+      { label: "blank total", total: "   ", usable: false },
+      { label: "malformed total", total: "not-a-total", usable: false },
+      { label: "over-precise total", total: "0.3333344", usable: false },
+      { label: "zero total", total: "0.000000", usable: false },
+      { label: "padded valid total", total: `  ${TOTAL_USDC}  `, usable: true },
+    ];
+
+    for (const { label, total, usable } of boundTotalCases) {
+      const totalSandbox = newSandbox();
+      stubFetch(() => jsonResponse(201, paycrestOrderPayload()));
+      const totalPreview = await seedPreview(totalSandbox);
+      const totalRow = await totalSandbox.transactions.create({
+        idempotencyKey: `idem_airtime_${totalPreview.id}`,
+        type: "airtime",
+        walletAddress: WALLET,
+        amountUsdc: AMOUNT_USDC,
+        amountNgn: AMOUNT_NGN,
+        paycrestReference: "p4b_bound_total_case",
+        paycrestOrderId: "pc_ord_bound_total",
+        receiveAddress: RECEIVE_ADDRESS,
+        validUntil: new Date(Date.now() + 600_000).toISOString(),
+        metadata: { rate: RATE, totalUsdcToSend: total as string },
+      });
+      assert.equal(totalRow.ok, true, label);
+
+      const totalResult = await prepareAirtimePaymentOrder({
+        previewId: totalPreview.id,
+        walletAddress: WALLET,
+        options: {
+          previewRepository: new ReplayPreviewRepository(totalPreview),
+          transactionRepository: totalSandbox.transactions,
+        },
+      });
+
+      if (usable) {
+        const instructions = expectInstructions(totalResult);
+        assert.equal(instructions.totalUsdcToSend, TOTAL_USDC, label);
+        assert.equal(instructions.baseUsdc, AMOUNT_USDC, label);
+        continue;
+      }
+      const refused = expectError(totalResult);
+      assert.equal(refused.code, "ORDER_CREATION_OUTCOME_UNKNOWN", label);
+      assert.equal(fetchCalls.length, 0, `no provider call: ${label}`);
+    }
 
     // A pre-existing pre-order row with no Paycrest binding is an unresolved
     // attempt: it is recorded as recovery-required and never re-sent upstream.

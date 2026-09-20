@@ -592,6 +592,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
           receiveAddress?: string;
           totalUsdcToSend?: string;
           validUntil?: string;
+          baseUsdc?: string;
+          senderFeeUsdc?: string;
+          transactionFeeUsdc?: string;
           error?: { code?: string; message?: string };
         } | null = null;
 
@@ -631,6 +634,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
           receiveAddress: json.receiveAddress,
           totalUsdcToSend: json.totalUsdcToSend,
           validUntil: json.validUntil,
+          ...(typeof json.baseUsdc === "string" ? { baseUsdc: json.baseUsdc } : {}),
+          ...(typeof json.senderFeeUsdc === "string" ? { senderFeeUsdc: json.senderFeeUsdc } : {}),
+          ...(typeof json.transactionFeeUsdc === "string" ? { transactionFeeUsdc: json.transactionFeeUsdc } : {}),
         });
 
         const snapshot: ConfirmedPaymentState = Object.freeze({

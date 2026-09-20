@@ -9,8 +9,12 @@
  * an address, or a settlement account.
  *
  * Response contract (frozen): success is flat —
- * `{ ok: true, transactionId, receiveAddress, totalUsdcToSend, validUntil }` —
- * and failure is `{ ok: false, error: { code, message, retryable? } }`.
+ * `{ ok: true, transactionId, receiveAddress, totalUsdcToSend, validUntil,
+ * baseUsdc, senderFeeUsdc, transactionFeeUsdc }` — where `totalUsdcToSend` is
+ * the provider-authoritative amount (base plus the Paycrest fees finalized on
+ * order creation) and the fee fields are that same bound breakdown, never a
+ * client-supplied or preview-derived estimate — and failure is
+ * `{ ok: false, error: { code, message, retryable? } }`.
  */
 
 import { NextResponse } from "next/server";

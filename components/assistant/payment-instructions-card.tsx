@@ -32,6 +32,9 @@ export interface PaymentInstructions {
   receiveAddress: string;
   totalUsdcToSend: string;
   validUntil: string;
+  baseUsdc?: string;
+  senderFeeUsdc?: string;
+  transactionFeeUsdc?: string;
 }
 
 export type DepositProgressionStatus =
@@ -45,6 +48,7 @@ export type DepositProgressionStatus =
 
 export interface PaymentInstructionsCardProps {
   instructions: PaymentInstructions;
+  preview?: { amountUsdc?: string } | null;
   status?: DepositProgressionStatus;
   depositStatus?: DepositProgressionStatus;
   depositHash?: string | null;
@@ -62,6 +66,7 @@ export const PAYMENT_EXPIRY_SAFETY_MS = 60_000;
 
 export function PaymentInstructionsCard({
   instructions,
+  preview = null,
   status = "awaiting_deposit",
   depositStatus: propDepositStatus,
   depositHash = null,
@@ -430,6 +435,42 @@ export function PaymentInstructionsCard({
               {formatDecimalForDisplay(instructions.totalUsdcToSend)}
             </span>
             <span className="font-proof text-sm text-receipt-grey">USDC</span>
+          </div>
+
+          {/* Truthful Fee Breakdown */}
+          <div className="mt-2.5 space-y-1 border-t border-ledger-edge/60 pt-2 text-[11px]">
+            <div className="flex items-center justify-between font-proof">
+              <span className="text-receipt-grey">Base deposit:</span>
+              <span className="font-proof tabular-nums text-ledger-stone">
+                {instructions.baseUsdc
+                  ? `${formatDecimalForDisplay(instructions.baseUsdc)} USDC`
+                  : preview?.amountUsdc
+                    ? `${formatDecimalForDisplay(preview.amountUsdc)} USDC`
+                    : `${formatDecimalForDisplay(instructions.totalUsdcToSend)} USDC`}
+              </span>
+            </div>
+            <div className="flex items-center justify-between font-proof">
+              <span className="text-receipt-grey">Provider fee (Paycrest):</span>
+              <span className="font-proof tabular-nums text-ledger-stone">
+                {instructions.senderFeeUsdc
+                  ? `${formatDecimalForDisplay(instructions.senderFeeUsdc)} USDC`
+                  : "Included"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between font-proof">
+              <span className="text-receipt-grey">Network fee:</span>
+              <span className="font-proof tabular-nums text-ledger-stone">
+                {instructions.transactionFeeUsdc
+                  ? `${formatDecimalForDisplay(instructions.transactionFeeUsdc)} USDC`
+                  : "0 USDC"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between font-proof border-t border-ledger-edge/40 pt-1 font-semibold text-ledger-stone">
+              <span>Total to send:</span>
+              <span className="font-proof tabular-nums">
+                {formatDecimalForDisplay(instructions.totalUsdcToSend)} USDC
+              </span>
+            </div>
           </div>
           <p className="mt-2 text-[11px] font-proof text-receipt-grey border-t border-ledger-edge/60 pt-2">
             Canonical Circle USDC on Celo ({CANONICAL_CELO_USDC.decimals} decimals). Do not send more or less.

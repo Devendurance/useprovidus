@@ -34,7 +34,10 @@ import {
   PREVIEW_STORE_UNAVAILABLE_MESSAGE,
   type PreviewRepository,
 } from "@/lib/assistant/preview-repository";
-import { decimalStringsEqual } from "@/lib/money/decimal";
+import {
+  decimalStringsEqual,
+  isNonNegativeUsdcDecimal,
+} from "@/lib/money/decimal";
 import {
   generateOrderReference,
   normalizeCashOutOrderResponse,
@@ -74,14 +77,17 @@ export interface AirtimePaymentError {
 }
 
 /**
- * Deposit instructions. `totalUsdcToSend` is the consumed preview's total, so
- * the client can never be asked to send an amount the quote did not price.
+ * Deposit instructions are derived from the provider-bound transaction. The
+ * total and fee breakdown are therefore the exact values Paycrest authorized.
  */
 export interface PaymentInstructions {
   transactionId: string;
   receiveAddress: string;
   totalUsdcToSend: string;
   validUntil: string;
+  baseUsdc?: string;
+  senderFeeUsdc?: string;
+  transactionFeeUsdc?: string;
 }
 
 export type AirtimePaymentResult =
@@ -203,14 +209,30 @@ function instructionsFromBoundTransaction(
   const expiry = Date.parse(record.validUntil);
   if (!Number.isFinite(expiry) || expiry <= Date.now()) return null;
 
+  // The bound total is the only amount the client may ever be asked to send.
+  // A row without a usable one fails closed: falling back to the base amount
+  // would silently under-pay the provider fees finalized on order creation.
   const total = record.metadata?.totalUsdcToSend;
+  if (typeof total !== "string") return null;
+  const trimmedTotal = total.trim();
+  if (!isNonNegativeUsdcDecimal(trimmedTotal)) return null;
+  // The deposit verifier only rejects transfers *shorter* than the instruction,
+  // so a zero total would be presented as payable while demanding no payment.
+  if (decimalStringsEqual(trimmedTotal, "0")) return null;
+
   return {
     transactionId: record.id,
     receiveAddress: record.receiveAddress,
-    totalUsdcToSend:
-      typeof total === "string" && total.trim() !== ""
-        ? total.trim()
-        : record.amountUsdc,
+    baseUsdc: record.amountUsdc,
+    senderFeeUsdc:
+      typeof record.metadata?.senderFee === "string"
+        ? record.metadata.senderFee
+        : undefined,
+    transactionFeeUsdc:
+      typeof record.metadata?.transactionFee === "string"
+        ? record.metadata.transactionFee
+        : undefined,
+    totalUsdcToSend: trimmedTotal,
     validUntil: record.validUntil,
   };
 }
@@ -425,17 +447,8 @@ export async function prepareAirtimePaymentOrder(
     return fail("PAYCREST_BIND_FAILED", BIND_FAILED_MESSAGE);
   }
 
-  // The client is told to send the preview total, so an order demanding more
-  // would be under-funded: refuse to hand over instructions instead.
-  if (!decimalStringsEqual(normalized.order.totalUsdcToSend, preview.totalUsdc)) {
-    await recordFailure(
-      transactionRepository,
-      transaction.id,
-      "ORDER_TOTAL_MISMATCH",
-      "Paycrest order total does not match the consumed preview total",
-    );
-    return fail("PAYCREST_BIND_FAILED", BIND_FAILED_MESSAGE);
-  }
+  // The provider-authoritative total includes the fees finalized on order
+  // creation; it is intentionally not compared with the preview snapshot.
 
   // Step 7: durable binding. No binding, no instructions.
   const bindResult = await transactionRepository.bindPaycrestOrder({
@@ -449,7 +462,7 @@ export async function prepareAirtimePaymentOrder(
       rate: normalized.order.rate ?? preview.rate,
       senderFee: normalized.order.senderFee,
       transactionFee: normalized.order.transactionFee,
-      totalUsdcToSend: preview.totalUsdc,
+      totalUsdcToSend: normalized.order.totalUsdcToSend,
       refundAddress: walletAddress,
     },
   });

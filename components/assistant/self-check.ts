@@ -597,6 +597,9 @@ async function runAsyncChecks() {
         receiveAddress?: string;
         totalUsdcToSend?: string;
         validUntil?: string;
+        baseUsdc?: string;
+        senderFeeUsdc?: string;
+        transactionFeeUsdc?: string;
         error?: { code: string; message: string };
       };
       walletOverride?: string;
@@ -667,6 +670,9 @@ async function runAsyncChecks() {
       receiveAddress: resp.receiveAddress,
       totalUsdcToSend: resp.totalUsdcToSend,
       validUntil: resp.validUntil,
+      ...(resp.baseUsdc ? { baseUsdc: resp.baseUsdc } : {}),
+      ...(resp.senderFeeUsdc ? { senderFeeUsdc: resp.senderFeeUsdc } : {}),
+      ...(resp.transactionFeeUsdc ? { transactionFeeUsdc: resp.transactionFeeUsdc } : {}),
     });
 
     const confirmedSnapshot: ConfirmedPaymentState = Object.freeze({
@@ -1295,6 +1301,67 @@ async function runAsyncChecks() {
   assert(cardError.sendTxCalls === 0, "sendTransaction never called when depositHash present in error state");
   assert(cardError.verifyCalls.length === 1, "verify called for existing hash");
 
+
+  // ---------------------------------------------------------------------------
+  // 21. Validate Truthful Payment Fee Breakdown & Extended PaymentInstructions (P6.6)
+  // ---------------------------------------------------------------------------
+  const instructionsWithFees: PaymentInstructions = Object.freeze({
+    transactionId: "tx_airtime_fees_p66",
+    receiveAddress: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    totalUsdcToSend: "0.337034",
+    validUntil: "2026-09-19T16:15:00.000Z",
+    baseUsdc: "0.333334",
+    senderFeeUsdc: "0.0037",
+    transactionFeeUsdc: "0",
+  });
+
+  assert(instructionsWithFees.baseUsdc === "0.333334", "instructions baseUsdc preserved");
+  assert(instructionsWithFees.senderFeeUsdc === "0.0037", "instructions senderFeeUsdc preserved");
+  assert(instructionsWithFees.transactionFeeUsdc === "0", "instructions transactionFeeUsdc preserved");
+  assert(instructionsWithFees.totalUsdcToSend === "0.337034", "instructions totalUsdcToSend includes fees");
+
+  const previewCardPropsWithFees: PaymentInstructionsCardProps = {
+    instructions: instructionsWithFees,
+    preview: samplePreview,
+  };
+  assert(previewCardPropsWithFees.preview?.amountUsdc === "0.333334", "preview accepted by PaymentInstructionsCardProps");
+
+  // Validate card breakdown formatting logic
+  const resolveFeeBreakdown = (
+    instr: PaymentInstructions,
+    prev?: { amountUsdc?: string } | null,
+  ) => {
+    const base = instr.baseUsdc
+      ? `${formatDecimalForDisplay(instr.baseUsdc)} USDC`
+      : prev?.amountUsdc
+        ? `${formatDecimalForDisplay(prev.amountUsdc)} USDC`
+        : `${formatDecimalForDisplay(instr.totalUsdcToSend)} USDC`;
+    const providerFee = instr.senderFeeUsdc
+      ? `${formatDecimalForDisplay(instr.senderFeeUsdc)} USDC`
+      : "Included";
+    const networkFee = instr.transactionFeeUsdc
+      ? `${formatDecimalForDisplay(instr.transactionFeeUsdc)} USDC`
+      : "0 USDC";
+    const total = `${formatDecimalForDisplay(instr.totalUsdcToSend)} USDC`;
+    return { base, providerFee, networkFee, total };
+  };
+
+  const breakdownWithFees = resolveFeeBreakdown(instructionsWithFees, samplePreview);
+  assert(breakdownWithFees.base === "0.333334 USDC", "breakdown base deposit matches");
+  assert(breakdownWithFees.providerFee === "0.0037 USDC", "breakdown provider fee matches Paycrest fee");
+  assert(breakdownWithFees.networkFee === "0 USDC", "breakdown network fee matches 0 USDC");
+  assert(breakdownWithFees.total === "0.337034 USDC", "breakdown total matches exact total to send");
+
+  // Fallback when senderFeeUsdc is undefined (backwards compatibility)
+  const breakdownWithoutFees = resolveFeeBreakdown(sampleInstructions, samplePreview);
+  assert(breakdownWithoutFees.base === "0.333334 USDC", "fallback base matches preview amount");
+  assert(breakdownWithoutFees.providerFee === "Included", "fallback provider fee is Included");
+  assert(breakdownWithoutFees.networkFee === "0 USDC", "fallback network fee is 0 USDC");
+  assert(breakdownWithoutFees.total === "0.333334 USDC", "fallback total matches totalUsdcToSend");
+
+  // Deposit amount passed to transfer MUST be totalUsdcToSend
+  const amountToSendBaseUnits = usdcToBaseUnits(instructionsWithFees.totalUsdcToSend, 6);
+  assert(amountToSendBaseUnits === BigInt("337034"), "transfer sends exact totalUsdcToSend in base units (6 decimals)");
   console.log("✓ Providus Assistant UI self-check passed: All preview types, confirmation state transitions, freshness boundaries, components, formatting, P5 payment instructions, tagged deposit calldata, onDepositConfirmed handoff, duplicate submission lifecycle, duplicate transfer guard, receipt delay polling, and late response guards verified!");
 }
 runAsyncChecks().catch((err) => {

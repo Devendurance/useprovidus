@@ -103,6 +103,7 @@ export function AirtimePreviewCard({
     return (
       <PaymentInstructionsCard
         instructions={effectiveInstructions}
+        preview={preview}
         status={depositStatus}
         depositStatus={depositStatus}
         depositHash={depositHash}
@@ -348,9 +349,11 @@ export function AirtimePreviewCard({
               </div>
 
               <div className="mt-1 flex items-baseline justify-between">
-                <span className="font-proof text-xs text-receipt-grey">Total to Pay:</span>
+                <span className="font-proof text-xs text-receipt-grey">
+                  Estimated base deposit:
+                </span>
                 <span className="font-proof tabular-nums text-xl font-bold text-ledger-stone">
-                  {formatDecimalForDisplay(preview.totalUsdc)}{" "}
+                  {formatDecimalForDisplay(preview.amountUsdc)}{" "}
                   <span className="text-xs font-normal text-receipt-grey">USDC</span>
                 </span>
               </div>
@@ -358,17 +361,20 @@ export function AirtimePreviewCard({
               {/* Breakdown */}
               <div className="mt-2.5 space-y-1 border-t border-ledger-edge/60 pt-2 text-[11px]">
                 <div className="flex items-center justify-between font-proof">
-                  <span className="text-receipt-grey">Quoted Amount:</span>
+                  <span className="text-receipt-grey">Estimated base deposit:</span>
                   <span className="font-proof tabular-nums text-ledger-stone">
                     {formatDecimalForDisplay(preview.amountUsdc)} USDC
                   </span>
                 </div>
                 <div className="flex items-center justify-between font-proof">
-                  <span className="text-receipt-grey">Network fee:</span>
-                  <span className="font-proof tabular-nums text-provident-green font-medium">
-                    {formatDecimalForDisplay(preview.feeUsdc)} USDC (Free)
+                  <span className="text-receipt-grey">Provider fee:</span>
+                  <span className="font-proof text-receipt-grey text-right">
+                    Finalized when payment order is created
                   </span>
                 </div>
+                <p className="font-proof text-[10px] text-receipt-grey">
+                  Final amount shown before wallet approval
+                </p>
                 <div className="flex items-center justify-between font-proof border-t border-ledger-edge/40 pt-1 text-receipt-grey">
                   <span>Exchange Rate:</span>
                   <span className="font-proof tabular-nums text-ledger-stone">
