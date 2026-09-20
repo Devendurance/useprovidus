@@ -22,8 +22,8 @@ import {
 import { addDecimalStrings, divideDecimalStrings } from "@/lib/money/decimal";
 import { getCorridorQuote } from "@/lib/paycrest/server/client";
 
-/** A preview is valid only while the current time is strictly before `expiresAt`. */
-export const PREVIEW_TTL_MS = 60_000;
+/** A preview is valid only while the current time is strictly before `expiresAt` (5-minute human-safe TTL). */
+export const PREVIEW_TTL_MS = 5 * 60_000;
 
 /** Crypto notional used on the sell side to read the current NGN-per-USDC rate. */
 export const SELL_NOTIONAL_USDC = "1";
@@ -149,7 +149,7 @@ function normalizePreviewWallet(value: string | undefined): string | null {
  *
  * Fetches the Paycrest sell corridor rate with a 1 USDC notional and treats it
  * as NGN per 1 USDC, computes the exact ceiling inverse quote, stamps the
- * 60-second TTL and the intent fingerprint, then stores the whole quote bound
+ * 5-minute TTL and the intent fingerprint, then stores the whole quote bound
  * to the caller's wallet. Never returns a preview for an incomplete intent, an
  * invalid wallet, a failed quote, an unusable rate, or a quote that could not
  * be persisted — an unpersisted quote could never be consumed for payment.

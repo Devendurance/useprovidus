@@ -122,7 +122,7 @@ function quoteInput(
     feeUsdc: "0",
     totalUsdc: AMOUNT_USDC,
     quotedAt,
-    expiresAt: new Date(Date.parse(quotedAt) + 60_000).toISOString(),
+    expiresAt: new Date(Date.parse(quotedAt) + 5 * 60_000).toISOString(),
     ...overrides,
   };
 }
@@ -183,7 +183,7 @@ async function run() {
     assert.equal(Number.isFinite(Date.parse(stored.createdAt)), true);
     assert.equal(
       Date.parse(stored.expiresAt) - Date.parse(stored.quotedAt),
-      60_000,
+      5 * 60_000,
     );
 
     // The returned quote is the frozen ten-field contract, with the id kept
@@ -444,10 +444,11 @@ async function run() {
     /* 4. Expiry                                                         */
     /* ---------------------------------------------------------------- */
 
+    const expiredQuotedAt = new Date(Date.now() - 6 * 60_000).toISOString();
     const expired = await repository.createPreview(
       quoteInput({
-        quotedAt: new Date(Date.now() - 120_000).toISOString(),
-        expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        quotedAt: expiredQuotedAt,
+        expiresAt: new Date(Date.parse(expiredQuotedAt) + 5 * 60_000).toISOString(),
       }),
     );
     assert.equal(expired.ok, true);

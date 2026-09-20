@@ -77,7 +77,7 @@ export function AirtimePreviewCard({
   const handleEdit = onEditIntent ?? onEdit;
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [localPreparing, setLocalPreparing] = useState(false);
-  // Live countdown timer for 60s TTL
+  // Live countdown timer for 5-minute preview TTL
   useEffect(() => {
     if (!preview?.expiresAt) {
       return;
@@ -413,7 +413,7 @@ export function AirtimePreviewCard({
                     Quote expired — refresh needed to confirm
                   </span>
                   <span className="text-receipt-grey ml-1.5">
-                    Rate guarantee has lapsed (60s TTL). Please refresh to recalculate before confirming.
+                    Rate guarantee has lapsed (5m TTL). Please refresh to recalculate before confirming.
                   </span>
                 </div>
               </div>

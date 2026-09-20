@@ -69,7 +69,7 @@ export type PreviewBindingResult =
  * readiness and completeness, then quote binding (fingerprint), then field
  * consistency, then freshness. Field consistency includes the quote's own
  * economics — `amountUsdc`/`totalUsdc` must be exactly what the inverse quote
- * at `rate` produces, and `expiresAt` must be exactly the fixed one-minute TTL
+ * at `rate` produces, and `expiresAt` must be exactly the fixed 5-minute TTL
  * after `quotedAt` — so a tampered quote can never widen the price or the
  * validity window. Every ambiguity resolves to "invalid" — there is no path
  * where a missing, stale, or mismatched value is treated as acceptable.
@@ -118,15 +118,15 @@ export function validatePreviewBinding(
     return { valid: false, reason: "FIELD_MISMATCH" };
   }
 
-  // The quote is a snapshot of a fixed one-minute TTL: `expiresAt` must be
-  // exactly `quotedAt + 60s`. A forged horizon (far future, unparseable, or
+  // The quote is a snapshot of a fixed 5-minute TTL: `expiresAt` must be
+  // exactly `quotedAt + 5 minutes`. A forged horizon (far future, unparseable, or
   // shifted origin) is a tampered snapshot, never a longer-lived quote.
   const quotedAtMs = Date.parse(preview.quotedAt);
   const expiresAtMs = Date.parse(preview.expiresAt);
   if (
     !Number.isFinite(quotedAtMs) ||
     !Number.isFinite(expiresAtMs) ||
-    expiresAtMs !== quotedAtMs + 60_000
+    expiresAtMs !== quotedAtMs + 5 * 60_000
   ) {
     return { valid: false, reason: "FIELD_MISMATCH" };
   }

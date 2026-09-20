@@ -27,7 +27,7 @@ export interface ConfirmedPaymentState extends ConfirmedAirtimePayment {
 }
 
 /**
- * Checks whether an AirtimePreview is fresh according to its 60s TTL.
+ * Checks whether an AirtimePreview is fresh according to its 5-minute TTL.
  * Quote is valid strictly while Date.now() < expiresAtMs.
  */
 export function isPreviewFresh(

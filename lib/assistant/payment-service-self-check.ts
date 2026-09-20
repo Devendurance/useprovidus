@@ -251,6 +251,8 @@ async function seedPreview(
   sandbox: Sandbox,
   overrides?: Partial<AirtimePreviewRecordInput>,
 ): Promise<AirtimePreviewRecord> {
+  const quotedAt = new Date().toISOString();
+  const expiresAt = new Date(Date.parse(quotedAt) + 5 * 60_000).toISOString();
   const result = await sandbox.previews.createPreview({
     walletAddress: WALLET,
     intentFingerprint: "a".repeat(64),
@@ -261,8 +263,8 @@ async function seedPreview(
     amountUsdc: AMOUNT_USDC,
     feeUsdc: "0",
     totalUsdc: TOTAL_USDC,
-    quotedAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    quotedAt,
+    expiresAt,
     ...overrides,
   });
   assert.equal(result.ok, true, "preview seed must succeed");

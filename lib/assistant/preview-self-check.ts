@@ -6,7 +6,7 @@
  *      so the inverse quote can never under-fund the requested NGN value;
  *   2. `buildAirtimePreview` reads the *sell* rate, treats it as NGN per 1
  *      USDC, and emits the frozen ten-field `AirtimePreview` with the exact
- *      amounts, fingerprint, and 60-second TTL;
+ *      amounts, fingerprint, and 5-minute TTL;
  *   3. an incomplete or invalid intent fails before any network call;
  *   4. a failed, absent, or malformed provider quote never becomes a preview;
  *   5. the route exposes `{ ok: true, previewId, preview }` with
@@ -202,9 +202,13 @@ async function run() {
   const quotedMs = Date.parse(preview.quotedAt);
   assert.equal(Number.isFinite(quotedMs), true);
   assert.equal(preview.expiresAt, new Date(quotedMs + PREVIEW_TTL_MS).toISOString());
-  assert.equal(Date.parse(preview.expiresAt) - quotedMs, 60_000);
+  assert.equal(Date.parse(preview.expiresAt) - quotedMs, 5 * 60_000);
   assert.equal(Math.abs(Date.now() - quotedMs) < 5_000, true);
-
+  // 5-minute TTL boundary assertions:
+  assert.equal(quotedMs + 60_000 < Date.parse(preview.expiresAt), true, "preview remains fresh at 60s");
+  assert.equal(quotedMs + 299_000 < Date.parse(preview.expiresAt), true, "preview remains fresh just before 5 minutes");
+  assert.equal(quotedMs + 300_000 < Date.parse(preview.expiresAt), false, "preview is expired at exact 5-minute mark");
+  assert.equal(quotedMs + 301_000 < Date.parse(preview.expiresAt), false, "preview is expired after 5 minutes");
   // SHA-256 over the exact canonical `amountNgn:phone:network` string.
   assert.equal(
     preview.intentFingerprint,

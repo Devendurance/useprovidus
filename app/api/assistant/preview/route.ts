@@ -2,7 +2,7 @@
  * Airtime preview endpoint.
  *
  * The sole HTTP boundary for obtaining an `AirtimePreview`: the server fetches
- * the Paycrest sell rate and returns the exact inverse quote plus a 60-second
+ * the Paycrest sell rate and returns the exact inverse quote plus a 5-minute
  * TTL and the intent fingerprint. The client never sees a provider credential
  * or a raw provider payload.
  */

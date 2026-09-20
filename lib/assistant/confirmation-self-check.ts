@@ -46,8 +46,8 @@ const OTHER_NETWORKS: readonly PaymentNetwork[] = ["glo", "9mobile"];
 
 const QUOTED_AT = "2026-09-19T00:00:00.000Z";
 const FRESH_MS = Date.parse(QUOTED_AT);
-/** The quote lifetime is frozen at one minute, exactly as the server prices it. */
-const PREVIEW_TTL_MS = 60_000;
+/** The quote lifetime is frozen at 5 minutes, exactly as the server prices it. */
+const PREVIEW_TTL_MS = 5 * 60_000;
 const EXPIRES_AT = new Date(FRESH_MS + PREVIEW_TTL_MS).toISOString();
 const EXPIRES_AT_MS = Date.parse(EXPIRES_AT);
 
@@ -230,7 +230,7 @@ function run() {
     "a non-comparable clock can never prove freshness",
   );
   // The default clock must accept a quote that is genuinely fresh *and* still
-  // inside its fixed one-minute window, so freshness is proven against the
+  // inside its fixed 5-minute window, so freshness is proven against the
   // real clock rather than a supplied one.
   const liveQuoteMs = Date.now();
   assert.deepEqual(
