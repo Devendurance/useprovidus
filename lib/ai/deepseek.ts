@@ -9,6 +9,11 @@
  * Boundaries:
  * - Never logs or returns the API key, request headers, request body, prompts,
  *   or raw provider responses. Errors carry a bounded classification only.
+ * - One diagnostic is emitted per instrumented failure — a non-OK HTTP response
+ *   or a classified transport failure — as a closed JSON record holding the
+ *   configured model, the HTTP status (or null), the attempt duration, and the
+ *   bounded error code. Configuration, invalid-request, and malformed-response
+ *   failures are intentionally outside that diagnostic scope.
  * - Never retries automatically. A provider retry must never be confused with
  *   a payment retry; retry policy belongs to the caller.
  * - A successful completion is only text. It is not an authorization, a
@@ -439,6 +444,35 @@ function classifyTransportFailure(
 }
 
 /**
+ * Emits the one permitted server diagnostic for an instrumented DeepSeek
+ * failure: a non-OK HTTP response or a classified transport failure. Failures
+ * outside that scope — configuration, request validation, and malformed
+ * response envelopes — stay silent.
+ *
+ * The payload is a closed, non-sensitive record: the configured (validated)
+ * model identifier, the HTTP status or `null` for a transport failure, the
+ * elapsed attempt duration, and the frozen LlmErrorCode. The API key,
+ * authorization header, prompt messages, phone numbers, and response bodies
+ * are never part of it.
+ */
+function emitDeepSeekFailureDiagnostic(
+  model: string,
+  status: number | null,
+  startedAt: number,
+  error: LlmProviderError,
+): void {
+  console.error(
+    JSON.stringify({
+      tag: "deepseek_failure",
+      model,
+      status,
+      durationMs: Math.max(0, Date.now() - startedAt),
+      code: error.code,
+    }),
+  );
+}
+
+/**
  * Creates the DeepSeek-backed LlmProvider.
  *
  * Environment is read inside `complete`, so a provider instance created before
@@ -477,6 +511,17 @@ export function createDeepSeekProvider(options?: DeepSeekProviderOptions): LlmPr
         controller.abort();
       }, config.timeoutMs);
 
+      const startedAt = Date.now();
+
+      /**
+       * Emits the safe failure diagnostic and rethrows the classified error, so
+       * every failing attempt is observable without duplicating the emit call.
+       */
+      const failRequest = (error: LlmProviderError, status: number | null): never => {
+        emitDeepSeekFailureDiagnostic(config.model, status, startedAt, error);
+        throw error;
+      };
+
       try {
         let response: Response;
         try {
@@ -491,13 +536,16 @@ export function createDeepSeekProvider(options?: DeepSeekProviderOptions): LlmPr
             signal: controller.signal,
           });
         } catch (error) {
-          throw classifyTransportFailure(error, timedOut, config.timeoutMs);
+          throw failRequest(
+            classifyTransportFailure(error, timedOut, config.timeoutMs),
+            null,
+          );
         }
 
         if (!response.ok) {
           const status = response.status;
           await discardResponseBody(response);
-          throw mapHttpStatusError(status);
+          throw failRequest(mapHttpStatusError(status), status);
         }
 
         let payload: unknown;
@@ -507,7 +555,10 @@ export function createDeepSeekProvider(options?: DeepSeekProviderOptions): LlmPr
           if (error instanceof LlmProviderError) {
             throw error;
           }
-          throw classifyTransportFailure(error, timedOut, config.timeoutMs);
+          throw failRequest(
+            classifyTransportFailure(error, timedOut, config.timeoutMs),
+            null,
+          );
         }
 
         return normalizeDeepSeekResponse(payload, config.model);

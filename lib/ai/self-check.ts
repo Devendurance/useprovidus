@@ -9,6 +9,9 @@
  *  - malformed JSON bodies and malformed envelopes
  *  - request validation that never reaches the network
  *  - no automatic retry and no raw body / API key leakage in LlmError
+ *  - exactly one closed, secret-free `deepseek_failure` diagnostic on every
+ *    non-OK response and every classified transport failure, and none anywhere
+ *    else (configuration, malformed envelopes, success)
  *  - prompt builder: system-first, bounded quoted history, candidate-only JSON,
  *    canonical draft context without readiness keys
  *  - static server-only boundary checks + env.example documentation
@@ -149,6 +152,87 @@ function userTurn(content = "hi"): LlmCompletionRequest {
   return { messages: [{ role: "user", content }] };
 }
 
+/** The frozen diagnostic key set: nothing else may cross into a log line. */
+const DIAGNOSTIC_KEYS = ["code", "durationMs", "model", "status", "tag"];
+
+/** The frozen LlmErrorCode union, restated so the log payload is checked against it. */
+const LLM_ERROR_CODES: readonly string[] = [
+  "CONFIGURATION",
+  "AUTHENTICATION",
+  "RATE_LIMITED",
+  "TIMEOUT",
+  "UPSTREAM_UNAVAILABLE",
+  "UPSTREAM_ERROR",
+  "MALFORMED_RESPONSE",
+  "INVALID_REQUEST",
+];
+
+interface DeepSeekFailureRecord {
+  tag: string;
+  model: string;
+  status: number | null;
+  durationMs: number;
+  code: string;
+}
+
+/**
+ * Captures `console.error` for the duration of the run, so the expected failure
+ * diagnostics are asserted on rather than printed, and none can escape the
+ * checks below.
+ */
+function captureConsoleErrors(): { lines: string[]; restore: () => void } {
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    lines.push(args.map((arg) => (typeof arg === "string" ? arg : String(arg))).join(" "));
+  };
+  return {
+    lines,
+    restore: () => {
+      console.error = original;
+    },
+  };
+}
+
+/**
+ * Parses a captured line and proves it is a closed, secret-free record: exactly
+ * the frozen key set, a frozen code, and numeric timing/status values. A line
+ * that is not a JSON object throws out of `JSON.parse` or fails an assertion,
+ * so a smuggled field, prompt, or credential can never pass silently.
+ */
+function parseFailureDiagnostic(line: string, label: string): DeepSeekFailureRecord {
+  const parsed = JSON.parse(line) as unknown;
+  assert.equal(
+    typeof parsed === "object" && parsed !== null && !Array.isArray(parsed),
+    true,
+    `${label}: a diagnostic must be a JSON object (got ${line})`,
+  );
+  const record = parsed as Record<string, unknown>;
+  assert.deepEqual(
+    Object.keys(record).sort(),
+    DIAGNOSTIC_KEYS,
+    `${label}: a diagnostic may only carry the frozen safe keys`,
+  );
+  assert.equal(record.tag, "deepseek_failure", `${label}: frozen tag`);
+  assert.equal(typeof record.model, "string", `${label}: model must be a string`);
+  assert.equal(
+    record.status === null || Number.isInteger(record.status),
+    true,
+    `${label}: status must be an HTTP status or null`,
+  );
+  assert.equal(
+    Number.isInteger(record.durationMs) && (record.durationMs as number) >= 0,
+    true,
+    `${label}: durationMs must be a non-negative integer`,
+  );
+  assert.equal(
+    LLM_ERROR_CODES.includes(record.code as string),
+    true,
+    `${label}: code must be a frozen LlmErrorCode`,
+  );
+  return record as unknown as DeepSeekFailureRecord;
+}
+
 /** Client-facing source trees that must never reach the server-only provider layer. */
 const CLIENT_SOURCE_DIRS = ["app", "components", "hooks"];
 
@@ -205,6 +289,10 @@ async function run() {
   const originalKey = process.env.DEEPSEEK_API_KEY;
   const originalBaseUrl = process.env.DEEPSEEK_BASE_URL;
   const originalModel = process.env.DEEPSEEK_MODEL;
+
+  // Expected DeepSeek failure diagnostics are captured for the whole run: they
+  // are asserted on in group 11 instead of being printed.
+  const capturedDiagnostics = captureConsoleErrors();
 
   try {
     // -------------------------------------------------------------
@@ -867,11 +955,24 @@ async function run() {
         /^import\s+["']server-only["'];?/,
         `lib/ai/${moduleName} must start with import "server-only";`,
       );
-      assert.equal(
-        /\bconsole\s*\./.test(moduleSource),
-        false,
-        `lib/ai/${moduleName} must never log`,
-      );
+      // Logging stays forbidden here except for the one frozen, secret-free
+      // failure diagnostic in `deepseek.ts`: a single `console.error` call.
+      // Any second call site, or any other console method, fails this check.
+      const consoleCalls = moduleSource.match(/console\s*\.\s*[A-Za-z]+\s*\(/g) ?? [];
+      if (moduleName === "deepseek.ts") {
+        assert.deepEqual(
+          consoleCalls,
+          ["console.error("],
+          "lib/ai/deepseek.ts may only emit the frozen failure diagnostic",
+        );
+        assert.equal(
+          moduleSource.includes('tag: "deepseek_failure"'),
+          true,
+          "lib/ai/deepseek.ts must emit the frozen deepseek_failure tag",
+        );
+      } else {
+        assert.deepEqual(consoleCalls, [], `lib/ai/${moduleName} must never log`);
+      }
     }
 
     const boundaryViolations: string[] = [];
@@ -902,8 +1003,148 @@ async function run() {
       "DeepSeek configuration must never be public",
     );
 
+    // -------------------------------------------------------------
+    // Group 11: safe failure diagnostics
+    // -------------------------------------------------------------
+    console.log("Group 11: safe failure diagnostics");
+
+    process.env.DEEPSEEK_API_KEY = TEST_API_KEY;
+    delete process.env.DEEPSEEK_BASE_URL;
+    process.env.DEEPSEEK_MODEL = "deepseek-chat";
+
+    const diagnosticBaseline = capturedDiagnostics.lines.length;
+
+    // An HTTP failure reports the real status and the mapped code.
+    const rateLimitedRecorder = createFetchRecorder(
+      () =>
+        new Response(`rate-limit prose that must never be logged: ${TEST_API_KEY}`, {
+          status: 429,
+        }),
+    );
+    const rateLimitedError = await captureLlmError(
+      createDeepSeekProvider({ fetch: rateLimitedRecorder.fetchImpl }).complete(userTurn()),
+      "diagnostic: HTTP 429",
+    );
+    const rateLimitedDiagnostics = capturedDiagnostics.lines
+      .slice(diagnosticBaseline)
+      .map((line) => parseFailureDiagnostic(line, "HTTP 429"));
+    assert.equal(
+      rateLimitedDiagnostics.length,
+      1,
+      "Exactly one diagnostic per failed attempt",
+    );
+    assert.equal(rateLimitedDiagnostics[0].status, 429);
+    assert.equal(rateLimitedDiagnostics[0].code, rateLimitedError.code);
+    assert.equal(
+      rateLimitedDiagnostics[0].model,
+      "deepseek-chat",
+      "The diagnostic reports the configured model",
+    );
+
+    // A transport failure has no HTTP status at all.
+    const transportBaseline = capturedDiagnostics.lines.length;
+    const transportRecorder = createFetchRecorder(() => {
+      throw new TypeError("fetch failed: socket closed at 10.0.0.5");
+    });
+    const transportError = await captureLlmError(
+      createDeepSeekProvider({ fetch: transportRecorder.fetchImpl }).complete(userTurn()),
+      "diagnostic: transport",
+    );
+    const transportDiagnostics = capturedDiagnostics.lines
+      .slice(transportBaseline)
+      .map((line) => parseFailureDiagnostic(line, "transport"));
+    assert.equal(transportDiagnostics.length, 1);
+    assert.equal(transportDiagnostics[0].status, null);
+    assert.equal(transportDiagnostics[0].code, transportError.code);
+
+    // The duration measures the whole attempt, not just the failure handling.
+    const timeoutBaseline = capturedDiagnostics.lines.length;
+    const diagnosticTimeoutRecorder = createFetchRecorder(hangingFetch());
+    await captureLlmError(
+      createDeepSeekProvider({
+        fetch: diagnosticTimeoutRecorder.fetchImpl,
+        timeoutMs: 40,
+      }).complete(userTurn()),
+      "diagnostic: timeout",
+    );
+    const timeoutDiagnostics = capturedDiagnostics.lines
+      .slice(timeoutBaseline)
+      .map((line) => parseFailureDiagnostic(line, "timeout"));
+    assert.equal(timeoutDiagnostics.length, 1);
+    assert.equal(timeoutDiagnostics[0].status, null);
+    assert.equal(timeoutDiagnostics[0].code, "TIMEOUT");
+    assert.equal(
+      timeoutDiagnostics[0].durationMs >= 20,
+      true,
+      "durationMs must measure the attempt rather than report zero",
+    );
+
+    // Configuration failures, malformed 200 envelopes, and successful calls are
+    // outside the frozen diagnostic scope: only `!response.ok` and a classified
+    // transport failure are instrumented.
+    const silentBaseline = capturedDiagnostics.lines.length;
+
+    process.env.DEEPSEEK_API_KEY = "";
+    const silentConfigRecorder = createFetchRecorder(() =>
+      jsonResponse(successEnvelope(CHAT_CONTENT)),
+    );
+    await captureLlmError(
+      createDeepSeekProvider({ fetch: silentConfigRecorder.fetchImpl }).complete(userTurn()),
+      "diagnostic: configuration",
+    );
+    process.env.DEEPSEEK_API_KEY = TEST_API_KEY;
+
+    const silentMalformedRecorder = createFetchRecorder(
+      () => new Response("{not json at all", { status: 200 }),
+    );
+    await captureLlmError(
+      createDeepSeekProvider({ fetch: silentMalformedRecorder.fetchImpl }).complete(userTurn()),
+      "diagnostic: malformed",
+    );
+
+    const silentSuccessRecorder = createFetchRecorder(() =>
+      jsonResponse(successEnvelope(CHAT_CONTENT)),
+    );
+    await createDeepSeekProvider({ fetch: silentSuccessRecorder.fetchImpl }).complete(userTurn());
+
+    assert.equal(
+      capturedDiagnostics.lines.length,
+      silentBaseline,
+      "Only a non-OK response or a classified transport failure emits a diagnostic",
+    );
+
+    // Global invariant over every failure the suite exercised: closed records
+    // only, and no credential, prompt, or provider prose in any of them.
+    const allDiagnostics = capturedDiagnostics.lines.map((line) =>
+      parseFailureDiagnostic(line, "captured diagnostic"),
+    );
+    assert.equal(
+      allDiagnostics.length >= 12,
+      true,
+      "The suite must have exercised every instrumented failure path",
+    );
+    const diagnosticText = capturedDiagnostics.lines.join("\n");
+    for (const forbidden of [
+      TEST_API_KEY,
+      "Bearer",
+      "Authorization",
+      "rate-limit prose",
+      "provider prose",
+      "socket closed",
+      "not json at all",
+      "Buy 500 airtime",
+      "08031234567",
+    ]) {
+      assert.equal(
+        diagnosticText.includes(forbidden),
+        false,
+        `Diagnostics must never contain ${forbidden}`,
+      );
+    }
+
     console.log("LLM provider layer self-check: ALL ASSERTIONS PASSED!");
   } finally {
+    capturedDiagnostics.restore();
     if (originalKey !== undefined) process.env.DEEPSEEK_API_KEY = originalKey;
     else delete process.env.DEEPSEEK_API_KEY;
     if (originalBaseUrl !== undefined) process.env.DEEPSEEK_BASE_URL = originalBaseUrl;

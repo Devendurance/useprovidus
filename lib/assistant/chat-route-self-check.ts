@@ -4,7 +4,8 @@
  * Exercises the real POST handler with a deterministic fake provider and an
  * in-memory transaction repository: request bounds, rate limiting, error
  * mapping, server-side recomputation of every derived field, the deterministic
- * status short-circuit, and the history cap.
+ * status short-circuit, the deterministic confirmation short-circuit, and the
+ * history cap.
  *
  * Run: npx tsx --conditions=react-server lib/assistant/chat-route-self-check.ts
  */
@@ -20,7 +21,15 @@ import {
   type LlmProvider,
   type LlmResponse,
 } from "@/lib/ai";
-import { setAssistantProviderForTesting } from "@/lib/assistant/resolve";
+import {
+  isAffirmativeConfirmation,
+  resolveAssistantTurn,
+  setAssistantProviderForTesting,
+} from "@/lib/assistant/resolve";
+import type {
+  AirtimeIntent,
+  ConversationMessage,
+} from "@/lib/assistant/types";
 import {
   InMemoryTransactionRepository,
   setTransactionRepositoryForTesting,
@@ -358,6 +367,299 @@ async function run() {
     );
     assert.equal(explodingProvider.requests.length, 0);
     assert.equal(statusBody.activeIntent, null);
+
+    /* ---------------------------------------------------------------- */
+    /* Deterministic confirmation short-circuit: no model call           */
+    /* ---------------------------------------------------------------- */
+    const affirmatives = [
+      "yes",
+      "Yes.",
+      "  YES  ",
+      "yes it is",
+      "yes, it is!",
+      "yes that's correct",
+      "yes thats correct",
+      "correct",
+      "ok",
+      "Okay…",
+      "confirm",
+      "Confirmed",
+      "proceed",
+      "continue",
+    ];
+    for (const affirmative of affirmatives) {
+      assert.equal(
+        isAffirmativeConfirmation(affirmative),
+        true,
+        `"${affirmative}" must confirm a ready draft`,
+      );
+    }
+
+    // Softer, longer, or negative phrasings stay with the model.
+    for (const notAffirmative of [
+      "",
+      "   ",
+      "yep",
+      "yes please",
+      "no",
+      "not yet",
+      "looks good",
+      "yes but make it 1000",
+      `ok send it to ${PHONE}`,
+    ]) {
+      assert.equal(
+        isAffirmativeConfirmation(notAffirmative),
+        false,
+        `"${notAffirmative}" must not confirm a ready draft`,
+      );
+    }
+
+    const readyHistory: ConversationMessage[] = [
+      {
+        role: "user",
+        content: `send 500 mtn airtime to ${PHONE}`,
+        timestamp: TIMESTAMP,
+      },
+      {
+        role: "assistant",
+        content: "That looks like MTN. Is MTN correct?",
+        timestamp: TIMESTAMP,
+      },
+    ];
+    const readyDraft: AirtimeIntent = {
+      type: "airtime",
+      amountNgn: "500",
+      phone: PHONE,
+      network: "mtn",
+      networkConfirmed: true,
+      missingFields: [],
+      readyForConfirmation: true,
+    };
+    const readyIntent = {
+      type: "airtime",
+      amountNgn: "500",
+      phone: PHONE,
+      network: "mtn",
+      networkConfirmed: true,
+      missingFields: [],
+      readyForConfirmation: true,
+    };
+
+    const confirmProvider = new FakeProvider(() => {
+      throw new Error("the model must not be called for a confirmed draft");
+    });
+    setAssistantProviderForTesting(confirmProvider);
+
+    for (let index = 0; index < affirmatives.length; index += 1) {
+      const affirmative = affirmatives[index];
+      const response = await POST(
+        chatRequest(
+          {
+            message: affirmative,
+            history: readyHistory,
+            activeIntent: readyDraft,
+          },
+          `10.2.0.${index + 1}`,
+        ),
+      );
+      assert.equal(response.status, 200, `"${affirmative}" must be answered`);
+      const body = await response.json();
+      assert.equal(body.ok, true);
+      assert.equal(
+        body.turn.kind,
+        "payment_intent",
+        `"${affirmative}" must short-circuit the model`,
+      );
+      assert.equal(body.turn.message.role, "assistant");
+      assert.equal(
+        body.turn.message.content,
+        "Payment details confirmed. You can review the quote and proceed to payment below.",
+      );
+      assert.match(body.turn.message.timestamp, /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
+      // The draft crosses the boundary field-for-field, never re-derived.
+      assert.deepEqual(body.turn.message.intent, readyIntent);
+      assert.deepEqual(body.turn.intent, readyIntent);
+      assert.deepEqual(body.activeIntent, readyIntent);
+    }
+    assert.equal(
+      confirmProvider.requests.length,
+      0,
+      "a confirmed draft must never reach the provider",
+    );
+
+    // By reference, not by copy: the resolver's sanitized draft is a single
+    // intent instance shared by the turn and the returned draft state, while
+    // the caller's own object is canonicalized and never echoed back.
+    const directConfirmation = await resolveAssistantTurn({
+      message: "yes",
+      history: readyHistory,
+      activeIntent: readyDraft,
+    });
+    assert.equal(directConfirmation.ok, true);
+    if (directConfirmation.ok) {
+      assert.equal(directConfirmation.turn.kind, "payment_intent");
+      if (directConfirmation.turn.kind === "payment_intent") {
+        assert.equal(
+          directConfirmation.turn.intent,
+          directConfirmation.activeIntent,
+          "turn.intent must be the same object as the returned activeIntent",
+        );
+        assert.equal(
+          directConfirmation.turn.message.intent,
+          directConfirmation.activeIntent,
+          "turn.message.intent must be the same object as the returned activeIntent",
+        );
+      }
+      assert.notEqual(
+        directConfirmation.activeIntent,
+        readyDraft,
+        "the caller's own draft object is never echoed back",
+      );
+      assert.deepEqual(directConfirmation.activeIntent, readyIntent);
+    }
+    assert.equal(confirmProvider.requests.length, 0);
+
+    // A different ready draft is echoed exactly as well.
+    const airtelConfirmation = await POST(
+      chatRequest(
+        {
+          message: "confirm",
+          history: [
+            {
+              role: "user",
+              content: `send 2500 airtel airtime to ${PHONE}`,
+              timestamp: TIMESTAMP,
+            },
+          ],
+          activeIntent: {
+            type: "airtime",
+            amountNgn: "2500",
+            phone: PHONE,
+            network: "airtel",
+          },
+        },
+        "10.3.0.1",
+      ),
+    );
+    const airtelBody = await airtelConfirmation.json();
+    assert.equal(airtelBody.turn.kind, "payment_intent");
+    assert.deepEqual(airtelBody.activeIntent, {
+      type: "airtime",
+      amountNgn: "2500",
+      phone: PHONE,
+      network: "airtel",
+      networkConfirmed: true,
+      missingFields: [],
+      readyForConfirmation: true,
+    });
+    assert.deepEqual(airtelBody.turn.message.intent, airtelBody.activeIntent);
+    assert.equal(confirmProvider.requests.length, 0);
+
+    /* ---------------------------------------------------------------- */
+    /* Confirmation short-circuit does not swallow other turns           */
+    /* ---------------------------------------------------------------- */
+    const followUpProvider = new FakeProvider(() =>
+      llmResponse('{"mode":"chat","reply":"Sure — what would you like to change?","intent":null}'),
+    );
+    setAssistantProviderForTesting(followUpProvider);
+
+    const fallThroughCases: Array<{
+      ip: string;
+      message: string;
+      history: unknown[];
+      activeIntent: unknown;
+    }> = [
+      {
+        ip: "10.4.0.1",
+        message: "yes please",
+        history: readyHistory,
+        activeIntent: readyDraft,
+      },
+      {
+        ip: "10.4.0.2",
+        message: "yep",
+        history: readyHistory,
+        activeIntent: readyDraft,
+      },
+      {
+        ip: "10.4.0.3",
+        message: "yes but make it 1000",
+        history: readyHistory,
+        activeIntent: readyDraft,
+      },
+      {
+        ip: "10.4.0.4",
+        message: "yes",
+        history: [],
+        activeIntent: { type: "airtime", amountNgn: "500", phone: PHONE },
+      },
+      {
+        ip: "10.4.0.5",
+        message: "ok",
+        history: [],
+        activeIntent: { type: "data", missingFields: [], readyForConfirmation: false },
+      },
+      {
+        ip: "10.4.0.6",
+        message: "yes",
+        history: [],
+        activeIntent: null,
+      },
+    ];
+
+    for (const fallThrough of fallThroughCases) {
+      const response = await POST(
+        chatRequest(
+          {
+            message: fallThrough.message,
+            history: fallThrough.history,
+            activeIntent: fallThrough.activeIntent,
+          },
+          fallThrough.ip,
+        ),
+      );
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.ok, true);
+      assert.equal(
+        body.turn.kind,
+        "chat",
+        `"${fallThrough.message}" must fall through to the model`,
+      );
+    }
+    assert.equal(followUpProvider.requests.length, fallThroughCases.length);
+    assert.equal(
+      followUpProvider.requests[0].messages[0].content.includes(
+        '"networkConfirmed":true',
+      ),
+      true,
+      "an unconfirmed ready draft still reaches the model as server-derived state",
+    );
+
+    // Recorded status outranks confirmation, even with a ready draft.
+    const statusWithReadyDraft = await POST(
+      chatRequest(
+        {
+          message: "what is the status of tx_route_settled?",
+          history: readyHistory,
+          activeIntent: readyDraft,
+        },
+        "10.5.0.1",
+      ),
+    );
+    const statusWithReadyDraftBody = await statusWithReadyDraft.json();
+    assert.equal(statusWithReadyDraftBody.ok, true);
+    assert.equal(statusWithReadyDraftBody.turn.kind, "chat");
+    assert.equal(
+      statusWithReadyDraftBody.turn.message.content.includes("tx_route_settled"),
+      true,
+    );
+    assert.equal(
+      statusWithReadyDraftBody.turn.message.content.includes("Payment details confirmed"),
+      false,
+    );
+    assert.deepEqual(statusWithReadyDraftBody.activeIntent, readyIntent);
+    assert.equal(followUpProvider.requests.length, fallThroughCases.length);
 
     /* ---------------------------------------------------------------- */
     /* Provider error mapping                                            */

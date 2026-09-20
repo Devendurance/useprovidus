@@ -3,8 +3,10 @@
  *
  * Order of authority:
  * 1. deterministic status answers (no model call at all);
- * 2. the configured model, which may only produce a candidate intent;
- * 3. `parseAssistantModelOutput` + `resolveIntent`, which own every accepted
+ * 2. the deterministic confirmation fast-path: an already-ready draft plus an
+ *    exact affirmative answer (no model call at all);
+ * 3. the configured model, which may only produce a candidate intent;
+ * 4. `parseAssistantModelOutput` + `resolveIntent`, which own every accepted
  *    value and recompute all derived fields.
  *
  * Nothing here authorizes, executes, or reconciles a payment: no provider
@@ -48,6 +50,42 @@ export interface ResolveAssistantTurnInput {
 const MODEL_TEMPERATURE = 0;
 /** Bounded: one short reply plus one small intent object. */
 const MODEL_MAX_TOKENS = 600;
+
+/**
+ * The only user messages that can confirm an already-ready draft without the
+ * model: exact matches, after normalization, against a closed vocabulary.
+ * Anything else falls through to the model, which owns every softer reading.
+ *
+ * Apostrophes are punctuation and are stripped by normalization, so
+ * "yes that's correct" and "yes thats correct" collapse onto one entry.
+ */
+const AFFIRMATIVE_CONFIRMATIONS: Record<string, true> = {
+  yes: true,
+  "yes it is": true,
+  "yes thats correct": true,
+  correct: true,
+  confirm: true,
+  confirmed: true,
+  proceed: true,
+  continue: true,
+  ok: true,
+  okay: true,
+};
+
+/**
+ * Deterministic fast-path gate: true only when the whole message is a bare
+ * affirmative from the closed vocabulary above. Normalization lowercases,
+ * removes punctuation and symbols, collapses whitespace, and trims.
+ */
+export function isAffirmativeConfirmation(message: string): boolean {
+  if (typeof message !== "string") return false;
+  const normalized = message
+    .toLowerCase()
+    .replace(/[\p{P}\p{S}]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return AFFIRMATIVE_CONFIRMATIONS[normalized] === true;
+}
 
 let providerOverride: LlmProvider | null = null;
 
@@ -162,7 +200,28 @@ export async function resolveAssistantTurn(
     return chatTurn(lookup.message, activeIntent);
   }
 
-  // 2. Conversational / intent candidate path.
+  // 2. A complete draft answered with an exact affirmative is already decided:
+  //    no model call, no reinterpretation, the draft passes through untouched.
+  if (
+    activeIntent !== null &&
+    activeIntent.readyForConfirmation === true &&
+    isAffirmativeConfirmation(message)
+  ) {
+    const timestamp = new Date().toISOString();
+    const turn: AssistantTurn = {
+      kind: "payment_intent",
+      message: {
+        role: "assistant",
+        content: "Payment details confirmed. You can review the quote and proceed to payment below.",
+        timestamp,
+        intent: activeIntent,
+      },
+      intent: activeIntent,
+    };
+    return { ok: true, turn, activeIntent };
+  }
+
+  // 3. Conversational / intent candidate path.
   const provider = providerOverride ?? createDeepSeekProvider();
 
   let content: string;
@@ -191,7 +250,7 @@ export async function resolveAssistantTurn(
     };
   }
 
-  // 3. Deterministic re-validation owns the result.
+  // 4. Deterministic re-validation owns the result.
   const resolved = resolveIntent({
     candidate: parsed.data.intent,
     userMessage: message,

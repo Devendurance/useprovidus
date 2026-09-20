@@ -13,6 +13,10 @@ import { getAddress, isAddress } from "viem";
 
 import { computeIntentFingerprint } from "@/lib/assistant/fingerprint";
 import { getPreviewRepository } from "@/lib/assistant/preview-repository";
+import type {
+  AirtimePreviewRecord,
+  Result,
+} from "@/lib/assistant/preview-repository";
 import type { AirtimePreview, PaymentNetwork } from "@/lib/assistant/types";
 import {
   normalizeAirtimeAmountNgn,
@@ -21,6 +25,7 @@ import {
 } from "@/lib/assistant/validation";
 import { addDecimalStrings, divideDecimalStrings } from "@/lib/money/decimal";
 import { getCorridorQuote } from "@/lib/paycrest/server/client";
+import type { CorridorQuote, PaycrestResult } from "@/lib/paycrest/types";
 
 /** A preview is valid only while the current time is strictly before `expiresAt` (5-minute human-safe TTL). */
 export const PREVIEW_TTL_MS = 5 * 60_000;
@@ -153,11 +158,19 @@ function normalizePreviewWallet(value: string | undefined): string | null {
  * to the caller's wallet. Never returns a preview for an incomplete intent, an
  * invalid wallet, a failed quote, an unusable rate, or a quote that could not
  * be persisted — an unpersisted quote could never be consumed for payment.
+ *
+ * Every call that reaches the rate lookup emits one safe `preview_timing`
+ * record holding only durations, so a slow Paycrest read or a slow write is
+ * observable without logging the wallet, the phone number, or the quote. A
+ * lookup or write that throws is timed too and rethrown unchanged: the
+ * instrumentation never alters or masks a failure.
  */
 export async function buildAirtimePreview(
   intent: AirtimePreviewIntent,
   options?: AirtimePreviewOptions,
 ): Promise<AirtimePreviewResult> {
+  const startedAt = Date.now();
+
   const checked = normalizePreviewIntent(intent);
   if (!checked.ok) return { ok: false, error: checked.error };
   const { amountNgn, phone, network } = checked.intent;
@@ -171,21 +184,56 @@ export async function buildAirtimePreview(
     );
   }
 
-  const quote = await getCorridorQuote("sell", SELL_NOTIONAL_USDC, {
-    fetchFn: options?.fetchFn,
-  });
+  let rateLookupDurationMs = 0;
+  let dbPersistenceDurationMs = 0;
+
+  /**
+   * Emits the one safe timing record for this call. A closed record only:
+   * durations and a tag — never the wallet, the phone number, the rate, or the
+   * intent. Every exit taken once the rate lookup has started reaches it — the
+   * return paths through `withTiming` and the throw paths through the catches
+   * below — so exactly one record is emitted per call, and a step that was
+   * never attempted reports 0.
+   */
+  const emitTiming = (): void => {
+    console.log(
+      JSON.stringify({
+        tag: "preview_timing",
+        rateLookupDurationMs,
+        dbPersistenceDurationMs,
+        totalMs: Math.max(0, Date.now() - startedAt),
+      }),
+    );
+  };
+
+  /** Emits the timing record and returns the result unchanged. */
+  const withTiming = (result: AirtimePreviewResult): AirtimePreviewResult => {
+    emitTiming();
+    return result;
+  };
+
+  const rateLookupStartedAt = Date.now();
+  let quote: PaycrestResult<CorridorQuote>;
+  try {
+    quote = await getCorridorQuote("sell", SELL_NOTIONAL_USDC, {
+      fetchFn: options?.fetchFn,
+    });
+  } catch (error) {
+    // A lookup that throws is still timed, and the error is rethrown unchanged:
+    // instrumentation must never alter or mask a failure.
+    rateLookupDurationMs = Math.max(0, Date.now() - rateLookupStartedAt);
+    emitTiming();
+    throw error;
+  }
+  rateLookupDurationMs = Math.max(0, Date.now() - rateLookupStartedAt);
   if (!quote.ok) {
-    return failure(
-      "QUOTE_UNAVAILABLE",
-      "Paycrest sell rate could not be fetched",
-      true,
+    return withTiming(
+      failure("QUOTE_UNAVAILABLE", "Paycrest sell rate could not be fetched", true),
     );
   }
   if (!quote.data.available) {
-    return failure(
-      "RATE_UNAVAILABLE",
-      "No Paycrest sell rate is available right now",
-      true,
+    return withTiming(
+      failure("RATE_UNAVAILABLE", "No Paycrest sell rate is available right now", true),
     );
   }
 
@@ -194,7 +242,9 @@ export async function buildAirtimePreview(
   const rateUsable =
     /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(rate) && !/^0+(?:\.0*)?$/.test(rate);
   if (!rateUsable) {
-    return failure("INVALID_RATE", "Paycrest returned an unusable sell rate", false);
+    return withTiming(
+      failure("INVALID_RATE", "Paycrest returned an unusable sell rate", false),
+    );
   }
 
   const amountUsdc = divideDecimalStrings(
@@ -224,28 +274,41 @@ export async function buildAirtimePreview(
 
   // Persist the full quote before it is ever handed out: payment preparation
   // re-reads these values from the stored row and never trusts the browser.
-  const persisted = await getPreviewRepository().createPreview({
-    walletAddress,
-    intentFingerprint,
-    amountNgn,
-    phone,
-    network,
-    rate,
-    amountUsdc,
-    feeUsdc,
-    totalUsdc,
-    quotedAt,
-    expiresAt,
-  });
+  const persistenceStartedAt = Date.now();
+  let persisted: Result<AirtimePreviewRecord>;
+  try {
+    persisted = await getPreviewRepository().createPreview({
+      walletAddress,
+      intentFingerprint,
+      amountNgn,
+      phone,
+      network,
+      rate,
+      amountUsdc,
+      feeUsdc,
+      totalUsdc,
+      quotedAt,
+      expiresAt,
+    });
+  } catch (error) {
+    // A write that throws is still timed, and the error is rethrown unchanged:
+    // instrumentation must never turn a driver failure into a payment outcome.
+    dbPersistenceDurationMs = Math.max(0, Date.now() - persistenceStartedAt);
+    emitTiming();
+    throw error;
+  }
+  dbPersistenceDurationMs = Math.max(0, Date.now() - persistenceStartedAt);
   if (!persisted.ok) {
-    return failure(
-      "PREVIEW_STORE_UNAVAILABLE",
-      "Airtime preview could not be persisted; no payment can be prepared",
-      true,
+    return withTiming(
+      failure(
+        "PREVIEW_STORE_UNAVAILABLE",
+        "Airtime preview could not be persisted; no payment can be prepared",
+        true,
+      ),
     );
   }
 
-  return {
+  return withTiming({
     ok: true,
     previewId: persisted.preview.id,
     data: {
@@ -260,5 +323,5 @@ export async function buildAirtimePreview(
       quotedAt,
       expiresAt,
     },
-  };
+  });
 }
