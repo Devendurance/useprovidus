@@ -4,6 +4,7 @@ import { useAssistant } from "@/hooks/use-assistant";
 import { MessageList } from "@/components/assistant/message-list";
 import { AssistantComposer } from "@/components/assistant/assistant-composer";
 import { IntentDraftCard } from "@/components/assistant/intent-draft-card";
+import { PaymentInstructionsCard } from "@/components/assistant/payment-instructions-card";
 import { cn } from "@/lib/cn";
 import {
   Sparkles,
@@ -11,6 +12,8 @@ import {
   AlertTriangle,
   X,
   ShieldAlert,
+  ReceiptText,
+  Loader2,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -40,14 +43,22 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
     depositHash,
     depositError,
     confirmDeposit,
+    rehydratedTransactionId,
+    rehydrating,
+    rehydrationError,
+    loadTransaction,
   } = useAssistant();
   const [dismissedError, setDismissedError] = useState<string | null>(null);
+  const [lookupId, setLookupId] = useState("");
+  const [lookupDismissedFor, setLookupDismissedFor] = useState<string | null>(null);
 
   const displayError = error && error !== dismissedError ? error : null;
 
   const handleReset = () => {
     reset();
     setDismissedError(null);
+    setLookupId("");
+    setLookupDismissedFor(null);
   };
 
   return (
@@ -117,6 +128,22 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
           />
         </div>
       ) : null}
+      {/* Rehydrated payment instructions (detached: no active intent required) */}
+      {!activeIntent && paymentInstructions && lookupDismissedFor !== rehydratedTransactionId ? (
+        <div className="border-b border-ledger-edge/80 bg-receipt-field/60 p-3 sm:p-4">
+          <PaymentInstructionsCard
+            instructions={paymentInstructions}
+            preview={preview}
+            status={depositStatus}
+            depositStatus={depositStatus}
+            depositHash={depositHash}
+            depositError={depositError ?? rehydrationError}
+            onDepositConfirmed={confirmDeposit}
+            onBackToPreview={() => setLookupDismissedFor(rehydratedTransactionId)}
+          />
+        </div>
+      ) : null}
+
 
       {/* Message List */}
       <MessageList
@@ -125,6 +152,58 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
         onSelectSuggestion={send}
         className="bg-clear-paper"
       />
+      {/* Explicit transaction lookup (resume an unfunded order after reload) */}
+      <div className="mx-4 mb-2 rounded-[10px] border border-ledger-edge bg-receipt-field/70 p-3">
+        <form
+          aria-label="Resume a pending payment"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setLookupDismissedFor(null);
+            void loadTransaction(lookupId.trim());
+          }}
+        >
+          <label htmlFor="assistant-transaction-lookup" className="flex items-center gap-1.5 font-proof text-[11px] font-semibold text-ledger-stone">
+            <ReceiptText className="h-3.5 w-3.5 text-quote-blue" aria-hidden="true" />
+            <span>Resume a pending payment</span>
+          </label>
+          <p className="mt-1 font-proof text-[11px] leading-relaxed text-receipt-grey">
+            Paste a transaction ID to reload its deposit instructions. Nothing is paid automatically.
+          </p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input
+              id="assistant-transaction-lookup"
+              type="text"
+              value={lookupId}
+              onChange={(event) => setLookupId(event.target.value)}
+              placeholder="tx_airtime_…"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={rehydrating || pending}
+              className="min-h-[38px] w-full flex-1 rounded-[8px] border border-ledger-edge bg-clear-paper px-2.5 py-1.5 font-mono text-xs text-ledger-stone placeholder:text-receipt-grey/70 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-provident-green disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <button
+              type="submit"
+              disabled={rehydrating || pending || lookupId.trim() === ""}
+              className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-[8px] border border-ledger bg-clear-paper px-3.5 py-1.5 font-display text-xs font-semibold text-ledger-stone shadow-none transition-all hover:border-ledger hover:shadow-base active:translate-x-px active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {rehydrating ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  <span>Loading…</span>
+                </>
+              ) : (
+                <span>Load payment</span>
+              )}
+            </button>
+          </div>
+        </form>
+        {rehydrationError ? (
+          <p role="alert" className="mt-2 font-proof text-[11px] leading-relaxed text-loss-red">
+            {rehydrationError}
+          </p>
+        ) : null}
+      </div>
+
 
       {/* Error Alert Banner */}
       {displayError ? (

@@ -16,6 +16,10 @@ import type {
   PaymentInstructions,
   DepositProgressionStatus,
 } from "@/components/assistant/payment-instructions-card";
+import {
+  decimalStringsEqual,
+  isNonNegativeUsdcDecimal,
+} from "@/lib/money/decimal";
 
 export type { PaymentInstructions, DepositProgressionStatus };
 
@@ -85,6 +89,129 @@ export async function computeIntentFingerprintClient(intent: {
   }
   return "";
 }
+/**
+ * Wire shape of GET /api/transactions/[id]?paymentInstructions=true.
+ * The server always reports the field explicitly on an opted-in read:
+ * an object when payable, null when not, plus an optional machine-readable
+ * expiry reason. A read that never opted in omits both keys (legacy body).
+ */
+export interface RehydratedTransactionResponse {
+  ok: boolean;
+  transaction?: unknown;
+  paymentInstructions?: PaymentInstructions | null;
+  paymentInstructionsError?: string;
+  error?: { code?: string; message?: string } | string;
+}
+
+/** Machine-readable expiry reason emitted only for a proven, elapsed order. */
+export const PAYMENT_ORDER_EXPIRED_CODE = "PAYMENT_ORDER_EXPIRED";
+
+/**
+ * Fail-closed client-side guard for server-reported deposit instructions.
+ * Mirrors the server derivation without trusting it: object shape, exact
+ * required fields, non-zero USDC total, finite future validUntil, stable
+ * transaction binding. Returns the frozen, trimmed instruction or null.
+ * Never synthesizes values, never signs, never sends.
+ */
+export function coerceRehydratedInstructions(
+  value: unknown,
+  expectedTransactionId?: string,
+  nowMs: number = Date.now(),
+): PaymentInstructions | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const transactionId = candidate.transactionId;
+  const receiveAddress = candidate.receiveAddress;
+  const totalUsdcToSend = candidate.totalUsdcToSend;
+  const validUntil = candidate.validUntil;
+  if (
+    typeof transactionId !== "string" ||
+    transactionId.trim() === "" ||
+    typeof receiveAddress !== "string" ||
+    !/^0x[a-fA-F0-9]{40}$/.test(receiveAddress.trim()) ||
+    typeof totalUsdcToSend !== "string" ||
+    typeof validUntil !== "string"
+  ) {
+    return null;
+  }
+  const trimmedTotal = totalUsdcToSend.trim();
+  if (!isNonNegativeUsdcDecimal(trimmedTotal)) return null;
+  if (decimalStringsEqual(trimmedTotal, "0")) return null;
+  const expiry = Date.parse(validUntil);
+  if (!Number.isFinite(expiry) || expiry <= nowMs) return null;
+  if (
+    expectedTransactionId !== undefined &&
+    transactionId !== expectedTransactionId
+  ) {
+    return null;
+  }
+  const frozen: PaymentInstructions = Object.freeze({
+    transactionId,
+    receiveAddress,
+    totalUsdcToSend: trimmedTotal,
+    validUntil,
+    ...(typeof candidate.baseUsdc === "string" ? { baseUsdc: candidate.baseUsdc } : {}),
+    ...(typeof candidate.senderFeeUsdc === "string" ? { senderFeeUsdc: candidate.senderFeeUsdc } : {}),
+    ...(typeof candidate.transactionFeeUsdc === "string" ? { transactionFeeUsdc: candidate.transactionFeeUsdc } : {}),
+  });
+  return frozen;
+}
+
+/**
+ * Deterministic rehydration state transition used by loadTransaction and the
+ * isolated self-check. Pure: no fetch, no wallet, no signing.
+ */
+export interface RehydrationStateInput {
+  requestedTransactionId: string;
+  response: RehydratedTransactionResponse | null;
+  nowMs?: number;
+}
+
+export interface RehydrationStateOutput {
+  ok: boolean;
+  paymentInstructions: PaymentInstructions | null;
+  rehydratedTransactionId: string | null;
+  depositStatus: DepositProgressionStatus;
+  rehydrationError: string | null;
+}
+
+export function resolveRehydrationState(input: RehydrationStateInput): RehydrationStateOutput {
+  const nowMs = input.nowMs ?? Date.now();
+  if (!input.response || input.response.ok !== true) {
+    return {
+      ok: false,
+      paymentInstructions: null,
+      rehydratedTransactionId: null,
+      depositStatus: "pending",
+      rehydrationError: "Transaction lookup failed. Verify the transaction ID and try again.",
+    };
+  }
+  const coerced = coerceRehydratedInstructions(
+    input.response.paymentInstructions,
+    input.requestedTransactionId,
+    nowMs,
+  );
+  if (!coerced) {
+    const expired =
+      input.response.paymentInstructionsError === PAYMENT_ORDER_EXPIRED_CODE;
+    return {
+      ok: false,
+      paymentInstructions: null,
+      rehydratedTransactionId: null,
+      depositStatus: "pending",
+      rehydrationError: expired
+        ? "This payment window has expired. Request a fresh quote to pay."
+        : "No payable instructions are available for this transaction.",
+    };
+  }
+  return {
+    ok: true,
+    paymentInstructions: coerced,
+    rehydratedTransactionId: coerced.transactionId,
+    depositStatus: "awaiting_deposit",
+    rehydrationError: null,
+  };
+}
 
 export interface UseAssistantState {
   messages: ConversationMessage[];
@@ -102,6 +229,9 @@ export interface UseAssistantState {
   depositStatus: DepositProgressionStatus;
   depositHash: string | null;
   depositError: string | null;
+  rehydratedTransactionId: string | null;
+  rehydrating: boolean;
+  rehydrationError: string | null;
 }
 
 export interface UseAssistantOptions {
@@ -119,6 +249,7 @@ export interface UseAssistantResult extends UseAssistantState {
     depositFn?: (instructions: PaymentInstructions) => Promise<string>,
   ): Promise<{ ok: boolean; celoTxHash?: string; error?: string }>;
   confirmDeposit(celoTxHash: string): Promise<{ ok: boolean; error?: string }>;
+  loadTransaction(transactionId: string, walletOverride?: string): Promise<{ ok: boolean; error?: string }>;
 }
 
 /**
@@ -176,6 +307,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     useState<DepositProgressionStatus>("pending");
   const [depositHash, setDepositHash] = useState<string | null>(null);
   const [depositError, setDepositError] = useState<string | null>(null);
+  const [rehydratedTransactionId, setRehydratedTransactionId] = useState<string | null>(null);
+  const [rehydrating, setRehydrating] = useState(false);
+  const [rehydrationError, setRehydrationError] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const previewAbortControllerRef = useRef<AbortController | null>(null);
@@ -250,6 +384,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     setDepositStatus("pending");
     setDepositHash(null);
     setDepositError(null);
+    setRehydratedTransactionId(null);
+    setRehydrating(false);
+    setRehydrationError(null);
   }, []);
 
   const send = useCallback(async (content: string) => {
@@ -877,6 +1014,8 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     setDepositStatus("pending");
     setDepositHash(null);
     setDepositError(null);
+    setRehydratedTransactionId(null);
+    setRehydrationError(null);
 
     if (typeof document !== "undefined") {
       const input =
@@ -887,6 +1026,101 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       input?.focus();
     }
   }, []);
+  /**
+   * Rehydrates payable deposit instructions for an explicit transaction ID.
+   * Read-only: fetches GET /api/transactions/[id]?paymentInstructions=true,
+   * stores only server-returned instructions that pass the fail-closed guard,
+   * surfaces expiry/ineligible states truthfully, and never signs or sends.
+   */
+  const loadTransaction = useCallback(
+    async (
+      transactionId: string,
+      walletOverride?: string,
+    ): Promise<{ ok: boolean; error?: string }> => {
+      const trimmedId = transactionId.trim();
+      if (trimmedId === "") {
+        const errorMsg = "A transaction ID is required to look up payment instructions.";
+        setRehydrationError(errorMsg);
+        return { ok: false, error: errorMsg };
+      }
+      const targetWallet = walletOverride ?? targetWalletRef.current;
+      if (!targetWallet || targetWallet.trim() === "") {
+        const errorMsg = "Please connect your wallet before looking up payment instructions.";
+        setRehydratedTransactionId(null);
+        setPaymentInstructions(null);
+        setDepositStatus("pending");
+        setDepositHash(null);
+        setDepositError(null);
+        setRehydrationError(errorMsg);
+        return { ok: false, error: errorMsg };
+      }
+      setRehydrating(true);
+      setRehydrationError(null);
+      try {
+        const url =
+          `/api/transactions/${encodeURIComponent(trimmedId)}` +
+          `?paymentInstructions=true&walletAddress=${encodeURIComponent(targetWallet.trim())}`;
+        const response = await fetch(url, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        });
+        let json: RehydratedTransactionResponse | null = null;
+        try {
+          json = (await response.json()) as RehydratedTransactionResponse;
+        } catch {
+          json = null;
+        }
+        if (!response.ok || !json || json.ok !== true) {
+          const errorMsg =
+            response.status === 404
+              ? "Transaction not found. Verify the transaction ID and try again."
+              : "Transaction lookup failed. Verify the transaction ID and try again.";
+          setPaymentInstructions(null);
+          setRehydratedTransactionId(null);
+          setDepositStatus("pending");
+          setDepositHash(null);
+          setDepositError(null);
+          setRehydrationError(errorMsg);
+          return { ok: false, error: errorMsg };
+        }
+        const resolved = resolveRehydrationState({
+          requestedTransactionId: trimmedId,
+          response: json,
+        });
+        if (!resolved.ok || !resolved.paymentInstructions) {
+          setPaymentInstructions(null);
+          setRehydratedTransactionId(null);
+          setDepositStatus("pending");
+          setDepositHash(null);
+          setDepositError(null);
+          setRehydrationError(resolved.rehydrationError);
+          return { ok: false, error: resolved.rehydrationError ?? "No payable instructions are available for this transaction." };
+        }
+        setPaymentInstructions(resolved.paymentInstructions);
+        setRehydratedTransactionId(resolved.rehydratedTransactionId);
+        setDepositStatus("awaiting_deposit");
+        setDepositHash(null);
+        setDepositError(null);
+        setPreparationError(null);
+        setRehydrationError(null);
+        return { ok: true };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Transaction lookup failed. Verify the transaction ID and try again.";
+        setPaymentInstructions(null);
+        setRehydratedTransactionId(null);
+        setDepositStatus("pending");
+        setDepositHash(null);
+        setDepositError(null);
+        setRehydrationError(message);
+        return { ok: false, error: message };
+      } finally {
+        setRehydrating(false);
+      }
+    },
+    [],
+  );
+
 
   return {
     messages,
@@ -904,6 +1138,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     depositStatus,
     depositHash,
     depositError,
+    rehydratedTransactionId,
+    rehydrating,
+    rehydrationError,
     send,
     reset,
     confirmPayment,
@@ -911,5 +1148,6 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     editIntent,
     executeDeposit,
     confirmDeposit,
+    loadTransaction,
   };
 }

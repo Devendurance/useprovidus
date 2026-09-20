@@ -24,7 +24,15 @@
  *      sender fee the preview never priced, and a bound row without a usable
  *      total is refused rather than falling back to the un-fee'd base amount;
  *   9. a repeated request for the same consumed preview cannot create a second
- *      Paycrest order.
+ *      Paycrest order;
+ *  10. deposit rehydration over `GET /api/transactions/[id]` is opt-in,
+ *      id-addressed, and ownership-gated: an opt-in read always reports
+ *      `paymentInstructions` explicitly — the instructions themselves only for
+ *      an unexpired, unfunded, provider-bound `pending` airtime order read by
+ *      its own id with the owning wallet and intact metadata, `null` for every
+ *      other refusal, and `PAYMENT_ORDER_EXPIRED` only when that ownership and
+ *      status context is already proven — and it stays a pure read that never
+ *      reconciles or otherwise calls the provider.
  *
  * No live Paycrest orders, no ClubKonnect purchases, no blockchain transactions.
  * Run: npx tsx --conditions=react-server lib/assistant/payment-service-self-check.ts
@@ -35,6 +43,7 @@ import "server-only";
 import assert from "node:assert/strict";
 
 import { POST } from "@/app/api/assistant/orders/route";
+import { GET as getTransactionById } from "@/app/api/transactions/[id]/route";
 import {
   getOperatingSettlementAccount,
   SETTLEMENT_CONFIG_MISSING_MESSAGE,
@@ -57,6 +66,9 @@ import { usdcToBaseUnits } from "@/lib/money/decimal";
 import {
   InMemoryTransactionRepository,
   setTransactionRepositoryForTesting,
+  type CreateTransactionInput,
+  type TransactionMetadata,
+  type TransactionRecord,
   type TransactionRepository,
 } from "@/lib/transactions";
 
@@ -299,6 +311,75 @@ function expectInstructions(result: AirtimePaymentResult): PaymentInstructions {
     assert.fail(`expected payment instructions, got ${result.error.code}`);
   }
   return result.data;
+}
+
+/** Per-sandbox uniqueness for seeded rows; the value itself is irrelevant. */
+let boundRowSequence = 0;
+
+/**
+ * Seeds one airtime row in the exact shape the provider binding writes, with any
+ * single field overridable to a crafted value for the fail-closed cases.
+ */
+async function seedAirtimeRow(
+  sandbox: Sandbox,
+  overrides?: Partial<CreateTransactionInput>,
+): Promise<TransactionRecord> {
+  boundRowSequence += 1;
+  const suffix = String(boundRowSequence);
+  const created = await sandbox.transactions.create({
+    idempotencyKey: `idem_rehydrate_${suffix}`,
+    type: "airtime",
+    walletAddress: WALLET,
+    amountUsdc: AMOUNT_USDC,
+    amountNgn: AMOUNT_NGN,
+    paycrestReference: `p4b_rehydrate_${suffix}`,
+    paycrestOrderId: `pc_ord_rehydrate_${suffix}`,
+    receiveAddress: RECEIVE_ADDRESS,
+    validUntil: new Date(Date.now() + 600_000).toISOString(),
+    metadata: {
+      rate: RATE,
+      senderFee: "0",
+      transactionFee: "0",
+      totalUsdcToSend: TOTAL_USDC,
+    },
+    ...overrides,
+  });
+  assert.equal(created.ok, true, "airtime row seed must succeed");
+  if (!created.ok) throw new Error("unreachable");
+  return created.record;
+}
+
+/** Calls the real recovery route against the sandbox's in-memory repository. */
+function rehydrateTransaction(
+  sandbox: Sandbox,
+  transactionId: string,
+  query: string,
+): Promise<Response> {
+  setTransactionRepositoryForTesting(sandbox.transactions);
+  return getTransactionById(
+    new Request(`http://localhost/api/transactions/${transactionId}${query}`),
+    { params: Promise.resolve({ id: transactionId }) },
+  );
+}
+
+/**
+ * Reads one rehydration response, asserting the transaction DTO contract that
+ * both the eligible and the ineligible cases must keep serving unchanged.
+ */
+async function readRehydratedBody(response: Response): Promise<{
+  ok: boolean;
+  transaction: { id: string; status: string; celoTxHash: string | null };
+  paymentInstructions?: PaymentInstructions | null;
+  paymentInstructionsError?: string;
+}> {
+  assert.equal(response.status, 200, "the transaction DTO must still be served");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  return (await response.json()) as {
+    ok: boolean;
+    transaction: { id: string; status: string; celoTxHash: string | null };
+    paymentInstructions?: PaymentInstructions | null;
+    paymentInstructionsError?: string;
+  };
 }
 
 /** Always-consumable fake: simulates a second caller reaching the pre-order step. */
@@ -1147,18 +1228,104 @@ async function run() {
     assert.equal(unboundTotalTx?.status, "failed");
     assert.equal(unboundTotalTx?.failureCode, "ORDER_CREATION_OUTCOME_UNKNOWN");
 
-    // The same refusal covers every unusable recorded total, while a padded but
-    // valid total is trimmed and honored exactly as bound.
-    const boundTotalCases: Array<{ label: string; total: unknown; usable: boolean }> = [
-      { label: "non-string total", total: 0.333334, usable: false },
-      { label: "blank total", total: "   ", usable: false },
-      { label: "malformed total", total: "not-a-total", usable: false },
-      { label: "over-precise total", total: "0.3333344", usable: false },
-      { label: "zero total", total: "0.000000", usable: false },
-      { label: "padded valid total", total: `  ${TOTAL_USDC}  `, usable: true },
+    // The same refusal covers every unusable recorded binding — an untrustworthy
+    // total or provider fee — while a padded but valid row is trimmed and
+    // honored exactly as bound.
+    const boundRowCases: Array<{
+      label: string;
+      metadata: TransactionMetadata;
+      usable: boolean;
+    }> = [
+      {
+        label: "non-string total",
+        // A legacy row can persist any JSON the older provider path wrote, so
+        // the fixture must reproduce an out-of-contract total to prove refusal.
+        metadata: {
+          rate: RATE,
+          senderFee: "0",
+          transactionFee: "0",
+          totalUsdcToSend: 0.333334,
+        } as unknown as TransactionMetadata,
+        usable: false,
+      },
+      {
+        label: "blank total",
+        metadata: {
+          rate: RATE,
+          senderFee: "0",
+          transactionFee: "0",
+          totalUsdcToSend: "   ",
+        },
+        usable: false,
+      },
+      {
+        label: "malformed total",
+        metadata: {
+          rate: RATE,
+          senderFee: "0",
+          transactionFee: "0",
+          totalUsdcToSend: "not-a-total",
+        },
+        usable: false,
+      },
+      {
+        label: "over-precise total",
+        metadata: {
+          rate: RATE,
+          senderFee: "0",
+          transactionFee: "0",
+          totalUsdcToSend: "0.3333344",
+        },
+        usable: false,
+      },
+      {
+        label: "zero total",
+        metadata: {
+          rate: RATE,
+          senderFee: "0",
+          transactionFee: "0",
+          totalUsdcToSend: "0.000000",
+        },
+        usable: false,
+      },
+      {
+        label: "malformed senderFee",
+        metadata: {
+          rate: RATE,
+          senderFee: "abc",
+          transactionFee: "0",
+          totalUsdcToSend: TOTAL_USDC,
+        },
+        usable: false,
+      },
+      {
+        label: "negative transactionFee",
+        metadata: {
+          rate: RATE,
+          senderFee: "0",
+          transactionFee: "-1",
+          totalUsdcToSend: TOTAL_USDC,
+        },
+        usable: false,
+      },
+      {
+        label: "absent fee fields",
+        metadata: { rate: RATE, totalUsdcToSend: TOTAL_USDC },
+        usable: false,
+      },
+      {
+        label: "padded valid row",
+        metadata: {
+          rate: RATE,
+          senderFee: " 0 ",
+          transactionFee: "0",
+          totalUsdcToSend: `  ${TOTAL_USDC}  `,
+        },
+        usable: true,
+      },
     ];
 
-    for (const { label, total, usable } of boundTotalCases) {
+    for (const { label, metadata, usable } of boundRowCases) {
       const totalSandbox = newSandbox();
       stubFetch(() => jsonResponse(201, paycrestOrderPayload()));
       const totalPreview = await seedPreview(totalSandbox);
@@ -1172,7 +1339,7 @@ async function run() {
         paycrestOrderId: "pc_ord_bound_total",
         receiveAddress: RECEIVE_ADDRESS,
         validUntil: new Date(Date.now() + 600_000).toISOString(),
-        metadata: { rate: RATE, totalUsdcToSend: total as string },
+        metadata,
       });
       assert.equal(totalRow.ok, true, label);
 
@@ -1189,6 +1356,8 @@ async function run() {
         const instructions = expectInstructions(totalResult);
         assert.equal(instructions.totalUsdcToSend, TOTAL_USDC, label);
         assert.equal(instructions.baseUsdc, AMOUNT_USDC, label);
+        assert.equal(instructions.senderFeeUsdc, "0", label);
+        assert.equal(instructions.transactionFeeUsdc, "0", label);
         continue;
       }
       const refused = expectError(totalResult);
@@ -1226,6 +1395,391 @@ async function run() {
     );
     assert.equal(markedUnbound?.status, "failed");
     assert.equal(markedUnbound?.failureCode, "ORDER_CREATION_OUTCOME_UNKNOWN");
+
+    /* ------------------------------------------------------------------ */
+    /* 9. Deposit rehydration: opt-in, id-addressed, ownership-gated       */
+    /* ------------------------------------------------------------------ */
+
+    // A rehydration read of a pending order must never reach the provider: any
+    // upstream call would be an unrequested financial side effect. The stub
+    // answers 500 so a stray call also shows up in the recorded call count.
+    stubFetch(() => jsonResponse(500, { status: "error", message: "unexpected" }));
+
+    const rehydrationSandbox = newSandbox();
+    const boundRow = await seedAirtimeRow(rehydrationSandbox);
+    const ownQuery = `?paymentInstructions=true&walletAddress=${WALLET}`;
+
+    // The stored wallet is the lowercased form and the query carries the
+    // checksummed one: both spellings address the same owner.
+    const rehydrated = await readRehydratedBody(
+      await rehydrateTransaction(rehydrationSandbox, boundRow.id, ownQuery),
+    );
+    assert.equal(rehydrated.ok, true);
+    assert.equal(rehydrated.transaction.id, boundRow.id);
+    assert.deepEqual(rehydrated.paymentInstructions, {
+      transactionId: boundRow.id,
+      receiveAddress: RECEIVE_ADDRESS,
+      baseUsdc: AMOUNT_USDC,
+      senderFeeUsdc: "0",
+      transactionFeeUsdc: "0",
+      totalUsdcToSend: TOTAL_USDC,
+      validUntil: boundRow.validUntil,
+    });
+    assert.equal("paymentInstructionsError" in rehydrated, false);
+
+    // Repeated reads are stable and leave the row byte-identical: rehydration
+    // never funds, re-binds, or re-orders anything.
+    const beforeReads = JSON.stringify(boundRow);
+    const repeated = await readRehydratedBody(
+      await rehydrateTransaction(
+        rehydrationSandbox,
+        boundRow.id,
+        `?paymentInstructions=true&walletAddress=${WALLET.toLowerCase()}`,
+      ),
+    );
+    assert.deepEqual(repeated.paymentInstructions, rehydrated.paymentInstructions);
+    assert.equal(
+      JSON.stringify(await rehydrationSandbox.transactions.findById(boundRow.id)),
+      beforeReads,
+    );
+
+    // A read that never opted in keeps the legacy body exactly: no rehydration
+    // key of any kind, so existing consumers see byte-identical responses.
+    const omittedReads: Array<{ label: string; query: string }> = [
+      { label: "not opted in", query: "" },
+      { label: "wallet without the flag", query: `?walletAddress=${WALLET}` },
+      {
+        label: "explicit false",
+        query: `?paymentInstructions=false&walletAddress=${WALLET}`,
+      },
+    ];
+
+    for (const { label, query } of omittedReads) {
+      const response = await readRehydratedBody(
+        await rehydrateTransaction(rehydrationSandbox, boundRow.id, query),
+      );
+      assert.equal(response.transaction.id, boundRow.id, label);
+      assert.equal("paymentInstructions" in response, false, label);
+      assert.equal("paymentInstructionsError" in response, false, label);
+    }
+
+    // An opt-in read always answers explicitly. Without an owning wallet there is
+    // nothing to say about the order, so the field is a bare `null`: no expiry
+    // code, no ownership oracle, and no payable instructions.
+    const nullReads: Array<{ label: string; query: string }> = [
+      { label: "missing wallet", query: "?paymentInstructions=true" },
+      { label: "blank wallet", query: "?paymentInstructions=true&walletAddress=%20" },
+      {
+        label: "malformed wallet",
+        query: "?paymentInstructions=true&walletAddress=0xnot-an-address",
+      },
+      {
+        label: "foreign wallet",
+        query: `?paymentInstructions=true&walletAddress=${OTHER_WALLET}`,
+      },
+    ];
+
+    for (const { label, query } of nullReads) {
+      const response = await readRehydratedBody(
+        await rehydrateTransaction(rehydrationSandbox, boundRow.id, query),
+      );
+      assert.equal(response.transaction.id, boundRow.id, label);
+      assert.equal(response.paymentInstructions, null, label);
+      assert.equal("paymentInstructionsError" in response, false, label);
+    }
+
+    // The paycrestOrderId fallback still serves the DTO, but it is a lookup
+    // convenience, never ownership proof: no instructions may be minted from it,
+    // and the explicit refusal must not imply anything about the order.
+    const orderIdRead = await readRehydratedBody(
+      await rehydrateTransaction(
+        rehydrationSandbox,
+        boundRow.paycrestOrderId ?? "",
+        ownQuery,
+      ),
+    );
+    assert.equal(orderIdRead.transaction.id, boundRow.id);
+    assert.equal(orderIdRead.paymentInstructions, null);
+    assert.equal("paymentInstructionsError" in orderIdRead, false);
+
+    // Per-field eligibility: each row is a realistically bound airtime order
+    // with exactly one eligibility input broken.
+    const ineligibleRows: Array<{
+      label: string;
+      overrides: Partial<CreateTransactionInput>;
+    }> = [
+      { label: "cash_out type", overrides: { type: "cash_out" } },
+      { label: "no paycrest order id", overrides: { paycrestOrderId: null } },
+      { label: "no receive address", overrides: { receiveAddress: null } },
+      {
+        label: "malformed receive address",
+        overrides: { receiveAddress: "0xnot-an-address" },
+      },
+      { label: "no validUntil", overrides: { validUntil: null } },
+      {
+        label: "unparsable validUntil",
+        overrides: { validUntil: "not-a-timestamp" },
+      },
+      {
+        label: "missing total",
+        overrides: { metadata: { rate: RATE, senderFee: "0", transactionFee: "0" } },
+      },
+      {
+        label: "zero total",
+        overrides: {
+          metadata: {
+            rate: RATE,
+            senderFee: "0",
+            transactionFee: "0",
+            totalUsdcToSend: "0.000000",
+          },
+        },
+      },
+      {
+        label: "unparsable total",
+        overrides: {
+          metadata: {
+            rate: RATE,
+            senderFee: "0",
+            transactionFee: "0",
+            totalUsdcToSend: "not-a-total",
+          },
+        },
+      },
+      {
+        label: "malformed senderFee",
+        overrides: {
+          metadata: {
+            rate: RATE,
+            senderFee: "abc",
+            transactionFee: "0",
+            totalUsdcToSend: TOTAL_USDC,
+          },
+        },
+      },
+      {
+        label: "negative transactionFee",
+        overrides: {
+          metadata: {
+            rate: RATE,
+            senderFee: "0",
+            transactionFee: "-1",
+            totalUsdcToSend: TOTAL_USDC,
+          },
+        },
+      },
+      {
+        label: "absent fee fields",
+        overrides: { metadata: { rate: RATE, totalUsdcToSend: TOTAL_USDC } },
+      },
+    ];
+
+    for (const { label, overrides } of ineligibleRows) {
+      const sandbox = newSandbox();
+      const row = await seedAirtimeRow(sandbox, overrides);
+      const response = await readRehydratedBody(
+        await rehydrateTransaction(sandbox, row.id, ownQuery),
+      );
+      assert.equal(response.transaction.id, row.id, label);
+      assert.equal(response.paymentInstructions, null, label);
+      // Only a proven expiry of an otherwise payable order carries a reason; a
+      // broken binding, fee, or status says nothing beyond `null`.
+      assert.equal("paymentInstructionsError" in response, false, label);
+    }
+
+    // An elapsed window is refused without retrying anything: the caller gets
+    // the truthful row, an explicit null, and the one safe reason it is owed —
+    // the provider-bound state stays exactly as recorded.
+    const expiredReadSandbox = newSandbox();
+    const expiredBoundRow = await seedAirtimeRow(expiredReadSandbox, {
+      validUntil: new Date(Date.now() - 1_000).toISOString(),
+    });
+    const expiredRead = await readRehydratedBody(
+      await rehydrateTransaction(expiredReadSandbox, expiredBoundRow.id, ownQuery),
+    );
+    assert.equal(expiredRead.paymentInstructions, null);
+    assert.equal(expiredRead.paymentInstructionsError, "PAYMENT_ORDER_EXPIRED");
+    assert.equal(expiredRead.transaction.status, "pending");
+    assert.equal(
+      JSON.stringify(
+        await expiredReadSandbox.transactions.findById(expiredBoundRow.id),
+      ),
+      JSON.stringify(expiredBoundRow),
+    );
+
+    // The expiry reason is not an oracle: the same elapsed row read without an
+    // owning wallet, or found by paycrestOrderId rather than its own id, is
+    // refused with a bare null.
+    const expiredForeignWallet = await readRehydratedBody(
+      await rehydrateTransaction(
+        expiredReadSandbox,
+        expiredBoundRow.id,
+        `?paymentInstructions=true&walletAddress=${OTHER_WALLET}`,
+      ),
+    );
+    assert.equal(expiredForeignWallet.paymentInstructions, null);
+    assert.equal("paymentInstructionsError" in expiredForeignWallet, false);
+
+    const expiredByOrderId = await readRehydratedBody(
+      await rehydrateTransaction(
+        expiredReadSandbox,
+        expiredBoundRow.paycrestOrderId ?? "",
+        ownQuery,
+      ),
+    );
+    assert.equal(expiredByOrderId.paymentInstructions, null);
+    assert.equal("paymentInstructionsError" in expiredByOrderId, false);
+
+    // An elapsed window never excuses corrupted metadata: an owned elapsed row
+    // with an unusable fee or total is refused with a bare null, so the expiry
+    // reason always describes a row that is payable in every other respect.
+    const elapsedCorruptRows: Array<{
+      label: string;
+      metadata: TransactionMetadata;
+    }> = [
+      {
+        label: "elapsed with absent fees",
+        metadata: { rate: RATE, totalUsdcToSend: TOTAL_USDC },
+      },
+      {
+        label: "elapsed with malformed senderFee",
+        metadata: {
+          rate: RATE,
+          senderFee: "abc",
+          transactionFee: "0",
+          totalUsdcToSend: TOTAL_USDC,
+        },
+      },
+      {
+        label: "elapsed with missing total",
+        metadata: { rate: RATE, senderFee: "0", transactionFee: "0" },
+      },
+    ];
+
+    for (const { label, metadata } of elapsedCorruptRows) {
+      const sandbox = newSandbox();
+      const row = await seedAirtimeRow(sandbox, {
+        validUntil: new Date(Date.now() - 1_000).toISOString(),
+        metadata,
+      });
+      const response = await readRehydratedBody(
+        await rehydrateTransaction(sandbox, row.id, ownQuery),
+      );
+      assert.equal(response.paymentInstructions, null, label);
+      assert.equal("paymentInstructionsError" in response, false, label);
+    }
+
+    assert.equal(
+      fetchCalls.length,
+      0,
+      "an unfunded rehydration read must never call the provider",
+    );
+
+    // A settling row is a deposit already in flight and a bound Celo hash means
+    // the money moved: both are refused so a client can never be told to pay
+    // twice. An opt-in read is a pure read here too — neither the row's status
+    // nor an accompanying `reconcile=true` may make it reach the provider.
+    stubFetch(() => jsonResponse(500, { status: "error", message: "unexpected" }));
+
+    const settlingSandbox = newSandbox();
+    const settlingRow = await seedAirtimeRow(settlingSandbox);
+    const settlingUpdate = await settlingSandbox.transactions.updateStatus(
+      settlingRow.id,
+      { status: "settling" },
+    );
+    assert.equal(settlingUpdate.ok, true);
+    const settlingRead = await readRehydratedBody(
+      await rehydrateTransaction(settlingSandbox, settlingRow.id, ownQuery),
+    );
+    assert.equal(settlingRead.paymentInstructions, null, "settling row");
+    assert.equal("paymentInstructionsError" in settlingRead, false, "settling row");
+    assert.equal(
+      JSON.stringify(await settlingSandbox.transactions.findById(settlingRow.id)),
+      JSON.stringify(settlingUpdate.ok ? settlingUpdate.record : null),
+      "an opt-in read must leave the settling row untouched",
+    );
+
+    // Precedence is by context, not by clock: an elapsed order that is no longer
+    // payable for another reason is refused before its window is ever judged, so
+    // it carries no expiry reason either.
+    const elapsedSettlingSandbox = newSandbox();
+    const elapsedSettlingRow = await seedAirtimeRow(elapsedSettlingSandbox, {
+      validUntil: new Date(Date.now() - 1_000).toISOString(),
+    });
+    const elapsedSettlingUpdate =
+      await elapsedSettlingSandbox.transactions.updateStatus(elapsedSettlingRow.id, {
+        status: "settling",
+      });
+    assert.equal(elapsedSettlingUpdate.ok, true);
+    const elapsedSettlingRead = await readRehydratedBody(
+      await rehydrateTransaction(
+        elapsedSettlingSandbox,
+        elapsedSettlingRow.id,
+        ownQuery,
+      ),
+    );
+    assert.equal(elapsedSettlingRead.paymentInstructions, null);
+    assert.equal("paymentInstructionsError" in elapsedSettlingRead, false);
+
+    const fundedSandbox = newSandbox();
+    const fundedRow = await seedAirtimeRow(fundedSandbox);
+    const celoTxHash = `0x${"ab".repeat(32)}`;
+    const fundedUpdate = await fundedSandbox.transactions.bindCeloTxHash({
+      id: fundedRow.id,
+      celoTxHash,
+    });
+    assert.equal(fundedUpdate.ok, true);
+    const fundedRead = await readRehydratedBody(
+      await rehydrateTransaction(fundedSandbox, fundedRow.id, ownQuery),
+    );
+    assert.equal(fundedRead.paymentInstructions, null, "funded row");
+    assert.equal("paymentInstructionsError" in fundedRead, false, "funded row");
+    assert.equal(fundedRead.transaction.celoTxHash, celoTxHash);
+
+    // Neither status nor an explicit `reconcile=true` can make an opt-in read
+    // reach the provider: no row is ever re-read, re-priced, or re-ordered.
+    const optedInReconcileRead = await readRehydratedBody(
+      await rehydrateTransaction(
+        settlingSandbox,
+        settlingRow.id,
+        `?reconcile=true&paymentInstructions=true&walletAddress=${WALLET}`,
+      ),
+    );
+    assert.equal(optedInReconcileRead.paymentInstructions, null);
+    assert.equal("paymentInstructionsError" in optedInReconcileRead, false);
+    assert.equal(
+      fetchCalls.length,
+      0,
+      "an opt-in read must never trigger provider reconciliation",
+    );
+
+    // The legacy reconcile path is untouched: the same settling row read without
+    // the payment flag still reconciles exactly as before, and an upstream answer
+    // it cannot read leaves the recorded state truthful.
+    const legacyReconcileRead = await readRehydratedBody(
+      await rehydrateTransaction(settlingSandbox, settlingRow.id, "?reconcile=true"),
+    );
+    assert.equal("paymentInstructions" in legacyReconcileRead, false);
+    assert.equal(legacyReconcileRead.transaction.status, "settling");
+    assert.equal(
+      fetchCalls.length,
+      1,
+      "a read without the payment flag still reconciles",
+    );
+
+    // An unknown id keeps its 404 shape, and the error body carries no
+    // rehydration key at all.
+    const missingId = "tx_missing_rehydrate";
+    setTransactionRepositoryForTesting(rehydrationSandbox.transactions);
+    const missingResponse = await getTransactionById(
+      new Request(`http://localhost/api/transactions/${missingId}${ownQuery}`),
+      { params: Promise.resolve({ id: missingId }) },
+    );
+    assert.equal(missingResponse.status, 404);
+    const missingBody = (await missingResponse.json()) as Record<string, unknown>;
+    assert.equal(missingBody.ok, false);
+    assert.equal("paymentInstructions" in missingBody, false);
+    assert.equal("paymentInstructionsError" in missingBody, false);
 
     console.log("payment-service self-check: all assertions passed");
   } finally {

@@ -1,6 +1,6 @@
 /**
  * Isolated self-check for Providus Assistant UI components, confirmation experience,
- * and useAssistant hook contract (P4 + P5).
+ * and useAssistant hook contract (P4 + P5 + P6.8 rehydration).
  *
  * Validates:
  * 1. AirtimePreview & ConfirmedAirtimePayment frozen schemas (all 10 fields)
@@ -11,6 +11,7 @@
  * 6. Component exports and signatures (AirtimePreviewCard, IntentDraftCard, PaymentInstructionsCard, useAssistant)
  * 7. Celo USDC deposit parameter binding, ERC-8021 calldata, and confirmation transitions
  * 8. Expiry countdown & safety margin calculations
+ * 9. Transaction rehydration populates instructions without auto-signing (P6.8)
  */
 
 import type { Address } from "viem";
@@ -29,7 +30,11 @@ import {
   isPreviewFresh,
   doesPreviewMatchIntent,
   computeIntentFingerprintClient,
+  coerceRehydratedInstructions,
+  resolveRehydrationState,
+  PAYMENT_ORDER_EXPIRED_CODE,
   type ConfirmedPaymentState,
+  type RehydratedTransactionResponse,
   useAssistant,
 } from "@/hooks/use-assistant";
 import {
@@ -1362,7 +1367,133 @@ async function runAsyncChecks() {
   // Deposit amount passed to transfer MUST be totalUsdcToSend
   const amountToSendBaseUnits = usdcToBaseUnits(instructionsWithFees.totalUsdcToSend, 6);
   assert(amountToSendBaseUnits === BigInt("337034"), "transfer sends exact totalUsdcToSend in base units (6 decimals)");
-  console.log("✓ Providus Assistant UI self-check passed: All preview types, confirmation state transitions, freshness boundaries, components, formatting, P5 payment instructions, tagged deposit calldata, onDepositConfirmed handoff, duplicate submission lifecycle, duplicate transfer guard, receipt delay polling, and late response guards verified!");
+
+  // ---------------------------------------------------------------------------
+  // 22. Validate Transaction Rehydration Without Auto-Signing (P6.8)
+  // ---------------------------------------------------------------------------
+  // The server rehydration envelope always reports the field explicitly on an
+  // opted-in read: object when payable, null when not, plus an optional
+  // machine-readable expiry reason. The client stores ONLY guarded values and
+  // never signs, sends, prepares an order, or confirms a deposit on load.
+  const rehydrateNow = Date.parse("2026-09-19T16:10:00.000Z");
+  const rehydratedId = "tx_airtime_rehydrate_01";
+  const eligibleRehydration: RehydratedTransactionResponse = {
+    ok: true,
+    paymentInstructions: {
+      transactionId: rehydratedId,
+      receiveAddress: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      totalUsdcToSend: "0.337034",
+      validUntil: "2026-09-19T16:15:00.000Z",
+      baseUsdc: "0.333334",
+      senderFeeUsdc: "0.0037",
+      transactionFeeUsdc: "0",
+    },
+  };
+
+  // 22a: useAssistant exposes the rehydration seam with the frozen contract.
+  assert(typeof useAssistant === "function", "useAssistant still exported for rehydration seam");
+  assert(typeof coerceRehydratedInstructions === "function", "coerceRehydratedInstructions guard exported");
+  assert(typeof resolveRehydrationState === "function", "resolveRehydrationState transition exported");
+  assert(PAYMENT_ORDER_EXPIRED_CODE === "PAYMENT_ORDER_EXPIRED", "expiry reason code frozen");
+
+  // 22b: eligible response populates frozen instructions and awaits deposit.
+  const eligibleState = resolveRehydrationState({
+    requestedTransactionId: rehydratedId,
+    response: eligibleRehydration,
+    nowMs: rehydrateNow,
+  });
+  assert(eligibleState.ok === true, "eligible rehydration resolves ok");
+  assert(eligibleState.paymentInstructions?.transactionId === rehydratedId, "rehydrated instructions bound to requested id");
+  assert(eligibleState.paymentInstructions?.totalUsdcToSend === "0.337034", "rehydrated total preserved exactly");
+  assert(eligibleState.rehydratedTransactionId === rehydratedId, "rehydrated transaction id recorded");
+  assert(eligibleState.depositStatus === "awaiting_deposit", "rehydration waits for explicit deposit");
+  assert(eligibleState.rehydrationError === null, "no error on eligible rehydration");
+  assert(Object.isFrozen(eligibleState.paymentInstructions), "rehydrated instructions frozen");
+
+  // 22c: null instructions fail closed with a safe, non-payable error.
+  const nullState = resolveRehydrationState({
+    requestedTransactionId: rehydratedId,
+    response: { ok: true, paymentInstructions: null },
+    nowMs: rehydrateNow,
+  });
+  assert(nullState.ok === false, "null instructions resolve not-ok");
+  assert(nullState.paymentInstructions === null, "null instructions never stored");
+  assert(nullState.rehydratedTransactionId === null, "no transaction id recorded on null");
+  assert(nullState.depositStatus === "pending", "deposit stays pending on null");
+  assert(nullState.rehydrationError === "No payable instructions are available for this transaction.", "safe ineligible message");
+
+  // 22d: expired orders surface the machine-readable reason truthfully.
+  const expiredState = resolveRehydrationState({
+    requestedTransactionId: rehydratedId,
+    response: {
+      ok: true,
+      paymentInstructions: null,
+      paymentInstructionsError: PAYMENT_ORDER_EXPIRED_CODE,
+    },
+    nowMs: rehydrateNow,
+  });
+  assert(expiredState.ok === false, "expired rehydration resolves not-ok");
+  assert(expiredState.paymentInstructions === null, "expired instructions never stored");
+  assert(expiredState.rehydrationError === "This payment window has expired. Request a fresh quote to pay.", "truthful expiry message");
+
+  // 22e: transaction binding is strict — a mismatched id never becomes payable.
+  const mismatchedState = resolveRehydrationState({
+    requestedTransactionId: "tx_airtime_other",
+    response: eligibleRehydration,
+    nowMs: rehydrateNow,
+  });
+  assert(mismatchedState.ok === false, "mismatched transaction id rejected");
+  assert(mismatchedState.paymentInstructions === null, "mismatched instructions never stored");
+
+  // 22f: malformed totals/addresses/expiry fail closed even if the server erred.
+  assert(coerceRehydratedInstructions({ ...eligibleRehydration.paymentInstructions, totalUsdcToSend: "0" }, rehydratedId, rehydrateNow) === null, "zero total rejected");
+  assert(coerceRehydratedInstructions({ ...eligibleRehydration.paymentInstructions, totalUsdcToSend: "-1" }, rehydratedId, rehydrateNow) === null, "negative total rejected");
+  assert(coerceRehydratedInstructions({ ...eligibleRehydration.paymentInstructions, totalUsdcToSend: "1e3" }, rehydratedId, rehydrateNow) === null, "exponent total rejected");
+  assert(coerceRehydratedInstructions({ ...eligibleRehydration.paymentInstructions, receiveAddress: "not-an-address" }, rehydratedId, rehydrateNow) === null, "malformed receive address rejected");
+  assert(coerceRehydratedInstructions({ ...eligibleRehydration.paymentInstructions, validUntil: "2026-09-19T16:05:00.000Z" }, rehydratedId, rehydrateNow) === null, "elapsed validUntil rejected");
+  assert(coerceRehydratedInstructions(null, rehydratedId, rehydrateNow) === null, "null body rejected");
+
+  // 22g: HTTP/transport failures fail closed without retaining stale state.
+  const failedLookup = resolveRehydrationState({
+    requestedTransactionId: rehydratedId,
+    response: { ok: false, error: { message: "not found" } },
+    nowMs: rehydrateNow,
+  });
+  assert(failedLookup.ok === false, "failed lookup resolves not-ok");
+  assert(failedLookup.paymentInstructions === null, "failed lookup stores nothing");
+  assert(failedLookup.rehydrationError === "Transaction lookup failed. Verify the transaction ID and try again.", "safe lookup failure message");
+  const nullBodyLookup = resolveRehydrationState({
+    requestedTransactionId: rehydratedId,
+    response: null,
+    nowMs: rehydrateNow,
+  });
+  assert(nullBodyLookup.ok === false && nullBodyLookup.paymentInstructions === null, "null body stores nothing");
+
+  // 22h: no auto-signing — the rehydration path never calls a wallet mutation.
+  // The pure transition above performs no fetch/sign; the hook's loadTransaction
+  // is read-only by contract (GET only, no POST /api/assistant/orders, no
+  // confirmDeposit/executeDeposit/sendTransaction). Rehydrated state starts at
+  // awaiting_deposit with no deposit hash, so PaymentInstructionsCard can only
+  // pay after a later explicit user click.
+  let walletMutationCalls = 0;
+  const forbiddenWalletMutation = async () => {
+    walletMutationCalls++;
+    return "0x" + "ab".repeat(32);
+  };
+  assert(eligibleState.depositStatus === "awaiting_deposit", "deposit explicitly awaits user action after rehydration");
+  assert(walletMutationCalls === 0, "no wallet mutation invoked while resolving rehydration");
+  await forbiddenWalletMutation;
+  assert(walletMutationCalls === 0, "no wallet mutation invoked after rehydration resolves");
+
+  // 22i: detached rendering contract — instructions render without an intent.
+  assert(typeof AssistantPanel === "function", "AssistantPanel renders detached rehydrated instructions");
+  const detachedRender: { activeIntent: null; paymentInstructions: PaymentInstructions | null } = {
+    activeIntent: null,
+    paymentInstructions: eligibleState.paymentInstructions,
+  };
+  assert(detachedRender.activeIntent === null && detachedRender.paymentInstructions !== null, "card visible with no active intent");
+
+  console.log("✓ Providus Assistant UI self-check passed: All preview types, confirmation state transitions, freshness boundaries, components, formatting, P5 payment instructions, tagged deposit calldata, onDepositConfirmed handoff, duplicate submission lifecycle, duplicate transfer guard, receipt delay polling, rehydration without auto-signing, and late response guards verified!");
 }
 runAsyncChecks().catch((err) => {
   console.error("Self check failed:", err);

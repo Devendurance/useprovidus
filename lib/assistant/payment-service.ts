@@ -196,18 +196,40 @@ async function releaseConsumedPreview(
 }
 
 /**
- * Deposit instructions are only ever derived from a durably bound transaction,
- * so an unbound or expired row can never become a payable instruction.
+ * The provider-authoritative fee breakdown of a durably bound order, normalized
+ * (trimmed) exactly as it is handed to a paying client.
  */
-function instructionsFromBoundTransaction(
+export interface BoundTransactionMetadata {
+  senderFee: string;
+  transactionFee: string;
+  totalUsdcToSend: string;
+}
+
+/**
+ * Validates and normalizes the provider-authoritative fee/total fields without
+ * considering the payment window. The GET route uses this before classifying a
+ * matching expired row, so malformed metadata can never receive an expiry
+ * reason.
+ */
+export function validatedBoundTransactionMetadata(
   record: TransactionRecord,
-): PaymentInstructions | null {
-  if (record.status !== "pending" && record.status !== "settling") return null;
-  if (!record.paycrestOrderId || !record.receiveAddress || !record.validUntil) {
+): BoundTransactionMetadata | null {
+  const senderFee =
+    typeof record.metadata?.senderFee === "string"
+      ? record.metadata.senderFee.trim()
+      : null;
+  const transactionFee =
+    typeof record.metadata?.transactionFee === "string"
+      ? record.metadata.transactionFee.trim()
+      : null;
+  if (
+    senderFee === null ||
+    transactionFee === null ||
+    !isNonNegativeUsdcDecimal(senderFee) ||
+    !isNonNegativeUsdcDecimal(transactionFee)
+  ) {
     return null;
   }
-  const expiry = Date.parse(record.validUntil);
-  if (!Number.isFinite(expiry) || expiry <= Date.now()) return null;
 
   // The bound total is the only amount the client may ever be asked to send.
   // A row without a usable one fails closed: falling back to the base amount
@@ -221,18 +243,45 @@ function instructionsFromBoundTransaction(
   if (decimalStringsEqual(trimmedTotal, "0")) return null;
 
   return {
+    senderFee,
+    transactionFee,
+    totalUsdcToSend: trimmedTotal,
+  };
+}
+
+/**
+ * Deposit instructions are only ever derived from a durably bound transaction,
+ * so an unbound or expired row can never become a payable instruction.
+ */
+export function instructionsFromBoundTransaction(
+  record: TransactionRecord,
+): PaymentInstructions | null {
+  if (record.status !== "pending" && record.status !== "settling") return null;
+  if (
+    typeof record.paycrestOrderId !== "string" ||
+    record.paycrestOrderId.trim() === "" ||
+    // The address the client is told to pay must be a real EVM address: a
+    // malformed one is a permanently lost deposit, never a payable instruction.
+    typeof record.receiveAddress !== "string" ||
+    !isAddress(record.receiveAddress) ||
+    typeof record.validUntil !== "string" ||
+    record.validUntil.trim() === ""
+  ) {
+    return null;
+  }
+  const expiry = Date.parse(record.validUntil);
+  if (!Number.isFinite(expiry) || expiry <= Date.now()) return null;
+
+  const metadata = validatedBoundTransactionMetadata(record);
+  if (!metadata) return null;
+
+  return {
     transactionId: record.id,
     receiveAddress: record.receiveAddress,
     baseUsdc: record.amountUsdc,
-    senderFeeUsdc:
-      typeof record.metadata?.senderFee === "string"
-        ? record.metadata.senderFee
-        : undefined,
-    transactionFeeUsdc:
-      typeof record.metadata?.transactionFee === "string"
-        ? record.metadata.transactionFee
-        : undefined,
-    totalUsdcToSend: trimmedTotal,
+    senderFeeUsdc: metadata.senderFee,
+    transactionFeeUsdc: metadata.transactionFee,
+    totalUsdcToSend: metadata.totalUsdcToSend,
     validUntil: record.validUntil,
   };
 }
