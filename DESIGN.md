@@ -1,257 +1,215 @@
----
-version: alpha
-name: Providus
-description: "The Value Ledger — a Celo route-intelligence agent that makes the true outcome of moving money visible before a user pays."
-colors:
-  primary: "#18211F"
-  background: "#F5F6F1"
-  surface: "#FFFFFF"
-  provident-green: "#3F7560"
-  deep-provision: "#285542"
-  quote-blue: "#4C6A9E"
-  rate-amber: "#B77A2B"
-  loss-red: "#B54642"
-  receipt-grey: "#68716D"
-  ledger-edge: "#DDE1DA"
-typography:
-  display:
-    fontFamily: "DM Sans, Inter, Arial, sans-serif"
-    fontSize: 4.5rem
-    fontWeight: 650
-    lineHeight: 0.98
-    letterSpacing: "-0.055em"
-  h1:
-    fontFamily: "DM Sans, Inter, Arial, sans-serif"
-    fontSize: 3rem
-    fontWeight: 650
-    lineHeight: 1.02
-    letterSpacing: "-0.04em"
-  h2:
-    fontFamily: "Inter, Arial, sans-serif"
-    fontSize: 1.75rem
-    fontWeight: 650
-    lineHeight: 1.2
-    letterSpacing: "-0.02em"
-  body-md:
-    fontFamily: "Inter, Arial, sans-serif"
-    fontSize: 1rem
-    fontWeight: 400
-    lineHeight: 1.55
-  data:
-    fontFamily: "IBM Plex Mono, ui-monospace, monospace"
-    fontSize: 0.8125rem
-    fontWeight: 500
-    lineHeight: 1.45
-    letterSpacing: "0.01em"
-rounded:
-  sm: 10px
-  md: 14px
-  lg: 24px
-  arch: 120px
-spacing:
-  xs: 4px
-  sm: 8px
-  md: 16px
-  lg: 24px
-  xl: 32px
-  2xl: 48px
-components:
-  button-primary:
-    backgroundColor: "{colors.provident-green}"
-    textColor: "#FFFFFF"
-    rounded: "{rounded.sm}"
-    padding: 16px
-    height: 52px
-  button-primary-hover:
-    backgroundColor: "{colors.deep-provision}"
-    textColor: "#FFFFFF"
-    rounded: "{rounded.sm}"
-    padding: 16px
-    height: 52px
-  button-secondary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.background}"
-    rounded: "{rounded.sm}"
-    padding: 12px
-    height: 44px
-  card-standard:
-    backgroundColor: "{colors.background}"
-    textColor: "{colors.primary}"
-    rounded: "{rounded.md}"
-    padding: 24px
-  card-route-verdict:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.primary}"
-    rounded: "{rounded.md}"
-    padding: 24px
----
+# Design System Inspired by Global Bank
 
-## Overview
+## 1. Visual Theme & Atmosphere
 
-Providus is a Celo route-intelligence agent. It compares local fiat-to-Celo paths by the money that actually arrives—not by the provider’s headline fee—and gives a user a transparent recommendation before they pay.
+This system pairs a friendly, bubbly typographic voice with a genuinely distinctive hero device: a hand-illustrated vintage appliance (a toaster) reimagined as a payment terminal, complete with an LCD readout, a rotary dial, indicator lights, and a credit card popping up like toast. It's warm and a little nostalgic rather than sleek/corporate — muted sage green instead of bank-blue, a dusty rose coffee mug, gold coins, and soft flat-vector illustration with confident black outlines throughout. The overall effect is retro-futurist fintech: a bank that wants to feel like a trusted, well-designed household object rather than an app.
 
-The supplied LearnStack system contributes useful **component mechanics**: direct layouts, hard offset shadows, 2–3px outlines, obvious press feedback through shadow compression, spacious asymmetric hero construction, and clear responsive behaviour. It does not contribute the brand expression. Providus must feel financially precise and prudent, not mischievous, student-community-made, neubrutalist, or loud.
+**Key Characteristics**
+- Muted sage green base with a very subtle sunburst of radiating lines behind the hero illustration
+- A hand-illustrated retro appliance (toaster-as-payment-terminal) as the hero's signature visual metaphor, complete with its own internal "product" details (LCD screen, dial, lights)
+- Bold black outlines on every illustrated element, with light two-tone cel-shading suggesting volume rather than flat single-color fills
+- A bubbly, rounded display typeface for the logo and headline, paired with a plain clean sans for everything functional
+- A tightly-scoped monospace/pixel font used only inside the toaster's LCD screen — never elsewhere
+- Two distinct button treatments by hierarchy: a flat, simply-bordered secondary button (nav) versus a bold hard-shadow "sticker" primary CTA — the shadow is reserved for the more important action
+- Warm, slightly desaturated retro-tech palette (lavender-gray metal, deep teal screen, gold coins, dusty rose) instead of typical fintech blue/purple
 
-Its visual territory is **The Value Ledger**.
+## 2. Color Palette & Roles
 
-> **Know what arrives before you pay.**
+### Primary
+- **Sage Green** (`#CBD2C4`): Page background
+- **Ink** (`#1A1A1A`): All text, illustration outlines, borders
 
-## Colors
+### Illustration Palette
+- **Toaster Metal Light** (`#C7C3D1`): Front-facing toaster panel
+- **Toaster Metal Shadow** (`#9B96A8`): Side panel, providing the illustration's two-tone dimensional shading
+- **LCD Screen** (`#1F3D3A`): Toaster display background
+- **LCD Text Green** (`#6FCF97`): "PAYMENT SUCCESSFUL" readout text
+- **Coin Gold** (`#E8B84B`): The two stacked coins beside the toaster
+- **Mug Rose** (`#D68F87`): Coffee mug
 
-| Token | HEX | Role |
-|---|---:|---|
-| Ledger Stone | `#18211F` | Primary text, outline, hard shadow, high-focus surface |
-| Receipt Field | `#F5F6F1` | Main background and default contained-card field |
-| Clear Paper | `#FFFFFF` | Route Verdict and high-clarity receipt surface |
-| Provident Green | `#3F7560` | Primary action, recommended route, verified saving |
-| Deep Provision | `#285542` | Pressed / selected primary state |
-| Quote Blue | `#4C6A9E` | Information, live quote detail and neutral route context |
-| Rate Amber | `#B77A2B` | Stale quote, low confidence, limit or timing review |
-| Loss Red | `#B54642` | Actual unavailable route, failed payment or destructive action |
-| Receipt Grey | `#68716D` | Metadata, expiry, route labels and supporting text |
-| Ledger Edge | `#DDE1DA` | Quiet dividers and contained detail areas |
+### Accent Colors
+- **Indicator Blue** (`#4A90D9`), **Indicator Orange** (`#F2A93B`), **Indicator Green** (`#6FCF97`): Small status-light dots at the toaster's base — used as a trio, never individually
 
-### Colour rules
+### Neutral Scale
+- **Ink** (`#1A1A1A`): Text, outlines
+- **Sage Green** (`#CBD2C4`): Base background
+- **Cream** (`#F5F2EA`): Button fills
 
-- Provident Green is the single high-emphasis brand signal. It means **recommended, verified, or saved**.
-- Use amber when a user needs to inspect an assumption, never as generic urgency.
-- No coral, marigold, signal red, dark-purple, neon, gradients, glow, country-flag wallpaper, or generic crypto-blue shell.
-- Keep 70%+ of each view in Receipt Field, Clear Paper and Ledger Stone.
-- A route does not become “best” through green alone: it must state estimated received amount, timestamp, assumptions and why it ranked first.
+### Surface & Borders
+- **Button Border** (`#1A1A1A`, ~1.5-2px): Both button types
+- **Sunburst Ray** (`#BEC6B7`, low contrast): Subtle radiating lines behind the hero illustration
 
-## Typography
+## 3. Typography Rules
 
-| Role | Typeface | Job |
-|---|---|---|
-| Display / financial outcome | **DM Sans** | Clear major amount, product headline and high-value marketing statement |
-| UI / body | **Inter** | Inputs, controls, provider explanations, accessibility and everyday product work |
-| Financial proof | **IBM Plex Mono** | Fees, FX spread, timestamps, quote expiry, route IDs, exchange assumptions and API output |
+### Font Family
+**Primary (Display):** Baloo 2, sans-serif — bold, rounded, bubbly; used for the logo wordmark and hero headline only
+Fallback: 'Fredoka', 'Nunito', sans-serif
 
-### Type scale
+**Secondary (UI/Body):** Inter, sans-serif — nav, body copy, button text
+Fallback: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif
 
-| Role | Desktop | Mobile | Use |
-|---|---:|---:|---|
-| Display | 72px | 44px | Hero and largest outcome amount |
-| H1 | 48px | 32px | Page title / Route Verdict heading |
-| H2 | 28px | 24px | Section and card title |
-| H3 | 20px | 18px | Module title |
-| Body | 16px | 16px | Default UI/readability baseline |
-| Proof | 13px | 13px | Financial data; never below 12px |
+**Screen Readout (scoped):** VT323 or another pixel/LCD-style monospace — used exclusively for text rendered inside the toaster's LCD screen
+Fallback: 'Space Mono', monospace
 
-Do not use LearnStack’s Bricolage Grotesque or italic sticker caption behaviour. The money outcome should feel legible and accountable—not playful.
+### Hierarchy
 
-## Layout
+| Role | Font | Size | Weight | Line Height | Letter Spacing | Notes |
+|------|------|------|--------|-------------|-----------------|-------|
+| Display 1 | Baloo 2 | 44px | 700 | 46px | 0px | Hero headline, 4 lines |
+| Logo Wordmark | Baloo 2 | 18px | 700 | 20px | 0.5px | "GLOBAL BANK," uppercase, with the small spiral icon integrated |
+| Body Regular | Inter | 15px | 400 | 24px | 0px | Hero subhead paragraph |
+| Nav Label | Inter | 15px | 500 | 20px | 0px | Header nav links |
+| Button | Inter | 14px | 600 | 20px | 0px | Both button types |
+| Screen Readout | VT323 | 15px | 400 | 18px | 1px | LCD screen text only, uppercase, pixel-style |
 
-Retain the LearnStack base unit, spacing rhythm, 1280px container, asymmetric desktop 55/45 hero, stacked mobile transformation, and generous whitespace. Replace the image-first education narrative with a **Route Verdict-first** product hierarchy.
+### Principles
+- Baloo 2 is reserved for the logo and hero headline only — it should never appear in body copy, nav, or buttons
+- The pixel/LCD font is scoped exclusively to the toaster's screen readout — using it anywhere else would break the "this is a real device's display" illusion
+- Keep nav and body copy in plain, unbubbly Inter — the friendliness of this system lives in the display type and the illustration, not in every piece of text
 
-1. What the user is moving: country, amount, payment method and target asset.
-2. What will arrive: estimated received amount.
-3. Why: fees, FX, limits, speed and reliability.
-4. What to do: pay to unlock, then continue with the provider.
-5. What changed: a savings receipt with timestamped proof.
+## 4. Component Stylings
 
-### Core proprietary asset: Value Line
+### Buttons
 
-A structured route line:
+**Secondary Button (Create an Account — nav)**
+- **Background:** `#F5F2EA`
+- **Text Color:** `#1A1A1A`
+- **Padding:** `10px 20px`
+- **Border Radius:** `8px`
+- **Border:** `1.5px solid #1A1A1A`
+- **Font:** Inter, 14px, 600
+- **Height:** `40px`
+- **Box Shadow:** none — this button stays flat, deliberately lower-emphasis than the primary CTA
 
-> **You pay → fees + FX → selected route → you receive**
+**Primary Button (Learn More)**
+- **Background:** `#F5F2EA`
+- **Text Color:** `#1A1A1A`
+- **Padding:** `12px 28px`
+- **Border Radius:** `8px`
+- **Border:** `1.5px solid #1A1A1A`
+- **Font:** Inter, 14px, 600
+- **Height:** `44px`
+- **Signature Shadow:** A solid black rectangle offset `6-8px` down-right behind the button, no blur — reads as a "sticker" or layered card rather than a soft shadow
+- **Hover State:** Button shifts toward its offset shadow, landing flush on press
 
-It appears in the locked preview, Route Verdict, shareable receipt and x402 API output. It must convey real calculation. It is not a decorative graph, orbit line, zigzag, sparkline, or generic AI workflow.
+### Cards & Containers
 
-### Responsive behaviour
+**Hero Appliance Illustration** (signature component)
+- **Style:** Flat vector illustration with consistent `2-2.5px` black outlines and light two-tone cel-shading (one base color, one darker shadow-side tone per object)
+- **Core Object:** A retro toaster reimagined as a payment terminal — credit card emerging from the toast slot, LCD screen reading "PAYMENT SUCCESSFUL," a rotary dial on one side, three colored indicator dots along the base
+- **Supporting Objects:** A coffee mug and two stacked gold coins beside the toaster, each with their own soft grounding shadow beneath
+- **Background Treatment:** A subtle sunburst of radiating lines centered behind the illustration, low contrast against the sage base
+- **Extension Rule:** If this illustration system extends to other pages/sections, new illustrations should keep the same "everyday object reimagined as a fintech device" metaphor and the same outline/cel-shading treatment — not switch to a different illustration style
 
-Keep LearnStack’s desktop-to-mobile collapsing logic:
+### Inputs & Forms (extrapolated — not directly visible in the source, styled consistently with the button system)
 
-- Hero stays asymmetric at desktop and stacks below 1024px.
-- Navigation collapses below 768px.
-- Route cards never become a dense dashboard grid; show one Verdict first, then alternatives.
-- Buttons retain auto-width, hard-outline mechanics and ≥44px targets; do not force full-width button styling merely because the view is mobile.
+**Text Input**
+- **Background:** `#F5F2EA`
+- **Border:** `1.5px solid #1A1A1A`
+- **Border Radius:** `8px`
+- **Height:** `44px`
+- **Padding:** `0px 16px`
+- **Placeholder Color:** `rgba(26,26,26,0.45)`
 
-## Elevation & Depth
+### Navigation
 
-Preserve LearnStack’s hard, unblurred offset-shadow mechanics because they make actions tactile and visible:
+**Primary Navigation**
+- **Background:** transparent, sits directly on the sage background
+- **Text Color:** `#1A1A1A`
+- **Layout:** Logo left, centered nav links, "Log in" (plain text) + "Create an account" (secondary button) right
+- **Padding:** `24px 40px`
+- **Font:** Inter, 15px, 500
+
+## 5. Layout Principles
+
+### Spacing System
+**Base Unit:** `4px`
+
+**Spacing Scale:**
+- `4px` – Icon/indicator-dot spacing
+- `8px` – Button padding
+- `16px` – Standard component gutters
+- `24px` – Nav padding, headline line spacing
+- `32px` – Headline-to-body spacing
+- `48px` – Body-to-button spacing
+- `64-96px` – Hero side margins, vertical hero padding
+
+### Grid & Container
+**Max Width:** `1200px`, centered
+**Column Strategy:** Two-column hero split — text content left (~45%), illustration right (~55%)
+**Section Patterns:** Nav spans full width; hero splits into text/illustration columns, both vertically centered
+
+### Whitespace Philosophy
+The left column stays sparse — headline, one paragraph, one button — so the illustration has room to be the visual centerpiece without competing with dense text. The sunburst background gives the illustration a sense of radiating importance without needing extra framing or a card container around it.
+
+### Border Radius Scale
+- `8px` – Buttons, inputs
+- Illustration elements follow their own object-appropriate rounding (toaster corners, mug handle) rather than a systematic token
+
+## 6. Depth & Elevation
 
 | Level | Treatment | Use |
-|---|---|---|
-| Flat | No shadow | Navigation, text and dividers |
-| Base | `3px 3px 0px #18211F` | Focused input, small control |
-| Elevated | `4px 4px 0px #18211F` | Buttons, contained cards and short status label |
-| Prominent | `8px 8px 0px #18211F` | Single hero Route Verdict or savings receipt |
+|-------|-----------|-----|
+| Flat | No shadow | Nav, secondary button, body text |
+| Signature Sticker | Hard offset black rectangle, no blur | Primary CTA button only |
+| Grounding Shadow | Soft, blurred, dark | Beneath the toaster, mug, and coins in the illustration |
 
-Interaction remains **shadow compression**: hover and press reduce offset toward zero. Do not use blur, lift, glow or colour animation as the main feedback mechanism.
+**Shadow Philosophy:** UI chrome mostly stays flat, with exactly one exception — the primary CTA, which gets a hard "sticker" shadow to visually outrank the secondary nav button. The illustration uses a completely different shadow language (soft, blurred, grounding) appropriate to depicting physical objects sitting on a surface. Don't cross the two: UI shadows stay hard-edged, illustration shadows stay soft.
 
-## Shapes
-
-Retain LearnStack’s structure:
-
-- 2–3px Ledger Stone outline on interactive and contained elements.
-- 10px standard component radius.
-- 14px contained-card radius.
-- Single 120px corner arch may appear once in a hero-value panel per view.
-- No widespread pills. Use rounded pills only for short quote state labels such as `LIVE QUOTE` or `ESTIMATE`.
-
-## Components
-
-### Primary button
-
-Keep the original geometry: 52px height, `16px 28px` padding, 2.5px outline, 4px hard shadow, and shadow-compression feedback. Replace marigold fill with Provident Green and use concise action labels: `Check my route`, `Unlock full route`, `Continue with provider`.
-
-### Secondary button
-
-Keep the original compact solid-ink mechanics: 44px height, `12px 24px`, 2px outline. Use for secondary decisions: `Compare routes`, `Refresh quote`, `View assumptions`.
-
-### Tertiary utility button
-
-Keep the reference’s icon-button mechanics, but replace coral with Quote Blue. Use once per view only, for a non-destructive utility such as copy receipt, share outcome, or open quote methodology.
-
-### Standard card
-
-Keep the reference’s 24px internal padding, 2px outline, 14px radius and 4px hard shadow. Replace cream-on-marigold personality with Receipt Field + Ledger Stone. Cards hold a finite amount of proof; do not trap every paragraph in a card.
-
-### Route Verdict
-
-A single prominent Clear Paper panel contains the recommended route. Required information:
-
-- estimated received amount;
-- target asset;
-- selected provider and payment method;
-- total fee and estimated FX spread;
-- settlement range;
-- reliability/confidence;
-- capture time and expiry;
-- savings against baseline;
-- paid/unlocked status;
-- `Continue with provider` action.
-
-### Quote input
-
-Preserve original input mechanics—48px height, hard outline and hard focus shadow—while using Inter 16px and Ledger Stone. Inputs must never hide the unit, country or asset. Use helper text for quote freshness and supported method constraints.
-
-### Savings receipt
-
-A concise, shareable proof surface:
-
-> **You kept an estimated 3.42 cUSD**
-> `via bank transfer → cUSD · captured 14:26 UTC`
-
-It should never reveal wallet balances or provider personal data publicly. The public/share version must be user-approved and data-minimised.
-
-## Do's and Don'ts
+## 7. Do's and Don'ts
 
 ### Do
-
-- Preserve LearnStack’s hard-outline, hard-shadow, tactile component system and responsive layout mechanics.
-- Make effective received amount the largest, clearest figure in any route result.
-- Use the Value Line only to show actual financial logic.
-- Show quote timestamp, expiry and confidence wherever a price recommendation appears.
-- Keep provider alternatives visible after the recommendation; this is a trust product.
-- Pair all status colour with explicit text and icon.
+- Reserve the hard offset "sticker" shadow for the single primary CTA on a given screen — it's a hierarchy signal, not a default button style
+- Keep Baloo 2 to the logo and headline only
+- Keep the LCD/pixel font scoped to actual "screen" surfaces within illustrations
+- Extend the illustration system with the same "everyday object as fintech device" metaphor if new hero art is needed
+- Use soft, blurred, grounding shadows for illustrated objects; hard offset shadows for UI components — never swap the two
 
 ### Don't
+- Don't apply the hard offset shadow to secondary buttons — that would flatten the deliberate hierarchy between primary and secondary actions
+- Don't set body copy or nav text in Baloo 2 — it's reserved for the two biggest, most attention-grabbing text elements on the page
+- Don't introduce a second illustration style (e.g., photography, 3D render) alongside the flat-vector retro-appliance illustrations
+- Don't extend the indicator-light trio (blue/orange/green) into a general accent-color palette — they're a specific detail of the toaster illustration, not brand colors
+- Don't lose the subtle sunburst background texture when adapting this hero to other pages; it's a quiet but consistent brand signature
 
-- Do not retain LearnStack’s marigold, coral, red, cream/yellow education aesthetic, Bricolage display face or sticker rotations.
-- Do not use a hand-stuck/sticker style for financial warnings or price data.
-- Do not replace factual route breakdown with an unexplained “AI best choice.”
-- Do not use country flags, provider logos or token icons as dominant identity assets.
-- Do not make affiliate/sponsored routes indistinguishable from best-value recommendations.
-- Do not create a dark DeFi dashboard, generic crypto UI, gradient-heavy fintech page, or full-card grid.
+## 8. Responsive Behavior
+
+### Breakpoints
+
+| Name | Width | Key Changes |
+|------|-------|--------------|
+| Mobile | 375px–599px | Hero stacks to single column (illustration below text), nav collapses to hamburger, headline drops to ~28px |
+| Tablet | 600px–1023px | Two-column split narrows but holds, headline ~36px |
+| Desktop | 1024px–1439px | Full layout as designed, 44px headline |
+| Wide | 1440px+ | Max-width 1200px container, centered |
+
+**Typography Adjustments by Breakpoint:**
+- **Mobile:** Display 1 `28px`, Body Regular `14px`
+- **Tablet:** Display 1 `36px`, Body Regular `15px`
+- **Desktop:** Display 1 `44px`, Body Regular `15px`
+
+### Touch Targets
+- **Minimum Size:** `44px × 44px`
+
+### Collapsing Strategy
+- **Hero:** Illustration moves below the text column on narrow viewports, scaling down but keeping its full detail (screen, dial, coins, mug) rather than simplifying
+- **Nav:** Collapses to a hamburger below ~768px; logo and "Create an account" button remain visible
+- **Buttons:** Both button types stay at their designed sizes rather than shrinking below the minimum touch target
+
+## 9. Agent Prompt Guide
+
+### Quick Color Reference
+- **Base:** Sage Green (`#CBD2C4`) | **Text/Outlines:** Ink (`#1A1A1A`) | **Button Fill:** Cream (`#F5F2EA`)
+- **Illustration:** Toaster Metal Light (`#C7C3D1`) / Shadow (`#9B96A8`), LCD Screen (`#1F3D3A`) / Text (`#6FCF97`), Coin Gold (`#E8B84B`), Mug Rose (`#D68F87`)
+
+### Iteration Guide
+1. **Only the primary CTA gets the hard offset "sticker" shadow** — the secondary nav button stays flat. This hierarchy distinction should hold everywhere the two button types appear together.
+2. **Baloo 2 is reserved for the logo and hero headline** — every other piece of text uses plain Inter.
+3. **The pixel/LCD font never leaves the illustration's screen surface** — don't use it for real UI text anywhere else.
+4. **Illustrations use hard black outlines with two-tone cel-shading**, not flat single-color fills or photorealistic rendering.
+5. **UI shadows are hard-edged (the sticker effect); illustration shadows are soft and blurred (grounding objects on a surface)** — never mix the two shadow languages.
+6. **The indicator-light trio (blue/orange/green) is a toaster-specific detail**, not a reusable brand accent set — don't repurpose those colors elsewhere.
+7. **Keep the sunburst background subtle** — it should read as atmosphere, not as a bold graphic element competing with the illustration.
+8. **If new hero illustrations are needed, keep the "everyday object reimagined as a fintech device" metaphor** consistent with the toaster-as-payment-terminal concept.
+9. **Body copy and nav text stay plain and functional (Inter)** — the personality of this brand lives in the illustration and the display headline, not in every text element.
+10. **Two-column hero split (text left, illustration right)** is the system's core arrangement — don't center or symmetrize it.

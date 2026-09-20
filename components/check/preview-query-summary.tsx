@@ -77,8 +77,8 @@ export function PreviewQuerySummary() {
       <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         {rows.map((row) => (
           <div key={row.label}>
-            <dt className="font-proof text-receipt-grey">{row.label}</dt>
-            <dd className="mt-0.5 text-sm font-semibold text-ledger-stone">
+            <dt className="font-sans text-receipt-grey">{row.label}</dt>
+            <dd className="mt-0.5 text-sm font-semibold text-ink">
               {row.value}
             </dd>
           </div>
