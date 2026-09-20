@@ -83,11 +83,17 @@ export function mapPaycrestStatusToInternal(
     case "pending":
     case "fulfilling":
     case "fulfilled":
+      // These are provider-side progress (or stale, out-of-order) milestones:
+      // none of them proves fiat reached the recipient, so none may claim fiat
+      // finality, fiat delivery, or protocol settlement. A row already at
+      // `settled` (e.g. via `validated` or `settled`) keeps its internal
+      // status — the milestone change is recorded, never rolled back — but the
+      // answer's truthfulness flags stay false.
       if (currentInternalStatus === "settled") {
         return {
           targetStatus: "settled",
-          isFiatFinal: true,
-          isFiatDelivered: true,
+          isFiatFinal: false,
+          isFiatDelivered: false,
           isProtocolSettled: false,
           isDepositConfirmed: true,
           isTerminal: isTerminalStatus("settled", type),

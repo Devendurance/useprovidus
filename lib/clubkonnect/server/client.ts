@@ -138,6 +138,128 @@ export function buildAirtimeRequestPayload(
 }
 
 /**
+ * Executes exactly one airtime purchase request.
+ *
+ * The caller must supply the deterministic RequestID already bound to the
+ * transaction. The request builder derives the same value from transactionId;
+ * a mismatch is rejected before any upstream mutation is attempted.
+ */
+export async function executeClubKonnectAirtimePurchase(input: {
+  transactionId: string;
+  requestId: string;
+  phone: string;
+  amountNgn: number;
+  network: ClubKonnectNetwork;
+}): Promise<ClubKonnectResult<NormalizedFulfilmentResult>> {
+  if (
+    !input ||
+    typeof input.transactionId !== "string" ||
+    input.transactionId.trim() === "" ||
+    typeof input.requestId !== "string" ||
+    input.requestId.trim() === "" ||
+    typeof input.phone !== "string" ||
+    typeof input.amountNgn !== "number" ||
+    !Number.isFinite(input.amountNgn) ||
+    typeof input.network !== "string" ||
+    !NETWORK_CODES[input.network]
+  ) {
+    return {
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "Invalid ClubKonnect airtime purchase input",
+    };
+  }
+
+  let payloadResult: ClubKonnectResult<{
+    payload: AirtimeRequestPayload;
+    url: string;
+    redactedUrl: string;
+  }>;
+  try {
+    payloadResult = buildAirtimeRequestPayload({
+      transactionId: input.transactionId,
+      phone: input.phone,
+      amountNgn: input.amountNgn,
+      network: input.network,
+    });
+  } catch {
+    return {
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "Invalid ClubKonnect airtime purchase input",
+    };
+  }
+
+  if (!payloadResult.ok) {
+    return payloadResult;
+  }
+
+  if (payloadResult.data.payload.RequestID !== input.requestId) {
+    return {
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "ClubKonnect RequestID does not match transaction request ID",
+    };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20_000);
+
+  try {
+    const response = await fetch(payloadResult.data.url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      return {
+        ok: false,
+        code: "UPSTREAM_ERROR",
+        message: `ClubKonnect returned HTTP status ${response.status}`,
+        statusCode: String(response.status),
+      };
+    }
+
+    let raw: unknown;
+    try {
+      raw = await response.json();
+    } catch {
+      return {
+        ok: false,
+        code: "UNKNOWN_OUTCOME",
+        message: "Failed to parse ClubKonnect response",
+      };
+    }
+
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return {
+        ok: false,
+        code: "UNKNOWN_OUTCOME",
+        message: "Failed to parse ClubKonnect response",
+      };
+    }
+
+    return {
+      ok: true,
+      data: normalizeClubKonnectStatus(raw as ClubKonnectRawResponse),
+    };
+  } catch (err: unknown) {
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+
+    return {
+      ok: false,
+      code: isTimeout ? "UPSTREAM_TIMEOUT" : "NETWORK_ERROR",
+      message: isTimeout
+        ? "ClubKonnect request timed out; outcome unknown, reconciliation required"
+        : "ClubKonnect network error; outcome unknown, reconciliation required",
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
  * Builds URL to query transaction status by RequestID or OrderID.
  */
 export function buildQueryTransactionUrl(params: {

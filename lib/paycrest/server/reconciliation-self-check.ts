@@ -47,6 +47,39 @@ async function run() {
     assert.equal(m.isProtocolSettled, false);
   }
 
+  // A stale milestone arriving after internal settlement never claims fiat
+  // delivery: the row keeps `settled` (no rollback), but the answer stays
+  // truthful about what that milestone proves.
+  for (const stale of ["fulfilled", "fulfilling", "pending"]) {
+    const m = mapPaycrestStatusToInternal(stale, "settled");
+    assert.equal(
+      m.targetStatus,
+      "settled",
+      `${stale} after settlement must never roll the row back`,
+    );
+    assert.equal(m.isFiatFinal, false, `${stale} after settlement is NOT fiat final`);
+    assert.equal(
+      m.isFiatDelivered,
+      false,
+      `${stale} after settlement is NOT fiat delivered`,
+    );
+    assert.equal(
+      m.isProtocolSettled,
+      false,
+      `${stale} after settlement is NOT protocol settled`,
+    );
+    assert.equal(m.isTerminal, true, "settled stays terminal for cash_out");
+  }
+
+  // Same staleness on an airtime row: delivery is never claimed, and the
+  // preserved `settled` is not terminal for a utility transaction.
+  const staleAirtime = mapPaycrestStatusToInternal("fulfilled", "settled", "airtime");
+  assert.equal(staleAirtime.targetStatus, "settled");
+  assert.equal(staleAirtime.isFiatFinal, false);
+  assert.equal(staleAirtime.isFiatDelivered, false);
+  assert.equal(staleAirtime.isProtocolSettled, false);
+  assert.equal(staleAirtime.isTerminal, false, "settled is not terminal for airtime");
+
   // validated -> provider confirmed fiat delivery! FIAT FINALITY confirmed
   const validatedMap = mapPaycrestStatusToInternal("validated", "settling", "cash_out");
   assert.equal(validatedMap.targetStatus, "settled", "validated MUST map to internal settled");

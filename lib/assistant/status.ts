@@ -186,30 +186,81 @@ export function formatStatusAnswer(
   if (amountNgn) details.push(`Amount: ${amountNgn}`);
   lines.push(details.join(" · "));
 
-  if (stage.isFiatDelivered) {
-    lines.push(
-      "The provider has confirmed fiat delivery to the recipient account.",
-    );
-  } else if (stage.stage === "recovery_required") {
-    lines.push(
-      "Do not send another payment for this order — it needs manual review first.",
-    );
-  } else if (stage.stage === "failed") {
-    lines.push(
-      stage.label === "Refunded"
-        ? "The deposit was refunded on Celo; no NGN was delivered."
-        : "This payment did not complete; no NGN delivery is outstanding.",
-    );
-  } else if (stage.isDepositConfirmed) {
-    lines.push(
-      "Your Celo deposit is confirmed, but NGN bank delivery is NOT confirmed yet.",
-    );
+  if (transaction.type === "airtime") {
+    if (stage.stage === "airtime_delivered") {
+      lines.push("Airtime delivered. Delivery was confirmed by ClubKonnect.");
+    } else if (stage.stage === "airtime_reconciliation_required") {
+      lines.push(
+        "The airtime provider status is unresolved. Providus will not submit another purchase; this request needs reconciliation.",
+      );
+    } else if (stage.stage === "airtime_processing") {
+      lines.push(
+        "The airtime request was received and is still processing. Providus will not create another purchase while this request is unresolved.",
+      );
+    } else if (stage.stage === "airtime_submitting") {
+      lines.push(
+        stage.isFiatDelivered
+          ? "Your Celo payment and NGN settlement are confirmed. The airtime request is being submitted."
+          : "Your Celo payment is confirmed, but NGN settlement is still processing. Providus is submitting the airtime request.",
+      );
+    } else if (stage.stage === "settled") {
+      lines.push(
+        stage.isFiatDelivered
+          ? "Your Celo payment and NGN settlement are confirmed. The airtime request is being prepared."
+          : "Your Celo payment is confirmed, but NGN settlement is still processing. The airtime request is being prepared.",
+      );
+    } else if (stage.stage === "failed") {
+      if (stage.isFiatDelivered || stage.isFiatFinal) {
+        const reason =
+          transaction.failureReason || "Provider rejected request";
+        lines.push(
+          `NGN settlement was confirmed, but airtime fulfilment failed: ${reason}. Providus did not issue an automatic refund.`,
+        );
+      } else if (stage.label === "Refunded") {
+        lines.push("The deposit was refunded on Celo; no NGN was delivered.");
+      } else {
+        lines.push(
+          "This payment did not complete; Providus did not issue an automatic refund and no NGN delivery is outstanding.",
+        );
+      }
+    } else if (stage.stage === "recovery_required") {
+      lines.push(
+        "Do not send another payment for this order — it needs manual review first.",
+      );
+    } else if (stage.isDepositConfirmed) {
+      lines.push(
+        "Your Celo deposit is confirmed, but NGN bank delivery is NOT confirmed yet.",
+      );
+    } else {
+      lines.push(
+        "No confirmed Celo deposit and no confirmed NGN delivery for this order yet.",
+      );
+    }
   } else {
-    lines.push(
-      "No confirmed Celo deposit and no confirmed NGN delivery for this order yet.",
-    );
+    if (stage.isFiatDelivered) {
+      lines.push(
+        "The provider has confirmed fiat delivery to the recipient account.",
+      );
+    } else if (stage.stage === "recovery_required") {
+      lines.push(
+        "Do not send another payment for this order — it needs manual review first.",
+      );
+    } else if (stage.stage === "failed") {
+      lines.push(
+        stage.label === "Refunded"
+          ? "The deposit was refunded on Celo; no NGN was delivered."
+          : "This payment did not complete; no NGN delivery is outstanding.",
+      );
+    } else if (stage.isDepositConfirmed) {
+      lines.push(
+        "Your Celo deposit is confirmed, but NGN bank delivery is NOT confirmed yet.",
+      );
+    } else {
+      lines.push(
+        "No confirmed Celo deposit and no confirmed NGN delivery for this order yet.",
+      );
+    }
   }
-
   lines.push(
     "This is the recorded state only — I can't move money or change the status here.",
   );

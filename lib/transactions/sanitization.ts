@@ -1,8 +1,27 @@
+/**
+ * Credential-bearing `key=value` pairs and query parameters. The key name is
+ * matched case-insensitively (including the compound forms `secret_key`,
+ * `privateKey`, `access_key`, `authKey`), `=` or `:` may separate it from the
+ * value, and the value runs until a query separator or whitespace — so
+ * `UserID=...`, `APIKey=...`, `token=...`, `auth=...`, `secret=...`,
+ * `password=...`, and a plain `key=...` can never survive into persisted or
+ * public text.
+ */
+const CREDENTIAL_PAIR_PATTERN =
+  /\b(?:api[-_]?key|(?:secret|private|access|auth)[-_]?key|user_?id|auth(?:orization)?|token|key|secret|password)\s*[=:]\s*["']?[^&\s"']+["']?/gi;
+
+/**
+ * The whitespace-separated form (`password hunter2`) for exactly the key names
+ * this module already redacted before the `key=value` rule existed. Deliberately
+ * narrow: a bare `key`/`token` followed by prose must not be mangled.
+ */
+const LEGACY_CREDENTIAL_PATTERN =
+  /\b(?:api[-_]?key|secret|password)\s+["']?([a-zA-Z0-9_\-.]+)["']?/gi;
+
 const SENSITIVE_PATTERNS = [
-  /api[-_]?key[=:\s]+["']?([a-zA-Z0-9_\-.]+)["']?/gi,
-  /secret[=:\s]+["']?([a-zA-Z0-9_\-.]+)["']?/gi,
+  CREDENTIAL_PAIR_PATTERN,
+  LEGACY_CREDENTIAL_PATTERN,
   /bearer\s+([a-zA-Z0-9_\-.]+)/gi,
-  /password[=:\s]+["']?([^"'\s]+)["']?/gi,
   /0x[a-fA-F0-9]{64}/g, // private keys or 32-byte hashes
   /https?:\/\/[^\s:]+:[^\s@]+@/gi, // URLs with user:password credentials
 ];

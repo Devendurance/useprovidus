@@ -530,6 +530,30 @@ async function run() {
         code: "TRANSACTION_NOT_FOUND",
         message: "not found",
       }),
+      acquireAirtimeFulfilmentReservation: async () => ({
+        ok: false,
+        error: "DATABASE_UNAVAILABLE",
+        code: "DATABASE_UNAVAILABLE",
+        message: "database unavailable",
+      }),
+      claimAirtimeFulfilmentAttempt: async () => ({
+        ok: false,
+        error: "DATABASE_UNAVAILABLE",
+        code: "DATABASE_UNAVAILABLE",
+        message: "database unavailable",
+      }),
+      recordAirtimeFulfilmentOutcome: async () => ({
+        ok: false,
+        error: "DATABASE_UNAVAILABLE",
+        code: "DATABASE_UNAVAILABLE",
+        message: "database unavailable",
+      }),
+      recordAirtimeFulfilmentPreflightFailure: async () => ({
+        ok: false,
+        error: "DATABASE_UNAVAILABLE",
+        code: "DATABASE_UNAVAILABLE",
+        message: "database unavailable",
+      }),
     };
     const insertFailResult = expectError(
       await prepareAirtimePaymentOrder({

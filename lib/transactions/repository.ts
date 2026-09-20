@@ -10,10 +10,24 @@ import {
 import type {
   BindPaycrestOrderInput,
   CreateTransactionInput,
+  FulfilmentAttemptInput,
+  FulfilmentAttemptResult,
+  FulfilmentMutationResult,
+  FulfilmentOperationError,
+  FulfilmentOutcomeInput,
+  FulfilmentPreflightFailureInput,
+  FulfilmentReservationError,
+  FulfilmentReservationInput,
+  FulfilmentReservationResult,
+  FulfilmentReservationState,
+  FulfilmentReservationStatus,
+  FulfilmentStatus,
+  TransactionMetadata,
   TransactionRecord,
   TransactionStatus,
   UpdateTransactionStatusInput,
 } from "@/lib/transactions/types";
+import { isFulfilmentStatus } from "@/lib/transactions/types";
 
 export interface TransactionRepository {
   create(
@@ -46,6 +60,36 @@ export interface TransactionRepository {
     | { ok: true; record: TransactionRecord; isNoop: boolean }
     | { ok: false; code: string; message: string }
   >;
+  /**
+   * Atomically reserves the single purchase right for an airtime fulfilment.
+   *
+   * 'acquired' is the only outcome that authorizes a provider purchase;
+   * 'already_processing' is query-only; terminal rows are successful no-ops.
+   */
+  acquireAirtimeFulfilmentReservation(
+    input: FulfilmentReservationInput,
+  ): Promise<FulfilmentReservationResult>;
+  /**
+   * Atomically consumes the one-shot purchase attempt (0 -> 1) for an already
+   * reserved transaction. Exactly one caller can ever be 'claimed'.
+   */
+  claimAirtimeFulfilmentAttempt(
+    input: FulfilmentAttemptInput,
+  ): Promise<FulfilmentAttemptResult>;
+  /**
+   * Persists a provider outcome. Completed/failed rows are never downgraded and
+   * a provider order id is write-once.
+   */
+  recordAirtimeFulfilmentOutcome(
+    input: FulfilmentOutcomeInput,
+  ): Promise<FulfilmentMutationResult>;
+  /**
+   * Marks a pre-purchase (no provider call) failure as terminal without
+   * consuming the purchase attempt.
+   */
+  recordAirtimeFulfilmentPreflightFailure(
+    input: FulfilmentPreflightFailureInput,
+  ): Promise<FulfilmentMutationResult>;
 }
 
 function generateTransactionId(): string {
@@ -134,6 +178,636 @@ export function shouldAdvancePaycrestStatus(
   return incomingRank > currentRank;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Airtime fulfilment (ClubKonnect) contract                                   */
+/* -------------------------------------------------------------------------- */
+
+/** Attempts are one-shot: absent/0 means "not purchased yet", 1 means "spent". */
+const FULFILMENT_ATTEMPT_LIMIT = 1;
+
+const FULFILMENT_STATUS_CODE_MAX_LENGTH = 64;
+
+const FULFILMENT_STRING_FIELDS = [
+  "clubkonnect_order_id",
+  "clubkonnect_status_code",
+  "clubkonnect_raw_status",
+  "fulfilment_last_error_code",
+  "fulfilment_last_error_reason",
+] as const;
+
+const FULFILMENT_TIMESTAMP_FIELDS = [
+  "fulfilment_reserved_at",
+  "fulfilled_at",
+  "fulfilment_last_checked_at",
+] as const;
+
+/**
+ * Validated view of the fulfilment fields inside `agent_transactions.metadata`.
+ * A malformed value fails the whole read closed instead of being guessed at.
+ */
+interface FulfilmentSnapshot {
+  requestId: string | null;
+  orderId: string | null;
+  statusCode: string | null;
+  rawStatus: string | null;
+  attempts: number;
+  reservedAt: string | null;
+  fulfilledAt: string | null;
+  status: FulfilmentStatus | null;
+  reconciliationRequired: boolean;
+  lastErrorCode: string | null;
+  lastErrorReason: string | null;
+  lastCheckedAt: string | null;
+}
+
+function readFulfilmentSnapshot(
+  metadata: TransactionMetadata | null | undefined,
+): { ok: true; snapshot: FulfilmentSnapshot } | { ok: false; message: string } {
+  const source: Record<string, unknown> = metadata ?? {};
+
+  for (const field of FULFILMENT_STRING_FIELDS) {
+    const value = source[field];
+    if (value !== undefined && value !== null && typeof value !== "string") {
+      return {
+        ok: false,
+        message: `Fulfilment metadata field '${field}' must be a string or null`,
+      };
+    }
+  }
+
+  const requestId = source.clubkonnect_request_id;
+  if (
+    requestId !== undefined &&
+    requestId !== null &&
+    (typeof requestId !== "string" || requestId.trim() === "")
+  ) {
+    return {
+      ok: false,
+      message:
+        "Fulfilment metadata field 'clubkonnect_request_id' must be a non-empty string",
+    };
+  }
+
+  for (const field of FULFILMENT_TIMESTAMP_FIELDS) {
+    const value = source[field];
+    if (
+      value !== undefined &&
+      value !== null &&
+      (typeof value !== "string" || Number.isNaN(Date.parse(value)))
+    ) {
+      return {
+        ok: false,
+        message: `Fulfilment metadata field '${field}' must be an ISO timestamp string or null`,
+      };
+    }
+  }
+
+  const attempts = source.fulfilment_attempts;
+  if (
+    attempts !== undefined &&
+    attempts !== null &&
+    (typeof attempts !== "number" ||
+      !Number.isInteger(attempts) ||
+      attempts < 0 ||
+      attempts > FULFILMENT_ATTEMPT_LIMIT)
+  ) {
+    return {
+      ok: false,
+      message: `Fulfilment metadata field 'fulfilment_attempts' must be 0 or ${FULFILMENT_ATTEMPT_LIMIT}`,
+    };
+  }
+
+  const reconciliationRequired = source.fulfilment_reconciliation_required;
+  if (
+    reconciliationRequired !== undefined &&
+    reconciliationRequired !== null &&
+    typeof reconciliationRequired !== "boolean"
+  ) {
+    return {
+      ok: false,
+      message:
+        "Fulfilment metadata field 'fulfilment_reconciliation_required' must be a boolean",
+    };
+  }
+
+  const status = source.fulfilment_status;
+  if (status !== undefined && status !== null && !isFulfilmentStatus(status)) {
+    return {
+      ok: false,
+      message:
+        "Fulfilment metadata field 'fulfilment_status' is not a recognised status",
+    };
+  }
+
+  return {
+    ok: true,
+    snapshot: {
+      requestId: typeof requestId === "string" ? requestId : null,
+      orderId:
+        typeof source.clubkonnect_order_id === "string"
+          ? source.clubkonnect_order_id
+          : null,
+      statusCode:
+        typeof source.clubkonnect_status_code === "string"
+          ? source.clubkonnect_status_code
+          : null,
+      rawStatus:
+        typeof source.clubkonnect_raw_status === "string"
+          ? source.clubkonnect_raw_status
+          : null,
+      attempts: typeof attempts === "number" ? attempts : 0,
+      reservedAt:
+        typeof source.fulfilment_reserved_at === "string"
+          ? source.fulfilment_reserved_at
+          : null,
+      fulfilledAt:
+        typeof source.fulfilled_at === "string" ? source.fulfilled_at : null,
+      status: isFulfilmentStatus(status) ? status : null,
+      reconciliationRequired: reconciliationRequired === true,
+      lastErrorCode:
+        typeof source.fulfilment_last_error_code === "string"
+          ? source.fulfilment_last_error_code
+          : null,
+      lastErrorReason:
+        typeof source.fulfilment_last_error_reason === "string"
+          ? source.fulfilment_last_error_reason
+          : null,
+      lastCheckedAt:
+        typeof source.fulfilment_last_checked_at === "string"
+          ? source.fulfilment_last_checked_at
+          : null,
+    },
+  };
+}
+
+/**
+ * Failure result shared by every fulfilment operation. Carries both the
+ * assignment's `error`/`message` contract and the orchestrator's `code` alias.
+ */
+function fulfilmentFailure<TError extends string>(
+  error: TError,
+  message: string,
+  record?: TransactionRecord,
+): { ok: false; error: TError; code: TError; message: string; record?: TransactionRecord } {
+  return { ok: false, error, code: error, message, record };
+}
+
+function reservationAcquired(
+  record: TransactionRecord,
+  requestId: string,
+): FulfilmentReservationResult {
+  return {
+    ok: true,
+    status: "acquired",
+    state: "acquired",
+    transaction: record,
+    record,
+    requestId,
+  };
+}
+
+function reservationHeld(
+  status: Exclude<FulfilmentReservationStatus, "acquired">,
+  state: Exclude<FulfilmentReservationState, "acquired">,
+  record: TransactionRecord,
+): FulfilmentReservationResult {
+  return { ok: true, status, state, transaction: record, record };
+}
+
+function attemptSettled(
+  status: "claimed" | "already_claimed",
+  record: TransactionRecord,
+): FulfilmentAttemptResult {
+  return { ok: true, status, state: status, transaction: record, record };
+}
+
+function mutationSettled(
+  changed: boolean,
+  record: TransactionRecord,
+): FulfilmentMutationResult {
+  return { ok: true, changed, transaction: record, record };
+}
+
+type FulfilmentApplyPlan = {
+  kind: "apply";
+  nextStatus: TransactionStatus;
+  /** Only fulfilment-owned keys, so the write never clobbers unrelated metadata. */
+  patch: TransactionMetadata;
+  /** Fully merged metadata for the in-memory implementation. */
+  metadata: TransactionMetadata;
+  failureCode?: string | null;
+  failureReason?: string | null;
+  changed: boolean;
+};
+
+type FulfilmentMutationPlan =
+  | { kind: "noop"; record: TransactionRecord }
+  | FulfilmentApplyPlan
+  | { kind: "error"; error: FulfilmentOperationError; message: string };
+
+type FulfilmentClaimPlan =
+  | { kind: "claim" }
+  | { kind: "held"; status: "already_claimed" }
+  | { kind: "error"; error: FulfilmentOperationError; message: string };
+
+type FulfilmentReservationPlan =
+  | { kind: "acquire" }
+  | {
+      kind: "held";
+      status: Exclude<FulfilmentReservationStatus, "acquired">;
+      state: Exclude<FulfilmentReservationState, "acquired">;
+    }
+  | { kind: "error"; error: FulfilmentReservationError; message: string };
+
+const FULFILMENT_TERMINAL_STATUSES: TransactionStatus[] = [
+  "completed",
+  "failed",
+  "refunded",
+];
+
+/**
+ * Decides what a reservation request means for the loaded row. Pure: every
+ * caller (in-memory, Drizzle) then applies the same decision atomically.
+ */
+function decideFulfilmentReservation(
+  record: TransactionRecord,
+  requestId: string,
+): FulfilmentReservationPlan {
+  if (record.type !== "airtime") {
+    return {
+      kind: "error",
+      error: "FULFILMENT_INVALID_TYPE",
+      message: `Transaction ${record.id} is type '${record.type}'; only airtime supports fulfilment`,
+    };
+  }
+
+  const read = readFulfilmentSnapshot(record.metadata);
+  if (!read.ok) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_METADATA_INVALID",
+      message: read.message,
+    };
+  }
+  const { snapshot } = read;
+
+  if (record.status === "processing" || FULFILMENT_TERMINAL_STATUSES.includes(record.status)) {
+    if (snapshot.requestId !== null && snapshot.requestId !== requestId) {
+      return {
+        kind: "error",
+        error: "FULFILMENT_REQUEST_ID_MISMATCH",
+        message: `Request id does not match the request id bound to transaction ${record.id}`,
+      };
+    }
+    // An in-flight row must carry the request id it was reserved with; a
+    // terminal row that never reached the provider has nothing to bind.
+    if (record.status === "processing" && snapshot.requestId === null) {
+      return {
+        kind: "error",
+        error: "FULFILMENT_METADATA_INVALID",
+        message: `Transaction ${record.id} is 'processing' without a bound fulfilment request id`,
+      };
+    }
+    if (record.status === "processing") {
+      return { kind: "held", status: "already_processing", state: "already_processing" };
+    }
+    if (record.status === "completed") {
+      return { kind: "held", status: "already_completed", state: "already_completed" };
+    }
+    return record.status === "failed"
+      ? { kind: "held", status: "already_failed_or_refunded", state: "already_failed" }
+      : { kind: "held", status: "already_failed_or_refunded", state: "already_refunded" };
+  }
+
+  if (record.status !== "settled") {
+    return {
+      kind: "error",
+      error: "FULFILMENT_NOT_ELIGIBLE",
+      message: `Transaction ${record.id} is '${record.status}'; fulfilment requires 'settled'`,
+    };
+  }
+
+  if (snapshot.requestId !== null && snapshot.requestId !== requestId) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_REQUEST_ID_MISMATCH",
+      message: `Request id does not match the request id bound to transaction ${record.id}`,
+    };
+  }
+
+  if (snapshot.orderId !== null) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_NOT_ELIGIBLE",
+      message: `Transaction ${record.id} already carries provider order id '${snapshot.orderId}'`,
+    };
+  }
+
+  // A spent attempt means a purchase already reached the provider: resetting
+  // the counter here would hand out a second purchase right.
+  if (snapshot.attempts >= FULFILMENT_ATTEMPT_LIMIT) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_METADATA_INVALID",
+      message: `Transaction ${record.id} already spent its purchase attempt; refusing to reserve a second one`,
+    };
+  }
+
+  return { kind: "acquire" };
+}
+
+/** The reservation metadata written on the single successful 'acquired' path. */
+function buildFulfilmentReservationPatch(requestId: string): TransactionMetadata {
+  return {
+    clubkonnect_request_id: requestId,
+    clubkonnect_order_id: null,
+    clubkonnect_status_code: null,
+    clubkonnect_raw_status: null,
+    fulfilment_attempts: 0,
+    fulfilment_reserved_at: nowIso(),
+    fulfilled_at: null,
+    fulfilment_status: "processing",
+    fulfilment_reconciliation_required: false,
+    fulfilment_last_error_code: null,
+    fulfilment_last_error_reason: null,
+    fulfilment_last_checked_at: null,
+  };
+}
+
+function decideFulfilmentClaim(
+  record: TransactionRecord,
+  requestId: string,
+): FulfilmentClaimPlan {
+  if (record.type !== "airtime") {
+    return {
+      kind: "error",
+      error: "FULFILMENT_INVALID_TYPE",
+      message: `Transaction ${record.id} is type '${record.type}'; only airtime supports fulfilment`,
+    };
+  }
+
+  const read = readFulfilmentSnapshot(record.metadata);
+  if (!read.ok) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_METADATA_INVALID",
+      message: read.message,
+    };
+  }
+  const { snapshot } = read;
+
+  if (record.status !== "processing") {
+    return {
+      kind: "error",
+      error: "FULFILMENT_NOT_ELIGIBLE",
+      message: `Attempt claim requires 'processing'; transaction ${record.id} is '${record.status}'`,
+    };
+  }
+
+  if (snapshot.requestId === null) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_REQUEST_ID_MISSING",
+      message: `Transaction ${record.id} is 'processing' without a bound fulfilment request id`,
+    };
+  }
+
+  if (snapshot.requestId !== requestId) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_REQUEST_ID_MISMATCH",
+      message: `Request id does not match the request id bound to transaction ${record.id}`,
+    };
+  }
+
+  if (snapshot.attempts >= FULFILMENT_ATTEMPT_LIMIT) {
+    return { kind: "held", status: "already_claimed" };
+  }
+
+  return { kind: "claim" };
+}
+
+/**
+ * Decides how a provider outcome mutates the row. Terminal rows are protected:
+ * a completed/failed/refunded row is never downgraded or rolled back, and a
+ * provider order id is write-once.
+ */
+function decideFulfilmentOutcome(
+  record: TransactionRecord,
+  input: FulfilmentOutcomeInput,
+): FulfilmentMutationPlan {
+  if (record.type !== "airtime") {
+    return {
+      kind: "error",
+      error: "FULFILMENT_INVALID_TYPE",
+      message: `Transaction ${record.id} is type '${record.type}'; only airtime supports fulfilment`,
+    };
+  }
+
+  const read = readFulfilmentSnapshot(record.metadata);
+  if (!read.ok) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_METADATA_INVALID",
+      message: read.message,
+    };
+  }
+  const { snapshot } = read;
+
+  const incomingOrderId = input.orderId ?? null;
+  if (
+    snapshot.orderId !== null &&
+    incomingOrderId !== null &&
+    snapshot.orderId !== incomingOrderId
+  ) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_ORDER_ID_CONFLICT",
+      message: `Provider order id '${incomingOrderId}' conflicts with persisted order id '${snapshot.orderId}'`,
+    };
+  }
+
+  if (record.status !== "processing" && !FULFILMENT_TERMINAL_STATUSES.includes(record.status)) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_NOT_ELIGIBLE",
+      message: `Transaction ${record.id} is '${record.status}'; fulfilment outcomes require 'processing'`,
+    };
+  }
+
+  if (snapshot.requestId !== null && snapshot.requestId !== input.requestId) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_REQUEST_ID_MISMATCH",
+      message: `Request id does not match the request id bound to transaction ${record.id}`,
+    };
+  }
+
+  // Terminal protection: never downgrade or roll back a settled outcome.
+  if (record.status !== "processing") {
+    return { kind: "noop", record };
+  }
+
+  if (snapshot.requestId === null) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_REQUEST_ID_MISSING",
+      message: `Transaction ${record.id} is 'processing' without a bound fulfilment request id`,
+    };
+  }
+
+  const now = nowIso();
+  const status = input.normalizedStatus;
+  const statusCode = input.statusCode
+    .trim()
+    .slice(0, FULFILMENT_STATUS_CODE_MAX_LENGTH);
+
+  // Hard completion gate: only the numeric statuscode 200 may complete. A
+  // completion claim without it is contradictory input and is never persisted
+  // (provider status TEXT such as "ORDER_COMPLETED" also accompanies 201).
+  if (status === "completed" && statusCode !== "200") {
+    return {
+      kind: "error",
+      error: "FULFILMENT_METADATA_INVALID",
+      message: `Only provider statuscode 200 completes a fulfilment; received '${statusCode}'`,
+    };
+  }
+
+  const nextStatus: TransactionStatus =
+    status === "completed"
+      ? "completed"
+      : status === "failed"
+        ? "failed"
+        : "processing";
+
+  // Reconciliation is derived, never trusted from the caller: an unknown
+  // outcome always needs it, and no terminal outcome ever does.
+  const reconciliationRequired =
+    status === "processing"
+      ? input.reconciliationRequired === true
+      : status === "unknown";
+
+  const failureReason = sanitizeFailureReason(input.failureReason);
+  const lastErrorCode =
+    status === "completed" || status === "processing"
+      ? null
+      : status === "failed"
+        ? (input.failureCode ?? null)
+        : (input.failureCode ?? snapshot.lastErrorCode);
+  const lastErrorReason =
+    status === "completed" || status === "processing"
+      ? null
+      : status === "failed"
+        ? failureReason
+        : (failureReason ?? snapshot.lastErrorReason);
+
+  const patch: TransactionMetadata = {
+    clubkonnect_order_id: incomingOrderId ?? snapshot.orderId,
+    clubkonnect_status_code: statusCode,
+    clubkonnect_raw_status: sanitizeFailureReason(input.rawStatus),
+    fulfilment_status: status,
+    fulfilment_reconciliation_required: reconciliationRequired,
+    fulfilment_last_error_code: lastErrorCode,
+    fulfilment_last_error_reason: lastErrorReason,
+    fulfilment_last_checked_at: now,
+    // Write-once: a duplicate 200 keeps the original completion timestamp.
+    fulfilled_at:
+      status === "completed" ? (snapshot.fulfilledAt ?? now) : snapshot.fulfilledAt,
+  };
+
+  return {
+    kind: "apply",
+    nextStatus,
+    patch,
+    metadata: { ...(record.metadata ?? {}), ...patch },
+    failureCode: status === "failed" ? (input.failureCode ?? null) : undefined,
+    failureReason: status === "failed" ? failureReason : undefined,
+    changed: true,
+  };
+}
+
+/**
+ * Decides a definite pre-purchase failure. Only reachable before the purchase
+ * attempt is claimed, so `fulfilment_attempts` must still be 0.
+ */
+function decideFulfilmentPreflightFailure(
+  record: TransactionRecord,
+  input: FulfilmentPreflightFailureInput,
+): FulfilmentMutationPlan {
+  if (record.type !== "airtime") {
+    return {
+      kind: "error",
+      error: "FULFILMENT_INVALID_TYPE",
+      message: `Transaction ${record.id} is type '${record.type}'; only airtime supports fulfilment`,
+    };
+  }
+
+  const read = readFulfilmentSnapshot(record.metadata);
+  if (!read.ok) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_METADATA_INVALID",
+      message: read.message,
+    };
+  }
+  const { snapshot } = read;
+
+  const isTerminal = FULFILMENT_TERMINAL_STATUSES.includes(record.status);
+
+  if (snapshot.requestId !== null && snapshot.requestId !== input.requestId) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_REQUEST_ID_MISMATCH",
+      message: `Request id does not match the request id bound to transaction ${record.id}`,
+    };
+  }
+
+  if (isTerminal) {
+    return { kind: "noop", record };
+  }
+
+  if (record.status !== "processing") {
+    return {
+      kind: "error",
+      error: "FULFILMENT_NOT_ELIGIBLE",
+      message: `Transaction ${record.id} is '${record.status}'; preflight failure requires 'processing'`,
+    };
+  }
+
+  if (snapshot.requestId === null) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_REQUEST_ID_MISSING",
+      message: `Transaction ${record.id} is 'processing' without a bound fulfilment request id`,
+    };
+  }
+
+  if (snapshot.attempts >= FULFILMENT_ATTEMPT_LIMIT) {
+    return {
+      kind: "error",
+      error: "FULFILMENT_METADATA_INVALID",
+      message: `Transaction ${record.id} already spent its purchase attempt; preflight failure is only valid before the provider call`,
+    };
+  }
+
+  const patch: TransactionMetadata = {
+    fulfilment_status: "failed",
+    fulfilment_reconciliation_required: false,
+    fulfilment_last_error_code: input.failureCode,
+    fulfilment_last_error_reason: sanitizeFailureReason(input.failureReason),
+    fulfilment_last_checked_at: nowIso(),
+  };
+
+  return {
+    kind: "apply",
+    nextStatus: "failed",
+    patch,
+    metadata: { ...(record.metadata ?? {}), ...patch },
+    failureCode: input.failureCode,
+    failureReason: sanitizeFailureReason(input.failureReason),
+    changed: true,
+  };
+}
 
 /**
  * In-Memory repository implementation used strictly for unit tests, offline execution,
@@ -380,6 +1054,122 @@ export class InMemoryTransactionRepository implements TransactionRepository {
 
     this.records.set(id, updated);
     return { ok: true, record: updated, isNoop: false };
+  }
+
+  /**
+   * Read/validate/write happen in one synchronous block (no await in between),
+   * so concurrent callers cannot both acquire: exactly one wins.
+   */
+  async acquireAirtimeFulfilmentReservation(
+    input: FulfilmentReservationInput,
+  ): Promise<FulfilmentReservationResult> {
+    const current = this.records.get(input.transactionId) ?? null;
+    if (!current) {
+      return fulfilmentFailure(
+        "TRANSACTION_NOT_FOUND",
+        `Transaction ${input.transactionId} not found`,
+      );
+    }
+
+    const decision = decideFulfilmentReservation(current, input.requestId);
+    if (decision.kind === "error") {
+      return fulfilmentFailure(decision.error, decision.message, current);
+    }
+    if (decision.kind === "held") {
+      return reservationHeld(decision.status, decision.state, current);
+    }
+
+    const patch = buildFulfilmentReservationPatch(input.requestId);
+    const reserved: TransactionRecord = {
+      ...current,
+      status: "processing",
+      metadata: { ...(current.metadata ?? {}), ...patch },
+      updatedAt: nowIso(),
+    };
+    this.records.set(reserved.id, reserved);
+
+    return reservationAcquired(reserved, input.requestId);
+  }
+
+  async claimAirtimeFulfilmentAttempt(
+    input: FulfilmentAttemptInput,
+  ): Promise<FulfilmentAttemptResult> {
+    const current = this.records.get(input.transactionId) ?? null;
+    if (!current) {
+      return fulfilmentFailure(
+        "TRANSACTION_NOT_FOUND",
+        `Transaction ${input.transactionId} not found`,
+      );
+    }
+
+    const decision = decideFulfilmentClaim(current, input.requestId);
+    if (decision.kind === "error") {
+      return fulfilmentFailure(decision.error, decision.message, current);
+    }
+    if (decision.kind === "held") {
+      return attemptSettled(decision.status, current);
+    }
+
+    const claimed: TransactionRecord = {
+      ...current,
+      metadata: {
+        ...(current.metadata ?? {}),
+        fulfilment_attempts: FULFILMENT_ATTEMPT_LIMIT,
+      },
+      updatedAt: nowIso(),
+    };
+    this.records.set(claimed.id, claimed);
+
+    return attemptSettled("claimed", claimed);
+  }
+
+  async recordAirtimeFulfilmentOutcome(
+    input: FulfilmentOutcomeInput,
+  ): Promise<FulfilmentMutationResult> {
+    return this.applyFulfilmentPlan(input, decideFulfilmentOutcome);
+  }
+
+  async recordAirtimeFulfilmentPreflightFailure(
+    input: FulfilmentPreflightFailureInput,
+  ): Promise<FulfilmentMutationResult> {
+    return this.applyFulfilmentPlan(input, decideFulfilmentPreflightFailure);
+  }
+
+  private applyFulfilmentPlan<TInput extends { transactionId: string }>(
+    input: TInput,
+    decide: (record: TransactionRecord, input: TInput) => FulfilmentMutationPlan,
+  ): FulfilmentMutationResult {
+    const current = this.records.get(input.transactionId) ?? null;
+    if (!current) {
+      return fulfilmentFailure(
+        "TRANSACTION_NOT_FOUND",
+        `Transaction ${input.transactionId} not found`,
+      );
+    }
+
+    const plan = decide(current, input);
+    if (plan.kind === "error") {
+      return fulfilmentFailure(plan.error, plan.message, current);
+    }
+    if (plan.kind === "noop") {
+      return mutationSettled(false, plan.record);
+    }
+
+    const updated: TransactionRecord = {
+      ...current,
+      status: plan.nextStatus,
+      metadata: plan.metadata,
+      failureCode:
+        plan.failureCode === undefined ? current.failureCode : plan.failureCode,
+      failureReason:
+        plan.failureReason === undefined
+          ? current.failureReason
+          : plan.failureReason,
+      updatedAt: nowIso(),
+    };
+    this.records.set(updated.id, updated);
+
+    return mutationSettled(plan.changed, updated);
   }
 }
 
@@ -786,6 +1576,293 @@ export class DrizzleTransactionRepository implements TransactionRepository {
     };
   }
 
+  /**
+   * Atomically reserves fulfilment. The conditional UPDATE is the only place
+   * the purchase right is granted; a loser of the race reloads and reports
+   * `already_processing` instead of ever purchasing twice.
+   */
+  async acquireAirtimeFulfilmentReservation(
+    input: FulfilmentReservationInput,
+  ): Promise<FulfilmentReservationResult> {
+    const db = getDb();
+    if (!db) {
+      return fulfilmentFailure(
+        "DATABASE_UNAVAILABLE",
+        "Database connection is not configured",
+      );
+    }
+
+    const current = await this.findById(input.transactionId);
+    if (!current) {
+      return fulfilmentFailure(
+        "TRANSACTION_NOT_FOUND",
+        `Transaction ${input.transactionId} not found`,
+      );
+    }
+
+    const decision = decideFulfilmentReservation(current, input.requestId);
+    if (decision.kind === "error") {
+      return fulfilmentFailure(decision.error, decision.message, current);
+    }
+    if (decision.kind === "held") {
+      return reservationHeld(decision.status, decision.state, current);
+    }
+
+    const patch = buildFulfilmentReservationPatch(input.requestId);
+
+    try {
+      const [updated] = await db
+        .update(agentTransactions)
+        .set({
+          status: "processing",
+          metadata: sql`coalesce(${agentTransactions.metadata}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
+          updatedAt: nowIso(),
+        })
+        .where(
+          and(
+            eq(agentTransactions.id, input.transactionId),
+            eq(agentTransactions.type, "airtime"),
+            eq(agentTransactions.status, "settled"),
+            sql`(${agentTransactions.metadata}->>'clubkonnect_request_id' is null or ${agentTransactions.metadata}->>'clubkonnect_request_id' = ${input.requestId})`,
+            sql`${agentTransactions.metadata}->>'clubkonnect_order_id' is null`,
+          ),
+        )
+        .returning();
+
+      if (updated) {
+        return reservationAcquired(this.mapRow(updated), input.requestId);
+      }
+    } catch (err) {
+      return fulfilmentFailure(
+        "DATABASE_UNAVAILABLE",
+        err instanceof Error
+          ? err.message
+          : "Failed to reserve airtime fulfilment",
+        current,
+      );
+    }
+
+    const raced = await this.findById(input.transactionId);
+    if (!raced) {
+      return fulfilmentFailure(
+        "TRANSACTION_NOT_FOUND",
+        `Transaction ${input.transactionId} not found`,
+      );
+    }
+
+    const racedDecision = decideFulfilmentReservation(raced, input.requestId);
+    if (racedDecision.kind === "held") {
+      return reservationHeld(racedDecision.status, racedDecision.state, raced);
+    }
+    if (racedDecision.kind === "error") {
+      return fulfilmentFailure(racedDecision.error, racedDecision.message, raced);
+    }
+
+    return fulfilmentFailure(
+      "DATABASE_UNAVAILABLE",
+      `Concurrent reservation prevented acquiring transaction ${input.transactionId}`,
+      raced,
+    );
+  }
+
+  async claimAirtimeFulfilmentAttempt(
+    input: FulfilmentAttemptInput,
+  ): Promise<FulfilmentAttemptResult> {
+    const db = getDb();
+    if (!db) {
+      return fulfilmentFailure(
+        "DATABASE_UNAVAILABLE",
+        "Database connection is not configured",
+      );
+    }
+
+    const current = await this.findById(input.transactionId);
+    if (!current) {
+      return fulfilmentFailure(
+        "TRANSACTION_NOT_FOUND",
+        `Transaction ${input.transactionId} not found`,
+      );
+    }
+
+    const decision = decideFulfilmentClaim(current, input.requestId);
+    if (decision.kind === "error") {
+      return fulfilmentFailure(decision.error, decision.message, current);
+    }
+    if (decision.kind === "held") {
+      return attemptSettled(decision.status, current);
+    }
+
+    const patch: TransactionMetadata = {
+      fulfilment_attempts: FULFILMENT_ATTEMPT_LIMIT,
+    };
+
+    try {
+      const [updated] = await db
+        .update(agentTransactions)
+        .set({
+          metadata: sql`coalesce(${agentTransactions.metadata}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
+          updatedAt: nowIso(),
+        })
+        .where(
+          and(
+            eq(agentTransactions.id, input.transactionId),
+            eq(agentTransactions.type, "airtime"),
+            eq(agentTransactions.status, "processing"),
+            sql`${agentTransactions.metadata}->>'clubkonnect_request_id' = ${input.requestId}`,
+            sql`coalesce(${agentTransactions.metadata}->>'fulfilment_attempts', '0') = '0'`,
+          ),
+        )
+        .returning();
+
+      if (updated) {
+        return attemptSettled("claimed", this.mapRow(updated));
+      }
+    } catch (err) {
+      return fulfilmentFailure(
+        "DATABASE_UNAVAILABLE",
+        err instanceof Error
+          ? err.message
+          : "Failed to claim airtime fulfilment attempt",
+        current,
+      );
+    }
+
+    const raced = await this.findById(input.transactionId);
+    if (!raced) {
+      return fulfilmentFailure(
+        "TRANSACTION_NOT_FOUND",
+        `Transaction ${input.transactionId} not found`,
+      );
+    }
+
+    const racedDecision = decideFulfilmentClaim(raced, input.requestId);
+    if (racedDecision.kind === "held") {
+      return attemptSettled(racedDecision.status, raced);
+    }
+    if (racedDecision.kind === "error") {
+      return fulfilmentFailure(racedDecision.error, racedDecision.message, raced);
+    }
+
+    return fulfilmentFailure(
+      "DATABASE_UNAVAILABLE",
+      `Concurrent attempt claim prevented claiming transaction ${input.transactionId}`,
+      raced,
+    );
+  }
+
+  async recordAirtimeFulfilmentOutcome(
+    input: FulfilmentOutcomeInput,
+  ): Promise<FulfilmentMutationResult> {
+    return this.applyFulfilmentMutation(input, input.requestId, decideFulfilmentOutcome);
+  }
+
+  async recordAirtimeFulfilmentPreflightFailure(
+    input: FulfilmentPreflightFailureInput,
+  ): Promise<FulfilmentMutationResult> {
+    return this.applyFulfilmentMutation(
+      input,
+      input.requestId,
+      decideFulfilmentPreflightFailure,
+    );
+  }
+
+  private async applyFulfilmentMutation<TInput extends { transactionId: string }>(
+    input: TInput,
+    requestId: string,
+    decide: (record: TransactionRecord, input: TInput) => FulfilmentMutationPlan,
+  ): Promise<FulfilmentMutationResult> {
+    const db = getDb();
+    if (!db) {
+      return fulfilmentFailure(
+        "DATABASE_UNAVAILABLE",
+        "Database connection is not configured",
+      );
+    }
+
+    const current = await this.findById(input.transactionId);
+    if (!current) {
+      return fulfilmentFailure(
+        "TRANSACTION_NOT_FOUND",
+        `Transaction ${input.transactionId} not found`,
+      );
+    }
+
+    const plan = decide(current, input);
+    if (plan.kind === "error") {
+      return fulfilmentFailure(plan.error, plan.message, current);
+    }
+    if (plan.kind === "noop") {
+      return mutationSettled(false, plan.record);
+    }
+
+    // Order ids are write-once: a concurrent different id must lose the write.
+    const orderId = plan.patch.clubkonnect_order_id ?? null;
+    const orderGuard =
+      "clubkonnect_order_id" in plan.patch
+        ? orderId === null
+          ? sql`${agentTransactions.metadata}->>'clubkonnect_order_id' is null`
+          : sql`coalesce(${agentTransactions.metadata}->>'clubkonnect_order_id', ${orderId}) = ${orderId}`
+        : undefined;
+
+    const conditions = [
+      eq(agentTransactions.id, input.transactionId),
+      eq(agentTransactions.type, "airtime"),
+      eq(agentTransactions.status, "processing"),
+      sql`${agentTransactions.metadata}->>'clubkonnect_request_id' = ${requestId}`,
+    ];
+    if (orderGuard) {
+      conditions.push(orderGuard);
+    }
+
+    try {
+      const [updated] = await db
+        .update(agentTransactions)
+        .set({
+          status: plan.nextStatus,
+          metadata: sql`coalesce(${agentTransactions.metadata}, '{}'::jsonb) || ${JSON.stringify(plan.patch)}::jsonb`,
+          failureCode: plan.failureCode,
+          failureReason: plan.failureReason,
+          updatedAt: nowIso(),
+        })
+        .where(and(...conditions))
+        .returning();
+
+      if (updated) {
+        return mutationSettled(plan.changed, this.mapRow(updated));
+      }
+    } catch (err) {
+      return fulfilmentFailure(
+        "DATABASE_UNAVAILABLE",
+        err instanceof Error
+          ? err.message
+          : "Failed to persist airtime fulfilment outcome",
+        current,
+      );
+    }
+
+    const raced = await this.findById(input.transactionId);
+    if (!raced) {
+      return fulfilmentFailure(
+        "TRANSACTION_NOT_FOUND",
+        `Transaction ${input.transactionId} not found`,
+      );
+    }
+
+    const racedPlan = decide(raced, input);
+    if (racedPlan.kind === "noop") {
+      return mutationSettled(false, racedPlan.record);
+    }
+    if (racedPlan.kind === "error") {
+      return fulfilmentFailure(racedPlan.error, racedPlan.message, raced);
+    }
+
+    return fulfilmentFailure(
+      "DATABASE_UNAVAILABLE",
+      `Concurrent fulfilment update prevented persisting the outcome for transaction ${input.transactionId}`,
+      raced,
+    );
+  }
+
   private mapRow(
     row: typeof agentTransactions.$inferSelect,
   ): TransactionRecord {
@@ -872,6 +1949,22 @@ class FailClosedTransactionRepository implements TransactionRepository {
       code: "DATABASE_UNAVAILABLE",
       message: "Database is unavailable",
     };
+  }
+
+  async acquireAirtimeFulfilmentReservation(): Promise<FulfilmentReservationResult> {
+    return fulfilmentFailure("DATABASE_UNAVAILABLE", "Database is unavailable");
+  }
+
+  async claimAirtimeFulfilmentAttempt(): Promise<FulfilmentAttemptResult> {
+    return fulfilmentFailure("DATABASE_UNAVAILABLE", "Database is unavailable");
+  }
+
+  async recordAirtimeFulfilmentOutcome(): Promise<FulfilmentMutationResult> {
+    return fulfilmentFailure("DATABASE_UNAVAILABLE", "Database is unavailable");
+  }
+
+  async recordAirtimeFulfilmentPreflightFailure(): Promise<FulfilmentMutationResult> {
+    return fulfilmentFailure("DATABASE_UNAVAILABLE", "Database is unavailable");
   }
 }
 

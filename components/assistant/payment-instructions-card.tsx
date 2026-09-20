@@ -25,7 +25,8 @@ import {
 } from "@/lib/celo/attribution";
 import { formatDecimalForDisplay, usdcToBaseUnits } from "@/lib/money/decimal";
 import { cn } from "@/lib/cn";
-
+import { useTransactionStatus } from "@/hooks/use-transaction-status";
+import type { TransactionStage } from "@/lib/transactions/status";
 export interface PaymentInstructions {
   transactionId: string;
   receiveAddress: string;
@@ -53,8 +54,9 @@ export interface PaymentInstructionsCardProps {
   onDepositConfirmed?: (celoTxHash: string) => Promise<{ ok: boolean; error?: string } | void>;
   onBackToPreview?: () => void;
   className?: string;
+  stage?: TransactionStage;
+  stageDescription?: string;
 }
-
 /** 60-second safety margin: deposit must be mined before validUntil */
 export const PAYMENT_EXPIRY_SAFETY_MS = 60_000;
 
@@ -69,6 +71,8 @@ export function PaymentInstructionsCard({
   onDepositConfirmed,
   onBackToPreview,
   className,
+  stage: propStage,
+  stageDescription: propStageDescription,
 }: PaymentInstructionsCardProps) {
   const [copied, setCopied] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -128,14 +132,28 @@ export function PaymentInstructionsCard({
     depositStatus === "submitting";
   const isSettling = depositStatus === "settling" || depositStatus === "confirmed";
   const isVerifyingActive = depositStatus === "verifying" && !displayError;
+
+  const txStatus = useTransactionStatus(instructions?.transactionId, {
+    enabled: Boolean(
+      instructions?.transactionId && (isSettling || Boolean(depositHash)),
+    ),
+  });
+
+  const effectiveStage = propStage ?? txStatus.stage;
+
+  const isFulfilmentTerminalOrActive =
+    effectiveStage === "airtime_delivered" ||
+    effectiveStage === "airtime_processing" ||
+    effectiveStage === "airtime_submitting" ||
+    effectiveStage === "airtime_reconciliation_required";
+
   const isActionDisabled = Boolean(depositHash)
-    ? isSettling || localSubmitting || isVerifyingActive
+    ? isSettling || localSubmitting || isVerifyingActive || isFulfilmentTerminalOrActive
     : isExpired ||
       depositStatus === "submitting" ||
       depositStatus === "verifying" ||
       depositStatus === "settling" ||
       isSubmitting;
-
   // IMPORTANT: Explicit user click ONLY. Never auto-trigger wallet transactions.
   const handlePayClick = async () => {
     // 1. If depositHash already exists: NEVER send another transaction!
@@ -517,26 +535,106 @@ export function PaymentInstructionsCard({
       ) : null}
 
       {/* Settling / Confirmed Notice with Hash */}
+      {/* Settling / Confirmed Notice with Hash and Airtime Steps */}
       {isSettling && depositHash ? (
-        <div className="mt-3 flex items-center justify-between rounded-[10px] border border-provident-green/40 bg-provident-green/10 p-3 text-xs text-ledger-stone">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-provident-green shrink-0" />
-            <div>
-              <p className="font-semibold text-deep-provision">Deposit Confirmed on Celo</p>
-              <p className="font-proof text-receipt-grey text-[11px]">
-                Server verified receipt. Paycrest is now settling the utility order.
-              </p>
+        <div className="mt-3 space-y-2.5 rounded-[10px] border border-provident-green/40 bg-provident-green/10 p-3 text-xs text-ledger-stone">
+          <div className="flex items-center justify-between border-b border-provident-green/20 pb-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-provident-green shrink-0" />
+              <div>
+                <p className="font-semibold text-deep-provision">Deposit Confirmed on Celo</p>
+                <p className="font-proof text-receipt-grey text-[11px]">
+                  Server verified receipt. Paycrest is settling the utility order.
+                </p>
+              </div>
+            </div>
+            <a
+              href={`${CELO_EXPLORER_URL}/tx/${depositHash}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center gap-1 font-proof text-xs font-semibold text-quote-blue hover:underline"
+            >
+              <span>Explorer</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+
+          {/* Airtime Fulfilment Stepper */}
+          <div className="grid gap-2 pt-1 font-proof">
+            {/* Step 1: Celo Deposit */}
+            <div className="flex items-center gap-2 text-[11px]">
+              <CheckCircle2 className="h-3.5 w-3.5 text-provident-green shrink-0" />
+              <span className="font-medium text-ledger-stone">1. Celo Deposit Confirmed</span>
+            </div>
+
+            {/* Step 2: NGN Settlement */}
+            <div className="flex items-center gap-2 text-[11px]">
+              {txStatus.isFiatFinal || txStatus.isFiatDelivered ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-provident-green shrink-0" />
+                  <span className="font-medium text-ledger-stone">2. NGN Settlement Confirmed</span>
+                </>
+              ) : (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-quote-blue shrink-0" />
+                  <span className="text-receipt-grey">2. NGN Settlement Processing...</span>
+                </>
+              )}
+            </div>
+
+            {/* Step 3: Airtime Fulfilment */}
+            <div className="flex items-start gap-2 text-[11px]">
+              {effectiveStage === "airtime_delivered" ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-provident-green shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-provident-green">3. Airtime Delivered</span>
+                    <p className="text-[10px] text-receipt-grey">Delivery verified by ClubKonnect.</p>
+                  </div>
+                </>
+              ) : effectiveStage === "airtime_reconciliation_required" ? (
+                <>
+                  <AlertTriangle className="h-3.5 w-3.5 text-rate-amber shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-rate-amber">3. Provider Status Unresolved</span>
+                    <p className="text-[10px] text-receipt-grey">Status is unresolved; Providus will not submit a duplicate purchase.</p>
+                  </div>
+                </>
+              ) : effectiveStage === "airtime_processing" ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-quote-blue shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-quote-blue">3. Airtime Processing</span>
+                    <p className="text-[10px] text-receipt-grey">Request received; waiting for delivery verification.</p>
+                  </div>
+                </>
+              ) : effectiveStage === "airtime_submitting" ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-quote-blue shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-quote-blue">3. Airtime Request Submitting</span>
+                    <p className="text-[10px] text-receipt-grey">Submitting airtime request to provider.</p>
+                  </div>
+                </>
+              ) : effectiveStage === "failed" ? (
+                <>
+                  <AlertTriangle className="h-3.5 w-3.5 text-loss-red shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-loss-red">3. Airtime Fulfilment Failed</span>
+                    <p className="text-[10px] text-receipt-grey">{propStageDescription || txStatus.stageDescription || "Provider rejected request. Providus does not issue automatic refunds."}</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Clock className="h-3.5 w-3.5 text-receipt-grey shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-receipt-grey">3. Airtime Fulfilment</span>
+                    <p className="text-[10px] text-receipt-grey">Awaiting NGN settlement confirmation before fulfilment.</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
-          <a
-            href={`${CELO_EXPLORER_URL}/tx/${depositHash}`}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="inline-flex items-center gap-1 font-proof text-xs font-semibold text-quote-blue hover:underline"
-          >
-            <span>Explorer</span>
-            <ExternalLink className="h-3 w-3" />
-          </a>
         </div>
       ) : null}
 
@@ -584,6 +682,21 @@ export function PaymentInstructionsCard({
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     <span>Verifying transaction on Celo...</span>
+                  </>
+                ) : effectiveStage === "airtime_delivered" ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                    <span>Airtime Delivered</span>
+                  </>
+                ) : effectiveStage === "airtime_reconciliation_required" ? (
+                  <>
+                    <AlertTriangle className="h-3.5 w-3.5 text-rate-amber" />
+                    <span>Status Unresolved</span>
+                  </>
+                ) : effectiveStage === "airtime_processing" || effectiveStage === "airtime_submitting" ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Fulfilment Processing...</span>
                   </>
                 ) : depositStatus === "settling" ? (
                   <>

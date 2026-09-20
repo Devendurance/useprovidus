@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { reconcileTransaction } from "@/lib/paycrest/server/reconciliation";
+import { reconcileAirtimeFulfilment } from "@/lib/clubkonnect/server/reconciliation";
 import {
   getTransactionRepository,
   toPublicTransactionDto,
@@ -60,6 +61,21 @@ export async function GET(
     }
   }
 
+  if (
+    url.searchParams.get("reconcile") === "true" &&
+    tx.type === "airtime" &&
+    tx.status === "processing"
+  ) {
+    try {
+      const reconcile = await reconcileAirtimeFulfilment(tx.id);
+      if (reconcile.ok && reconcile.transaction) {
+        tx = reconcile.transaction;
+      }
+    } catch {
+      // Reconcile network failure does not block returning current known state
+    }
+  }
+
   const stageInfo = computeTransactionStage(tx);
 
   return NextResponse.json(
@@ -73,6 +89,8 @@ export async function GET(
       isFiatDelivered: stageInfo.isFiatDelivered,
       isProtocolSettled: stageInfo.isProtocolSettled,
       isDepositConfirmed: stageInfo.isDepositConfirmed,
+      isAirtimeDelivered: Boolean(stageInfo.isAirtimeDelivered),
+      isReconciliationRequired: Boolean(stageInfo.isReconciliationRequired),
     },
     { status: 200, headers: NO_STORE },
   );

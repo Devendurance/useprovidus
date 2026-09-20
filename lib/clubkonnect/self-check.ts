@@ -548,9 +548,14 @@ async function run() {
     assert.deepEqual(extractImportSpecifiers('import "server-only";'), ["server-only"]);
 
     // Every server module must guard itself with `server-only` as its first statement.
-    const serverModulePaths = ["config.ts", "client.ts", "status.ts", "index.ts"].map(
-      (name) => `lib/clubkonnect/server/${name}`,
-    );
+    const serverModulePaths = [
+      "config.ts",
+      "client.ts",
+      "status.ts",
+      "index.ts",
+      "orchestration.ts",
+      "reconciliation.ts",
+    ].map((name) => `lib/clubkonnect/server/${name}`);
     for (const modulePath of serverModulePaths) {
       const moduleSource = readFileSync(path.join(REPO_ROOT, modulePath), "utf8");
       assert.match(
@@ -569,11 +574,15 @@ async function run() {
     );
 
     // No client-facing source tree may reach the server boundary or import `server-only`.
+    // Next.js route handlers (`route.ts`) are excluded: they are server-only by
+    // framework contract, never ship to the browser, and must import the server
+    // modules directly to serve the fulfilment and reconciliation endpoints.
     const boundaryViolations: string[] = [];
     for (const dir of CLIENT_SOURCE_DIRS) {
       const dirFiles = listSourceFiles(dir);
       assert.equal(dirFiles.length > 0, true, `Expected ${dir}/ to contain source files to audit`);
       for (const file of dirFiles) {
+        if (/^route\.[cm]?[jt]sx?$/.test(path.basename(file))) continue;
         for (const specifier of extractImportSpecifiers(readFileSync(path.join(REPO_ROOT, file), "utf8"))) {
           if (isServerBoundarySpecifier(specifier)) {
             boundaryViolations.push(`${file} -> ${specifier}`);

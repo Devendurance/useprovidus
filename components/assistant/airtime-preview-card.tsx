@@ -8,6 +8,7 @@ import {
   type PaymentInstructions,
   type DepositProgressionStatus,
 } from "@/components/assistant/payment-instructions-card";
+import type { TransactionStage } from "@/lib/transactions/status";
 import { formatDecimalForDisplay } from "@/lib/money/decimal";
 import { cn } from "@/lib/cn";
 import {
@@ -44,8 +45,9 @@ export interface AirtimePreviewCardProps {
   onPayWithConnectedWallet?: () => Promise<void> | void;
   onDepositConfirmed?: (celoTxHash: string) => Promise<{ ok: boolean; error?: string } | void>;
   className?: string;
+  stage?: TransactionStage;
+  stageDescription?: string;
 }
-
 export function AirtimePreviewCard({
   preview,
   loading = false,
@@ -67,13 +69,14 @@ export function AirtimePreviewCard({
   onPayWithConnectedWallet,
   onDepositConfirmed,
   className,
+  stage,
+  stageDescription,
 }: AirtimePreviewCardProps) {
   const handleConfirm = onConfirmPayment ?? onConfirm;
   const handleRefresh = onRefreshPreview ?? onRefresh;
   const handleEdit = onEditIntent ?? onEdit;
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [localPreparing, setLocalPreparing] = useState(false);
-
   // Live countdown timer for 60s TTL
   useEffect(() => {
     if (!preview?.expiresAt) {
@@ -109,10 +112,11 @@ export function AirtimePreviewCard({
         onDepositConfirmed={onDepositConfirmed}
         onBackToPreview={handleEdit}
         className={className}
+        stage={stage}
+        stageDescription={stageDescription}
       />
     );
   }
-
   const isPreparing = preparingPayment || localPreparing;
   const expiresAtMs = preview?.expiresAt ? Date.parse(preview.expiresAt) : 0;
   const isExpired =
