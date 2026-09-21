@@ -3,7 +3,8 @@
  *
  * One unexpired, unconsumed preview becomes exactly one pending airtime
  * transaction and exactly one Paycrest offramp order, and then the deposit
- * instructions the browser needs to send Celo USDC. Nothing else is trusted:
+ * instructions the browser needs to send the quote's Celo asset (USDC, or cNGN
+ * when the quote was priced in it). Nothing else is trusted:
  * the client supplies only the preview identifier and its wallet context, while
  * amount, phone, network, rate, total, destination account, and reference are
  * all read from the consumed preview row or from server configuration.
@@ -34,6 +35,11 @@ import {
   PREVIEW_STORE_UNAVAILABLE_MESSAGE,
   type PreviewRepository,
 } from "@/lib/assistant/preview-repository";
+import {
+  getPaymentAsset,
+  normalizePaymentAssetSymbol,
+  type PaymentAssetSymbol,
+} from "@/lib/celo/assets";
 import {
   decimalStringsEqual,
   isNonNegativeUsdcDecimal,
@@ -88,6 +94,12 @@ export interface PaymentInstructions {
   baseUsdc?: string;
   senderFeeUsdc?: string;
   transactionFeeUsdc?: string;
+  /**
+   * Asset the deposit must be made in. Absent is the legacy USDC default, so a
+   * USDC order keeps its exact instruction shape, while a non-USDC order always
+   * states the asset it was bound for.
+   */
+  asset?: PaymentAssetSymbol;
 }
 
 export type AirtimePaymentResult =
@@ -203,6 +215,22 @@ export interface BoundTransactionMetadata {
   senderFee: string;
   transactionFee: string;
   totalUsdcToSend: string;
+  /** The asset the order was bound for; absent is the legacy USDC default. */
+  asset?: PaymentAssetSymbol;
+}
+
+/**
+ * The asset a row records. An absent or blank value is the legacy USDC default,
+ * while a value that names no supported asset is a corrupted row — never
+ * silently USDC, because pricing such a row as USDC could make the user send
+ * the wrong token.
+ */
+function readRecordedAsset(
+  value: unknown,
+): PaymentAssetSymbol | undefined | null {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string" && value.trim() === "") return undefined;
+  return normalizePaymentAssetSymbol(value);
 }
 
 /**
@@ -242,10 +270,14 @@ export function validatedBoundTransactionMetadata(
   // so a zero total would be presented as payable while demanding no payment.
   if (decimalStringsEqual(trimmedTotal, "0")) return null;
 
+  const asset = readRecordedAsset(record.metadata?.asset);
+  if (asset === null) return null;
+
   return {
     senderFee,
     transactionFee,
     totalUsdcToSend: trimmedTotal,
+    ...(asset === undefined ? {} : { asset }),
   };
 }
 
@@ -278,6 +310,13 @@ export function instructionsFromBoundTransaction(
   return {
     transactionId: record.id,
     receiveAddress: record.receiveAddress,
+    // Additive-optional: the durable row records the resolved symbol, while the
+    // client-facing instruction states it only when it is not the legacy
+    // default — an absent asset means USDC, so a USDC order keeps the exact
+    // instruction shape it has always had.
+    ...(metadata.asset === undefined || metadata.asset === "USDC"
+      ? {}
+      : { asset: metadata.asset }),
     baseUsdc: record.amountUsdc,
     senderFeeUsdc: metadata.senderFee,
     transactionFeeUsdc: metadata.transactionFee,
@@ -341,6 +380,15 @@ export async function prepareAirtimePaymentOrder(
   }
   // The consumed row is the authoritative quote snapshot for everything below.
   const preview = consumed.preview;
+
+  // The quote's asset is authoritative for this payment. A stored value that
+  // names no supported asset is a corrupted quote: pricing it as USDC could make
+  // the user send the wrong token, so no order is attempted at all.
+  const recordedAsset = readRecordedAsset(preview.asset);
+  if (recordedAsset === null) {
+    return fail("PREVIEW_NOT_USABLE", PREVIEW_NOT_USABLE_MESSAGE);
+  }
+  const paymentAsset = getPaymentAsset(recordedAsset);
 
   // Step 3: pre-order row, gated by the server-derived idempotency key.
   // `paycrestReference` is NOT NULL, so the reference is generated first.
@@ -420,6 +468,8 @@ export async function prepareAirtimePaymentOrder(
       accountIdentifier: settlement.data.accountNumber,
       accountName: settlement.data.accountName,
       memo: settlement.data.memo,
+      // The asset the quote was priced in; USDC keeps the legacy payload.
+      currency: paymentAsset.paycrestToken,
     });
   } catch {
     // The client never throws, so an unexpected throw is an ambiguous outcome.
@@ -484,6 +534,9 @@ export async function prepareAirtimePaymentOrder(
     accountName: settlement.data.accountName,
     accountIdentifierMasked: maskAccountIdentifier(settlement.data.accountNumber),
     reference,
+    // An order the provider priced in another asset is refused outright rather
+    // than bound to a deposit instruction for the wrong token.
+    currency: paymentAsset.paycrestToken,
   });
 
   if (!normalized.ok) {
@@ -513,6 +566,10 @@ export async function prepareAirtimePaymentOrder(
       transactionFee: normalized.order.transactionFee,
       totalUsdcToSend: normalized.order.totalUsdcToSend,
       refundAddress: walletAddress,
+      // The resolved asset is always recorded on a newly prepared order, so the
+      // durable row states what was actually bought; a row without this field
+      // is a legacy USDC order and every reader defaults it to USDC.
+      asset: paymentAsset.symbol,
     },
   });
 

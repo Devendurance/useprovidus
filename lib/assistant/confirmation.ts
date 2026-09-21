@@ -72,6 +72,9 @@ export function validateConfirmationTransition(
       amountNgn: preview.amountNgn,
       phone: preview.phone,
       network: preview.network,
+      // Additive-optional: a legacy USDC quote carries no asset, and the
+      // confirmed payment keeps that exact shape, where absence means USDC.
+      ...(preview.asset === undefined ? {} : { asset: preview.asset }),
       amountUsdc: preview.amountUsdc,
       feeUsdc: "0",
       totalUsdc: preview.totalUsdc,

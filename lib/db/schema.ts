@@ -84,6 +84,9 @@ export type NewAgentTransaction = typeof agentTransactions.$inferInsert;
  * quote value ever has to be trusted from the browser. `consumed_at` and
  * `transaction_id` are written exactly once by the atomic single-use
  * consumption transition, and `expires_at` bounds the 60-second quote window.
+ * `asset` records the supported Celo payment asset the quote was priced in and
+ * defaults to USDC, so a row written before the column existed reads back as a
+ * USDC quote.
  */
 export const airtimePreviews = pgTable(
   "airtime_previews",
@@ -94,6 +97,7 @@ export const airtimePreviews = pgTable(
     amountNgn: text("amount_ngn").notNull(),
     phone: text("phone").notNull(),
     network: text("network").notNull(),
+    asset: text("asset").notNull().default("USDC"),
     rate: text("rate").notNull(),
     amountUsdc: text("amount_usdc").notNull(),
     feeUsdc: text("fee_usdc").notNull().default("0"),
@@ -125,5 +129,16 @@ export const airtimePreviews = pgTable(
   ],
 );
 
-export type AirtimePreviewRecord = typeof airtimePreviews.$inferSelect;
+/**
+ * A stored preview row.
+ *
+ * `asset` is read as optional on purpose: the asset column is not yet migrated
+ * in every environment and hand-built records carry none, so an absent asset
+ * means the legacy USDC default and no reader may assume a value a
+ * pre-migration row cannot have.
+ */
+export type AirtimePreviewRecord = Omit<
+  typeof airtimePreviews.$inferSelect,
+  "asset"
+> & { asset?: string };
 export type NewAirtimePreviewRecord = typeof airtimePreviews.$inferInsert;

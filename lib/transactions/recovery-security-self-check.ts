@@ -7,8 +7,10 @@ import assert from "node:assert/strict";
 import { getAddress, pad, toHex, type Hash, type TransactionReceipt } from "viem";
 import {
   setMockReceiptFetcherForTesting,
+  verifyCeloAssetDepositReceipt,
   verifyCeloUsdcDepositReceipt,
 } from "@/lib/celo/verify-deposit";
+import { CANONICAL_CELO_CNGN_ADDRESS } from "@/lib/celo/assets";
 import { CANONICAL_CELO_USDC_ADDRESS } from "@/lib/celo/usdc";
 import {
   InMemoryTransactionRepository,
@@ -257,6 +259,147 @@ async function run() {
   } finally {
     globalThis.fetch = originalFetch;
   }
+  // 6. cNGN deposits: the same receipt rules against the second supported
+  // Celo asset, with the expected contract supplied by the caller.
+  const cngnAmount = BigInt(10_000_000); // 10 cNGN (6 decimals)
+  const cngnLog = createTransferLog(wallet, receiveAddress, cngnAmount);
+  setMockReceiptFetcherForTesting(
+    async () =>
+      ({
+        status: "success",
+        logs: [
+          {
+            address: CANONICAL_CELO_CNGN_ADDRESS,
+            topics: cngnLog.topics,
+            data: cngnLog.data,
+          },
+        ],
+      }) as unknown as TransactionReceipt,
+  );
+
+  const vCngnValid = await verifyCeloAssetDepositReceipt({
+    txHash: fakeTxHash,
+    expectedSender: wallet,
+    expectedRecipient: receiveAddress,
+    expectedAmountBaseUnits: cngnAmount,
+    expectedTokenAddress: CANONICAL_CELO_CNGN_ADDRESS,
+  });
+  assert.equal(vCngnValid.valid, true, "A canonical cNGN transfer must verify for cNGN");
+  assert.equal(vCngnValid.transferredAmountBaseUnits, cngnAmount);
+  assert.equal(vCngnValid.from, wallet);
+  assert.equal(vCngnValid.to, receiveAddress);
+
+  // The very same receipt can never be accepted as a USDC deposit: the
+  // expected contract decides, and the refusal names it.
+  const vCngnAsUsdc = await verifyCeloAssetDepositReceipt({
+    txHash: fakeTxHash,
+    expectedSender: wallet,
+    expectedRecipient: receiveAddress,
+    expectedAmountBaseUnits: cngnAmount,
+    expectedTokenAddress: CANONICAL_CELO_USDC_ADDRESS,
+  });
+  assert.equal(vCngnAsUsdc.valid, false, "A cNGN log must not verify as a USDC deposit");
+  assert.equal(vCngnAsUsdc.code, "NO_MATCHING_TRANSFER");
+  assert.equal(
+    vCngnAsUsdc.reason?.includes(CANONICAL_CELO_USDC_ADDRESS),
+    true,
+    "The refusal must name the expected token contract",
+  );
+
+  // The USDC wrapper over the same receipt keeps its frozen legacy wording.
+  const vCngnOnUsdcWrapper = await verifyCeloUsdcDepositReceipt({
+    txHash: fakeTxHash,
+    expectedSender: wallet,
+    expectedRecipient: receiveAddress,
+    expectedAmountBaseUnits: cngnAmount,
+  });
+  assert.equal(vCngnOnUsdcWrapper.valid, false);
+  assert.equal(vCngnOnUsdcWrapper.code, "NO_MATCHING_TRANSFER");
+  assert.equal(
+    vCngnOnUsdcWrapper.reason,
+    "No matching Transfer(from, to, value) found in receipt to the expected Paycrest deposit address on canonical Celo USDC contract",
+  );
+
+  // An underfunded cNGN transfer is refused on the cNGN contract too.
+  const cngnPartialLog = createTransferLog(wallet, receiveAddress, BigInt(5_000_000));
+  setMockReceiptFetcherForTesting(
+    async () =>
+      ({
+        status: "success",
+        logs: [
+          {
+            address: CANONICAL_CELO_CNGN_ADDRESS,
+            topics: cngnPartialLog.topics,
+            data: cngnPartialLog.data,
+          },
+        ],
+      }) as unknown as TransactionReceipt,
+  );
+  const vCngnInsufficient = await verifyCeloAssetDepositReceipt({
+    txHash: fakeTxHash,
+    expectedSender: wallet,
+    expectedRecipient: receiveAddress,
+    expectedAmountBaseUnits: cngnAmount,
+    expectedTokenAddress: CANONICAL_CELO_CNGN_ADDRESS,
+  });
+  assert.equal(vCngnInsufficient.valid, false);
+  assert.equal(vCngnInsufficient.code, "INSUFFICIENT_TRANSFER_AMOUNT");
+  assert.equal(vCngnInsufficient.transferredAmountBaseUnits, BigInt(5_000_000));
+
+  // The USDC wrapper still accepts its own canonical contract unchanged.
+  const usdcLog = createTransferLog(wallet, receiveAddress, expectedAmount);
+  setMockReceiptFetcherForTesting(
+    async () =>
+      ({
+        status: "success",
+        logs: [
+          {
+            address: CANONICAL_CELO_USDC_ADDRESS,
+            topics: usdcLog.topics,
+            data: usdcLog.data,
+          },
+        ],
+      }) as unknown as TransactionReceipt,
+  );
+  const vUsdcWrapper = await verifyCeloUsdcDepositReceipt({
+    txHash: fakeTxHash,
+    expectedSender: wallet,
+    expectedRecipient: receiveAddress,
+    expectedAmountBaseUnits: expectedAmount,
+  });
+  assert.equal(vUsdcWrapper.valid, true, "The USDC wrapper still accepts canonical USDC");
+  assert.equal(vUsdcWrapper.transferredAmountBaseUnits, expectedAmount);
+
+  // 7. Public DTO: a non-USDC row states its asset, the legacy USDC shape
+  // never does.
+  const cngnDtoRow = await repo.create({
+    idempotencyKey: "idem_sec_cngn_dto",
+    walletAddress: wallet,
+    amountUsdc: "10.000000",
+    paycrestReference: "ref_sec_cngn_dto",
+    metadata: { asset: "CNGN" },
+  });
+  assert.equal(cngnDtoRow.ok, true);
+  if (!cngnDtoRow.ok) return;
+  assert.equal(toPublicTransactionDto(cngnDtoRow.record).asset, "CNGN");
+
+  const legacyDtoRow: TransactionRecord = { ...preOrder.record };
+  assert.equal(
+    "asset" in toPublicTransactionDto(legacyDtoRow),
+    false,
+    "A row without a recorded asset keeps its legacy USDC DTO shape",
+  );
+
+  const explicitUsdcDtoRow: TransactionRecord = {
+    ...preOrder.record,
+    metadata: { asset: "USDC" },
+  };
+  assert.equal(
+    "asset" in toPublicTransactionDto(explicitUsdcDtoRow),
+    false,
+    "An explicitly USDC row keeps the legacy USDC DTO shape",
+  );
+
   // Clean up mock
   setMockReceiptFetcherForTesting(null);
   setTransactionRepositoryForTesting(null);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAddress, isAddress, type Hash } from "viem";
-import { verifyCeloUsdcDepositReceipt } from "@/lib/celo/verify-deposit";
+import { getPaymentAsset, type PaymentAsset } from "@/lib/celo/assets";
+import { verifyCeloAssetDepositReceipt } from "@/lib/celo/verify-deposit";
 import { usdcToBaseUnits } from "@/lib/money/decimal";
 import {
   getTransactionRepository,
@@ -87,12 +88,32 @@ export async function POST(
     );
   }
 
-  // Compute required USDC base units
+  // The asset the order was actually created for. Absent metadata is the legacy
+  // USDC default; an explicit unsupported symbol is a corrupted row, refused
+  // rather than verified against a guessed token.
+  let paymentAsset: PaymentAsset;
+  try {
+    paymentAsset = getPaymentAsset(tx.metadata?.asset);
+  } catch {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "INVALID_ASSET",
+        error: "Transaction names an unsupported payment asset",
+      },
+      { status: 400, headers: NO_STORE },
+    );
+  }
+
+  // Compute the required base units at the asset's own scale.
   const requiredAmountString =
     tx.metadata?.totalUsdcToSend || tx.amountUsdc;
   let expectedAmountBaseUnits: bigint;
   try {
-    expectedAmountBaseUnits = usdcToBaseUnits(requiredAmountString, 6);
+    expectedAmountBaseUnits = usdcToBaseUnits(
+      requiredAmountString,
+      paymentAsset.decimals,
+    );
   } catch {
     return NextResponse.json(
       {
@@ -105,11 +126,12 @@ export async function POST(
   }
 
   // Authoritative server-side verification of Celo receipt
-  const verification = await verifyCeloUsdcDepositReceipt({
+  const verification = await verifyCeloAssetDepositReceipt({
     txHash: hash,
     expectedSender: getAddress(tx.walletAddress),
     expectedRecipient: getAddress(tx.receiveAddress),
     expectedAmountBaseUnits,
+    expectedTokenAddress: paymentAsset.address,
   });
 
   if (!verification.valid) {

@@ -1,3 +1,4 @@
+import { normalizePaymentAssetSymbol, type PaymentAssetSymbol } from "@/lib/celo/assets";
 import type { TransactionStatus, TransactionType } from "@/lib/db/schema";
 import { sanitizeFailureReason } from "@/lib/transactions/sanitization";
 
@@ -264,6 +265,12 @@ export interface PublicTransactionDto {
   walletAddress: string;
   amountUsdc: string;
   amountNgn: string | null;
+  /**
+   * The asset the order was created for, straight from the row's metadata.
+   * Absent is the legacy USDC default, and a value that names no supported
+   * asset stays absent rather than being surfaced as a guess.
+   */
+  asset?: PaymentAssetSymbol;
   celoTxHash: string | null;
   paycrestOrderId: string | null;
   paycrestReference: string;
@@ -395,6 +402,10 @@ function toPublicFulfilmentDto(
 export function toPublicTransactionDto(
   tx: TransactionRecord,
 ): PublicTransactionDto {
+  // Additive-optional: the row records the resolved symbol, but the public DTO
+  // states the asset only when it is not the legacy default, so an absent value
+  // means USDC and a USDC (or pre-asset) transaction keeps its exact shape.
+  const recordedAsset = normalizePaymentAssetSymbol(tx.metadata?.asset);
   return {
     id: tx.id,
     idempotencyKey: tx.idempotencyKey,
@@ -403,6 +414,9 @@ export function toPublicTransactionDto(
     walletAddress: tx.walletAddress,
     amountUsdc: tx.amountUsdc,
     amountNgn: tx.amountNgn,
+    ...(recordedAsset === null || recordedAsset === "USDC"
+      ? {}
+      : { asset: recordedAsset }),
     celoTxHash: tx.celoTxHash,
     paycrestOrderId: tx.paycrestOrderId,
     paycrestReference: tx.paycrestReference,

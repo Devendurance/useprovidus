@@ -5,6 +5,8 @@
  * belongs in the sibling assistant modules and route handlers.
  */
 
+import type { PaymentAssetSymbol } from "@/lib/celo/assets";
+
 export type PaymentNetwork = "mtn" | "airtel" | "glo" | "9mobile";
 
 export type UnsupportedIntentType =
@@ -30,6 +32,7 @@ export interface AirtimePreview {
   amountNgn: string;
   phone: string;
   network: PaymentNetwork;
+  asset?: PaymentAssetSymbol;
   amountUsdc: string;
   feeUsdc: "0";
   totalUsdc: string;
@@ -42,6 +45,7 @@ export interface ConfirmedAirtimePayment {
   amountNgn: string;
   phone: string;
   network: PaymentNetwork;
+  asset?: PaymentAssetSymbol;
   amountUsdc: string;
   feeUsdc: "0";
   totalUsdc: string;

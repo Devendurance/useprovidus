@@ -19,8 +19,10 @@ import {
   newDiagnosticId,
 } from "@/lib/paycrest/server/upstream-error";
 import type {
+  CeloAssetToken,
   CeloUsdcToken,
   CorridorQuote,
+  CorridorToken,
   InstitutionSummary,
   PaycrestResult,
   PaycrestSide,
@@ -178,6 +180,7 @@ function parseRateSide(
   cryptoAmount: string,
   payload: RateSidePayload,
   checkedAt: string,
+  token: CorridorToken,
 ): CorridorQuote | null {
   const rate = asString(payload.rate);
   if (rate === null || rate.trim() === "") return null;
@@ -198,7 +201,7 @@ function parseRateSide(
     available: true,
     side,
     network: NETWORK,
-    token: TOKEN,
+    token,
     fiat: FIAT,
     cryptoAmount,
     rate: rate.trim(),
@@ -229,14 +232,15 @@ function isNoProviderResponse(
 }
 
 /**
- * Live corridor quote for celo / USDC / NGN.
+ * Live corridor quote for celo / {USDC|cNGN} / NGN.
  * amount is crypto notional (path param) — validated string passed as-is.
  * `options.fetchFn` injects a fetch implementation for tests/self-checks.
+ * `options.token` selects the crypto asset; absent = USDC.
  */
 export async function getCorridorQuote(
   side: PaycrestSide,
   cryptoAmount: string,
-  options?: { fetchFn?: typeof fetch },
+  options?: { fetchFn?: typeof fetch; token?: CorridorToken },
 ): Promise<PaycrestResult<CorridorQuote>> {
   if (side !== "buy" && side !== "sell") {
     return {
@@ -246,11 +250,20 @@ export async function getCorridorQuote(
     };
   }
 
+  const token = options?.token ?? TOKEN;
+  if (token !== TOKEN && token !== "CNGN") {
+    return {
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "token must be USDC or CNGN",
+    };
+  }
+
   const amountCheck = validateCryptoAmount(cryptoAmount);
   if (!amountCheck.ok) return amountCheck;
 
   const amount = amountCheck.data;
-  const path = `/rates/${NETWORK}/${TOKEN}/${encodeURIComponent(amount)}/${FIAT}?side=${side}`;
+  const path = `/rates/${NETWORK}/${token}/${encodeURIComponent(amount)}/${FIAT}?side=${side}`;
   const result = await paycrestFetch(path, undefined, options);
   if (!result.ok) return result;
 
@@ -265,6 +278,7 @@ export async function getCorridorQuote(
         amount,
         sidePayload as RateSidePayload,
         checkedAt,
+        token,
       );
       if (quote) {
         return { ok: true, data: quote };
@@ -282,7 +296,7 @@ export async function getCorridorQuote(
           available: false,
           side,
           network: NETWORK,
-          token: TOKEN,
+          token,
           fiat: FIAT,
           reason: "NO_PROVIDER",
           checkedAt,
@@ -305,7 +319,7 @@ export async function getCorridorQuote(
         available: false,
         side,
         network: NETWORK,
-        token: TOKEN,
+        token,
         fiat: FIAT,
         reason: "NO_PROVIDER",
         checkedAt,
@@ -411,6 +425,8 @@ export async function createOfframpOrder(payload: {
   accountIdentifier: string;
   accountName: string;
   memo?: string;
+  /** Crypto asset for the order; absent = USDC. */
+  currency?: CorridorToken;
 }): Promise<
   PaycrestResult<{ raw: unknown; status: number; diagnosticId: string }>
 > {
@@ -785,36 +801,74 @@ export async function verifyNgnAccountName(input: {
   return { ok: true, data: { accountName } };
 }
 
+/** Token metadata without the symbol, which the caller supplies. */
+type CeloTokenFacts = Omit<CeloAssetToken, "symbol">;
+
+/**
+ * Resolve token metadata for a supported Celo payment asset from Paycrest /tokens.
+ */
+export async function getCeloAssetToken(
+  token: CorridorToken,
+  options?: { fetchFn?: typeof fetch },
+): Promise<PaycrestResult<CeloAssetToken>> {
+  const picked = await fetchCeloTokenFacts(token, options);
+  if (!picked.ok) return picked;
+  return { ok: true, data: { symbol: token, ...picked.data } };
+}
+
+/**
+ * Resolve cNGN token metadata on Celo from Paycrest /tokens.
+ */
+export async function getCeloCngnToken(
+  options?: { fetchFn?: typeof fetch },
+): Promise<PaycrestResult<CeloAssetToken>> {
+  return getCeloAssetToken("CNGN", options);
+}
+
 /**
  * Resolve USDC token metadata on Celo from Paycrest /tokens.
  */
 export async function getCeloUsdcToken(): Promise<
   PaycrestResult<CeloUsdcToken>
 > {
-  const result = await paycrestFetch(`/tokens?network=${NETWORK}`);
+  const picked = await fetchCeloTokenFacts(TOKEN);
+  if (!picked.ok) return picked;
+  return { ok: true, data: { symbol: TOKEN, ...picked.data } };
+}
+
+async function fetchCeloTokenFacts(
+  token: CorridorToken,
+  options?: { fetchFn?: typeof fetch },
+): Promise<PaycrestResult<CeloTokenFacts>> {
+  const result = await paycrestFetch(
+    `/tokens?network=${NETWORK}`,
+    undefined,
+    options,
+  );
   if (!result.ok) return result;
 
   const { status, json } = result.data;
   if (status !== 200) {
     // Fallback without network filter if filtered call fails with 400
     if (status === 400) {
-      const all = await paycrestFetch("/tokens");
+      const all = await paycrestFetch("/tokens", undefined, options);
       if (!all.ok) return all;
       if (all.data.status !== 200) {
         return mapAuthOrUpstream(all.data.status, all.data.json.message);
       }
-      return pickCeloUsdc(all.data.json.data, all.data.status);
+      return pickCeloTokenFacts(all.data.json.data, all.data.status, token);
     }
     return mapAuthOrUpstream(status, json.message);
   }
 
-  return pickCeloUsdc(json.data, status);
+  return pickCeloTokenFacts(json.data, status, token);
 }
 
-function pickCeloUsdc(
+function pickCeloTokenFacts(
   data: unknown,
   httpStatus: number,
-): PaycrestResult<CeloUsdcToken> {
+  token: CorridorToken,
+): PaycrestResult<CeloTokenFacts> {
   if (!Array.isArray(data)) {
     return {
       ok: false,
@@ -829,7 +883,7 @@ function pickCeloUsdc(
     const symbol = asString(item.symbol);
     const network = asString(item.network);
     if (!symbol || !network) continue;
-    if (symbol.toUpperCase() !== TOKEN) continue;
+    if (symbol.toUpperCase() !== token) continue;
     if (network.toLowerCase() !== NETWORK) continue;
 
     const contractAddress = asString(
@@ -840,27 +894,26 @@ function pickCeloUsdc(
       return {
         ok: false,
         code: "PARSE_ERROR",
-        message: "USDC on celo missing contract or decimals",
+        message: `${token} on celo missing contract or decimals`,
         httpStatus,
       };
     }
 
     const baseCurrency = asString(item.baseCurrency ?? item.base_currency);
 
-    const token: CeloUsdcToken = {
-      symbol: TOKEN,
+    const facts: CeloTokenFacts = {
       network: NETWORK,
       contractAddress,
       decimals: Math.trunc(decimals),
     };
-    if (baseCurrency) token.baseCurrency = baseCurrency;
-    return { ok: true, data: token };
+    if (baseCurrency) facts.baseCurrency = baseCurrency;
+    return { ok: true, data: facts };
   }
 
   return {
     ok: false,
     code: "TOKEN_NOT_FOUND",
-    message: "USDC on celo not found in Paycrest tokens",
+    message: `${token} on celo not found in Paycrest tokens`,
     httpStatus,
   };
 }

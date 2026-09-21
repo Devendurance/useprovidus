@@ -787,6 +787,163 @@ async function run() {
     timing.restore();
   }
 
+  /* ------------------------------------------------------------------ */
+  /* 7. cNGN: the same boundary priced in the second supported asset      */
+  /* ------------------------------------------------------------------ */
+
+  // The cNGN section's timing records are captured rather than printed, exactly
+  // like section 6's, so this check keeps emitting only its one result line.
+  const cngnTiming = capturePreviewTiming();
+  try {
+    setPreviewRepositoryForTesting(new InMemoryPreviewRepository());
+
+    // An unsupported asset is refused before the rate lookup: it can never be
+    // quoted or persisted on a preview.
+    const guardedAssetRequests: CorridorRequest[] = [];
+    const invalidAsset = await buildAirtimePreview(
+      { amountNgn: "1000", phone: PHONE, network: "mtn", asset: "BUSD" as never },
+      {
+        fetchFn: stubFetch(200, SELL_CORRIDOR_PAYLOAD, guardedAssetRequests),
+        walletAddress: WALLET_ADDRESS,
+      },
+    );
+    assert.equal(invalidAsset.ok, false);
+    assert.equal(!invalidAsset.ok && invalidAsset.error.code, "INVALID_INTENT");
+    assert.equal(!invalidAsset.ok && invalidAsset.error.retryable, false);
+    assert.equal("data" in invalidAsset, false);
+    assert.equal(guardedAssetRequests.length, 0);
+
+    // A cNGN quote reads the cNGN corridor at the airtime value itself — never
+    // the single-unit USDC notional — and prices the deposit as the exact
+    // ceiling inverse quote at 6 base-unit decimals.
+    const CNGN_AMOUNT_NGN = "1000";
+    const CNGN_SELL_RATE = "0.9";
+    const EXACT_CNGN_AMOUNT_USDC = "1111.111112";
+    const CNGN_SELL_CORRIDOR_PAYLOAD = {
+      status: "success",
+      data: {
+        sell: {
+          rate: CNGN_SELL_RATE,
+          providerIds: ["provider-1"],
+          orderType: "regular",
+          refundTimeoutMinutes: 10,
+        },
+      },
+    };
+
+    const cngnRequests: CorridorRequest[] = [];
+    const cngnResult = await buildAirtimePreview(
+      { amountNgn: CNGN_AMOUNT_NGN, phone: PHONE, network: "mtn", asset: "CNGN" },
+      {
+        fetchFn: stubFetch(200, CNGN_SELL_CORRIDOR_PAYLOAD, cngnRequests),
+        walletAddress: WALLET_ADDRESS,
+      },
+    );
+    assert.equal(cngnResult.ok, true);
+    if (!cngnResult.ok) {
+      throw new Error("expected a cNGN preview");
+    }
+    const cngnPreview = cngnResult.data;
+
+    assert.equal(cngnRequests.length, 1);
+    assert.equal(
+      cngnRequests[0].url,
+      "https://api.paycrest.io/v2/rates/celo/CNGN/1000/NGN?side=sell",
+    );
+    assert.equal(cngnRequests[0].method, "GET");
+    assert.equal(cngnRequests[0].apiKey, "test-key-not-real");
+
+    // Exactly the frozen eleven fields: the ten-field legacy shape plus the
+    // asset the quote was priced in.
+    assert.deepEqual(
+      Object.keys(cngnPreview).sort(),
+      [
+        "amountNgn",
+        "amountUsdc",
+        "asset",
+        "expiresAt",
+        "feeUsdc",
+        "intentFingerprint",
+        "network",
+        "phone",
+        "quotedAt",
+        "rate",
+        "totalUsdc",
+      ].sort(),
+    );
+    assert.equal(cngnPreview.asset, "CNGN");
+
+    // The USDC preview asserted in section 2 keeps its exact ten-field shape:
+    // only a non-USDC quote states what it was priced in.
+    assert.equal("asset" in preview, false);
+    assert.equal(Object.keys(preview).length, 10);
+
+    assert.equal(cngnPreview.amountNgn, CNGN_AMOUNT_NGN);
+    assert.equal(cngnPreview.rate, CNGN_SELL_RATE); // NGN per 1 cNGN, never inverted
+    assert.equal(
+      cngnPreview.amountUsdc,
+      divideDecimalStrings(CNGN_AMOUNT_NGN, CNGN_SELL_RATE, 6, "ceil"),
+    );
+    assert.equal(cngnPreview.amountUsdc, EXACT_CNGN_AMOUNT_USDC);
+    assert.equal(
+      (cngnPreview.amountUsdc as string) === (cngnPreview.amountNgn as string),
+      false,
+      "the cNGN deposit notional is the quote's crypto amount, never the NGN face value",
+    );
+    // Ceiling is load-bearing here too: the truncated quote would not cover it.
+    assert.equal(
+      multiplyDecimalStrings(cngnPreview.amountUsdc, CNGN_SELL_RATE),
+      "1000.0000008",
+    );
+    assert.equal(
+      divideDecimalStrings(CNGN_AMOUNT_NGN, CNGN_SELL_RATE, 6, "floor"),
+      "1111.111111",
+    );
+    assert.equal(cngnPreview.feeUsdc, "0");
+    assert.equal(cngnPreview.totalUsdc, cngnPreview.amountUsdc);
+    assert.equal(
+      cngnPreview.totalUsdc,
+      addDecimalStrings(cngnPreview.amountUsdc, cngnPreview.feeUsdc),
+    );
+    const cngnQuotedMs = Date.parse(cngnPreview.quotedAt);
+    assert.equal(Number.isFinite(cngnQuotedMs), true);
+    assert.equal(Date.parse(cngnPreview.expiresAt) - cngnQuotedMs, 5 * 60_000);
+    assert.equal(
+      cngnPreview.expiresAt,
+      new Date(cngnQuotedMs + PREVIEW_TTL_MS).toISOString(),
+    );
+
+    // A cNGN corridor the provider will not quote is refused with the cNGN
+    // wording: retryable, and never a preview.
+    const cngnUnavailableRequests: CorridorRequest[] = [];
+    const cngnUnavailable = await buildAirtimePreview(
+      { amountNgn: CNGN_AMOUNT_NGN, phone: PHONE, network: "mtn", asset: "CNGN" },
+      {
+        fetchFn: stubFetch(
+          404,
+          { message: "no provider available" },
+          cngnUnavailableRequests,
+        ),
+        walletAddress: WALLET_ADDRESS,
+      },
+    );
+    assert.equal(cngnUnavailable.ok, false);
+    if (cngnUnavailable.ok) {
+      throw new Error("expected no cNGN preview");
+    }
+    assert.equal(cngnUnavailable.error.code, "RATE_UNAVAILABLE");
+    assert.equal(cngnUnavailable.error.retryable, true);
+    assert.equal(cngnUnavailable.error.message.includes("cNGN"), true);
+    assert.equal("data" in cngnUnavailable, false);
+    assert.equal(cngnUnavailableRequests.length, 1);
+    assert.equal(
+      cngnUnavailableRequests[0].url,
+      "https://api.paycrest.io/v2/rates/celo/CNGN/1000/NGN?side=sell",
+    );
+  } finally {
+    cngnTiming.restore();
+  }
+
   console.log("preview self-check: all assertions passed");
 }
 

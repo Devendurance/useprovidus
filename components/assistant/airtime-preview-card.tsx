@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+
 import type { AirtimePreview, ConfirmedAirtimePayment } from "@/lib/assistant/types";
+import type { PaymentAssetSymbol } from "@/lib/celo/assets";
 import type { ConfirmedPaymentState } from "@/hooks/use-assistant";
 import {
   PaymentInstructionsCard,
@@ -31,6 +33,8 @@ export interface AirtimePreviewCardProps {
   confirmed?: boolean;
   confirmedPayment?: ConfirmedPaymentState | ConfirmedAirtimePayment | null;
   paymentInstructions?: PaymentInstructions | null;
+  asset?: PaymentAssetSymbol;
+  onAssetChange?: (asset: PaymentAssetSymbol) => void;
   preparingPayment?: boolean;
   preparationError?: string | null;
   depositStatus?: DepositProgressionStatus;
@@ -55,6 +59,8 @@ export function AirtimePreviewCard({
   confirmed = false,
   confirmedPayment = null,
   paymentInstructions = null,
+  asset: assetProp,
+  onAssetChange,
   preparingPayment = false,
   preparationError = null,
   depositStatus = "awaiting_deposit",
@@ -77,6 +83,8 @@ export function AirtimePreviewCard({
   const handleEdit = onEditIntent ?? onEdit;
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [localPreparing, setLocalPreparing] = useState(false);
+  const displayAsset: PaymentAssetSymbol =
+    assetProp ?? preview?.asset ?? "USDC";
   // Live countdown timer for 5-minute preview TTL
   useEffect(() => {
     if (!preview?.expiresAt) {
@@ -140,9 +148,9 @@ export function AirtimePreviewCard({
     ? `₦${formatDecimalForDisplay(preview.amountNgn)}`
     : null;
 
-  // Format rate: 1 USDC = ₦X,XXX without lossy Number conversions
+  // Format rate: 1 <ASSET> = ₦X,XXX without lossy Number conversions
   const formattedRate = preview?.rate
-    ? `1 USDC = ₦${formatDecimalForDisplay(preview.rate)}`
+    ? `1 ${displayAsset} = ₦${formatDecimalForDisplay(preview.rate)}`
     : null;
 
   const onConfirmClick = async () => {
@@ -197,7 +205,9 @@ export function AirtimePreviewCard({
               </span>
             </div>
             <p className="font-proof text-[11px] text-receipt-grey">
-              Current Celo USDC amount for this airtime
+              {displayAsset === "CNGN"
+                ? "Current Celo cNGN amount for this airtime"
+                : "Current Celo USDC amount for this airtime"}
             </p>
           </div>
         </div>
@@ -241,7 +251,9 @@ export function AirtimePreviewCard({
             Getting a current quote...
           </p>
           <p className="font-proof text-xs text-receipt-grey mt-0.5">
-            Checking the current Celo USDC amount for airtime delivery
+            {displayAsset === "CNGN"
+              ? "Checking the current Celo cNGN amount for airtime delivery"
+              : "Checking the current Celo USDC amount for airtime delivery"}
           </p>
         </div>
       ) : null}
@@ -344,7 +356,7 @@ export function AirtimePreviewCard({
                 </span>
                 <span className="inline-flex items-center gap-1 rounded bg-quote-blue/10 px-1.5 py-0.5 font-proof text-[10px] font-bold text-quote-blue border border-quote-blue/30">
                   <Coins className="h-3 w-3" />
-                  USDC
+                  {displayAsset}
                 </span>
               </div>
 
@@ -354,7 +366,7 @@ export function AirtimePreviewCard({
                 </span>
                 <span className="font-proof tabular-nums text-xl font-bold text-ledger-stone">
                   {formatDecimalForDisplay(preview.amountUsdc)}{" "}
-                  <span className="text-xs font-normal text-receipt-grey">USDC</span>
+                  <span className="text-xs font-normal text-receipt-grey">{displayAsset}</span>
                 </span>
               </div>
 
@@ -363,7 +375,7 @@ export function AirtimePreviewCard({
                 <div className="flex items-center justify-between font-proof">
                   <span className="text-receipt-grey">Celo amount:</span>
                   <span className="font-proof tabular-nums text-ledger-stone">
-                    {formatDecimalForDisplay(preview.amountUsdc)} USDC
+                    {formatDecimalForDisplay(preview.amountUsdc)} {displayAsset}
                   </span>
                 </div>
                 <div className="flex items-center justify-between font-proof">
@@ -442,6 +454,38 @@ export function AirtimePreviewCard({
                 <p className="mt-0.5 text-receipt-grey">
                   Payment instructions are ready. Your wallet approval is still required.
                 </p>
+              </div>
+            </div>
+          ) : null}
+          {/* Asset Selector: switching requests a fresh preview, never reprices in place */}
+          {onAssetChange && !isConfirmed && !effectiveInstructions ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-ledger-edge bg-receipt-field/60 p-2.5">
+              <span className="font-proof text-[11px] text-receipt-grey">
+                Pay with:
+              </span>
+              <div className="flex items-center gap-1.5" role="group" aria-label="Payment asset">
+                {(["USDC", "CNGN"] as const).map((symbol) => {
+                  const selected = displayAsset === symbol;
+                  return (
+                    <button
+                      key={symbol}
+                      type="button"
+                      onClick={() => {
+                        if (!selected && !loading && !isPreparing) onAssetChange(symbol);
+                      }}
+                      disabled={loading || isPreparing || selected}
+                      aria-pressed={selected}
+                      className={cn(
+                        "inline-flex min-h-[30px] items-center rounded-[6px] border px-2.5 py-1 font-display text-[11px] font-semibold transition-all disabled:cursor-default",
+                        selected
+                          ? "border-ledger bg-ledger-stone text-clear-paper"
+                          : "border-ledger-edge bg-clear-paper text-receipt-grey hover:border-ledger hover:text-ledger-stone disabled:opacity-60",
+                      )}
+                    >
+                      {symbol === "CNGN" ? "cNGN" : symbol}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : null}

@@ -68,7 +68,7 @@ import {
   type AirtimePaymentResult,
   type PaymentInstructions,
 } from "@/lib/assistant/payment-service";
-import { usdcToBaseUnits } from "@/lib/money/decimal";
+import { divideDecimalStrings, usdcToBaseUnits } from "@/lib/money/decimal";
 import {
   InMemoryTransactionRepository,
   setTransactionRepositoryForTesting,
@@ -229,13 +229,15 @@ function paycrestOrderPayload(overrides?: {
   transactionFee?: FeeOverride;
   orderId?: string;
   validUntil?: string;
+  token?: string;
+  rate?: string;
 }): unknown {
   const data: Record<string, unknown> = {
     id: overrides?.orderId ?? "pc_ord_selfcheck_1",
     status: "initiated",
     amount: overrides?.amount ?? AMOUNT_USDC,
-    rate: RATE,
-    token: "USDC",
+    rate: overrides?.rate ?? RATE,
+    token: overrides?.token ?? "USDC",
     providerAccount: {
       network: "celo",
       receiveAddress: RECEIVE_ADDRESS,
@@ -1903,6 +1905,125 @@ async function run() {
     assert.equal(missingBody.ok, false);
     assert.equal("paymentInstructions" in missingBody, false);
     assert.equal("paymentInstructionsError" in missingBody, false);
+
+    /* ------------------------------------------------------------------ */
+    /* 10. cNGN: the quote's asset drives the order, the binding and the    */
+    /*     instructions end to end                                          */
+    /* ------------------------------------------------------------------ */
+
+    applyValidSettlementEnv();
+
+    const cngnAmountNgn = "1000";
+    const cngnRate = "0.9";
+    // The exact ceiling inverse quote for the cNGN corridor: 1000 / 0.9 at 6
+    // base-unit decimals, rounded up so the deposit can never under-fund it.
+    const cngnAmountUsdc = divideDecimalStrings(cngnAmountNgn, cngnRate, 6, "ceil");
+    assert.equal(cngnAmountUsdc, "1111.111112", "cNGN quote is the ceiling inverse");
+    assert.equal(cngnAmountUsdc === (cngnAmountNgn as string), false);
+    const cngnTotalUsdc = "1111.861112"; // ceil quote + provider fees below
+
+    const cngnSandbox = newSandbox();
+    const cngnValidUntil = new Date(Date.now() + 600_000).toISOString();
+    stubFetch(() =>
+      jsonResponse(
+        201,
+        paycrestOrderPayload({
+          orderId: "pc_ord_cngn_1",
+          validUntil: cngnValidUntil,
+          token: "CNGN",
+          rate: cngnRate,
+          amount: cngnAmountUsdc,
+          senderFee: "0.5",
+          transactionFee: "0.25",
+        }),
+      ),
+    );
+    const cngnPreview = await seedPreview(cngnSandbox, {
+      asset: "CNGN",
+      amountNgn: cngnAmountNgn,
+      rate: cngnRate,
+      amountUsdc: cngnAmountUsdc,
+      totalUsdc: cngnAmountUsdc,
+    });
+    assert.equal(cngnPreview.asset, "CNGN");
+
+    const cngnInstructions = expectInstructions(
+      await prepare(cngnSandbox, cngnPreview.id),
+    );
+    assert.equal(cngnInstructions.asset, "CNGN", "the instruction names the cNGN asset");
+    assert.equal(cngnInstructions.baseUsdc, cngnAmountUsdc);
+    assert.equal(cngnInstructions.senderFeeUsdc, "0.5");
+    assert.equal(cngnInstructions.transactionFeeUsdc, "0.25");
+    assert.equal(cngnInstructions.totalUsdcToSend, cngnTotalUsdc);
+    assert.equal(cngnInstructions.receiveAddress, RECEIVE_ADDRESS);
+    assert.equal(cngnInstructions.validUntil, cngnValidUntil);
+    assert.equal(fetchCalls.length, 1);
+
+    const cngnOutgoing = fetchCalls[0].body as unknown as OutgoingOrderBody;
+    assert.equal(cngnOutgoing.amount, cngnAmountUsdc, "the cNGN order is priced in the ceil quote");
+    assert.equal(cngnOutgoing.source.currency, "CNGN");
+    assert.equal(cngnOutgoing.source.network, "celo");
+    assert.equal(cngnOutgoing.source.refundAddress, WALLET.toLowerCase());
+    assert.equal(cngnOutgoing.destination.recipient.memo, MEMO);
+
+    const cngnStored = await cngnSandbox.transactions.findById(
+      cngnInstructions.transactionId,
+    );
+    assert.notEqual(cngnStored, null);
+    if (!cngnStored) return;
+    assert.equal(cngnStored.status, "pending");
+    assert.equal(cngnStored.amountUsdc, cngnAmountUsdc);
+    assert.equal(cngnStored.amountNgn, cngnAmountNgn);
+    assert.equal(cngnStored.metadata?.asset, "CNGN");
+    assert.equal(cngnStored.metadata?.rate, cngnRate);
+    assert.equal(cngnStored.metadata?.totalUsdcToSend, cngnTotalUsdc);
+    assert.equal(cngnStored.paycrestOrderId, "pc_ord_cngn_1");
+
+    // A provider order priced in another asset than the quote is refused
+    // outright: the deposit instruction would name the wrong token.
+    const cngnMismatchSandbox = newSandbox();
+    stubFetch(() =>
+      jsonResponse(
+        201,
+        paycrestOrderPayload({
+          orderId: "pc_ord_cngn_mismatch",
+          validUntil: cngnValidUntil,
+          token: "USDC",
+          amount: cngnAmountUsdc,
+        }),
+      ),
+    );
+    const cngnMismatchPreview = await seedPreview(cngnMismatchSandbox, {
+      asset: "CNGN",
+      amountNgn: cngnAmountNgn,
+      rate: cngnRate,
+      amountUsdc: cngnAmountUsdc,
+      totalUsdc: cngnAmountUsdc,
+    });
+
+    const cngnMismatchResult = await prepare(
+      cngnMismatchSandbox,
+      cngnMismatchPreview.id,
+    );
+    const cngnMismatchError = expectError(cngnMismatchResult);
+    assert.equal(cngnMismatchError.code, "PAYCREST_BIND_FAILED");
+    assert.equal(
+      "data" in cngnMismatchResult,
+      false,
+      "a currency mismatch never yields instructions",
+    );
+    assert.equal(fetchCalls.length, 1, "a currency mismatch is never retried");
+
+    const cngnMismatchRow =
+      await cngnMismatchSandbox.transactions.findByIdempotencyKey(
+        `idem_airtime_${cngnMismatchPreview.id}`,
+      );
+    assert.notEqual(cngnMismatchRow, null);
+    assert.equal(cngnMismatchRow?.status, "failed");
+    assert.equal(cngnMismatchRow?.failureCode, "ORDER_RESPONSE_UNSAFE");
+    assert.equal(cngnMismatchRow?.failureReason, "Unexpected order currency");
+    assert.equal(cngnMismatchRow?.paycrestOrderId, null);
+    assert.equal(cngnMismatchRow?.metadata?.asset, undefined);
 
     console.log("payment-service self-check: all assertions passed");
   } finally {

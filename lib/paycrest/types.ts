@@ -1,6 +1,6 @@
 export type PaycrestSide = "buy" | "sell";
 export type CorridorNetwork = "celo";
-export type CorridorToken = "USDC";
+export type CorridorToken = "USDC" | "CNGN";
 export type CorridorFiat = "NGN";
 
 export type CorridorQuote =
@@ -8,7 +8,7 @@ export type CorridorQuote =
       available: true;
       side: PaycrestSide;
       network: "celo";
-      token: "USDC";
+      token: CorridorToken;
       fiat: "NGN";
       cryptoAmount: string;
       rate: string; // fiat per 1 token as string from Paycrest
@@ -22,7 +22,7 @@ export type CorridorQuote =
       available: false;
       side: PaycrestSide;
       network: "celo";
-      token: "USDC";
+      token: CorridorToken;
       fiat: "NGN";
       reason: "NO_PROVIDER";
       checkedAt: string;
@@ -37,6 +37,15 @@ export type InstitutionSummary = {
 
 export type CeloUsdcToken = {
   symbol: "USDC";
+  network: "celo";
+  contractAddress: string;
+  decimals: number;
+  baseCurrency?: string;
+};
+
+/** Paycrest /tokens entry for any supported Celo payment asset. */
+export type CeloAssetToken = {
+  symbol: CorridorToken;
   network: "celo";
   contractAddress: string;
   decimals: number;

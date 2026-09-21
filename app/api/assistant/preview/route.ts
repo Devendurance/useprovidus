@@ -5,6 +5,12 @@
  * the Paycrest sell rate and returns the exact inverse quote plus a 5-minute
  * TTL and the intent fingerprint. The client never sees a provider credential
  * or a raw provider payload.
+ *
+ * The optional `asset` selector (query and body) names the supported Celo asset
+ * to price in. An absent, null, or blank value is the legacy USDC default — a
+ * caller that always sends the field still gets a USDC quote — while any other
+ * value must be a supported symbol (case-insensitively) and is otherwise a
+ * malformed request, never a silent fallback to USDC.
  */
 
 import { NextResponse } from "next/server";
@@ -13,6 +19,7 @@ import {
   type AirtimePreviewErrorCode,
   type AirtimePreviewIntent,
 } from "@/lib/assistant/preview";
+import { normalizePaymentAssetSymbol, type PaymentAssetSymbol } from "@/lib/celo/assets";
 import type { PaymentNetwork } from "@/lib/assistant/types";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +27,7 @@ export const revalidate = 0;
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 
-/** Small JSON payloads only; the preview intent is three short fields. */
+/** Small JSON payloads only; the preview intent is a few short fields. */
 const MAX_BODY_BYTES = 4 * 1024;
 
 type RouteErrorCode = AirtimePreviewErrorCode | "INVALID_REQUEST" | "BODY_TOO_LARGE";
@@ -66,20 +73,29 @@ async function previewResponse(intent: AirtimePreviewIntent, walletAddress: stri
   );
 }
 
-/** GET /api/assistant/preview?amountNgn=…&phone=…&network=…&walletAddress=… */
+/** GET /api/assistant/preview?amountNgn=…&phone=…&network=…&walletAddress=…&asset=… */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const rawAsset = searchParams.get("asset");
+  const asset =
+    rawAsset === null || rawAsset.trim() === ""
+      ? undefined
+      : normalizePaymentAssetSymbol(rawAsset);
+  if (asset === null) {
+    return errorResponse("INVALID_REQUEST", "Unsupported payment asset");
+  }
   return previewResponse(
     {
       amountNgn: searchParams.get("amountNgn") ?? "",
       phone: searchParams.get("phone") ?? "",
       network: (searchParams.get("network") ?? "") as PaymentNetwork,
+      asset,
     },
     searchParams.get("walletAddress") ?? "",
   );
 }
 
-/** POST /api/assistant/preview with a JSON body of the same four fields. */
+/** POST /api/assistant/preview with a JSON body of the same fields. */
 export async function POST(request: Request) {
   let raw: string;
   try {
@@ -102,6 +118,18 @@ export async function POST(request: Request) {
   }
 
   const body = parsed as Record<string, unknown>;
+  const rawAsset = body.asset;
+  const asset: PaymentAssetSymbol | undefined | null =
+    rawAsset === undefined ||
+    rawAsset === null ||
+    (typeof rawAsset === "string" && rawAsset.trim() === "")
+      ? undefined
+      : typeof rawAsset === "string"
+        ? normalizePaymentAssetSymbol(rawAsset)
+        : null;
+  if (asset === null) {
+    return errorResponse("INVALID_REQUEST", "Unsupported payment asset");
+  }
 
   return previewResponse(
     {
@@ -110,6 +138,7 @@ export async function POST(request: Request) {
       network: (typeof body.network === "string"
         ? body.network
         : "") as PaymentNetwork,
+      asset,
     },
     typeof body.walletAddress === "string" ? body.walletAddress : "",
   );

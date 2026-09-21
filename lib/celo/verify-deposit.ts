@@ -19,6 +19,15 @@ export interface VerifyDepositParams {
   expectedAmountBaseUnits: bigint;
 }
 
+/**
+ * Asset-agnostic deposit verification: the expected token contract is supplied
+ * by the caller, so the same rules cover every supported Celo payment asset.
+ */
+export interface VerifyCeloAssetDepositParams extends VerifyDepositParams {
+  /** Canonical ERC-20 contract the deposit must have moved. */
+  expectedTokenAddress: Address;
+}
+
 export interface VerifyDepositResult {
   valid: boolean;
   code?: string;
@@ -39,23 +48,25 @@ export function setMockReceiptFetcherForTesting(
 }
 
 /**
- * Authoritative server-side verification of a Celo USDC deposit transaction.
+ * Authoritative server-side verification of a Celo deposit transaction for one
+ * expected ERC-20 token.
  *
  * Checks:
  * 1. Transaction exists on Celo mainnet and status === 'success'
- * 2. Emits an ERC-20 Transfer event on Circle's canonical USDC contract
+ * 2. Emits an ERC-20 Transfer event on the expected token's contract
  * 3. Transfer recipient ('to') matches expected Paycrest deposit address
  * 4. Transfer sender ('from') matches expected user wallet
  * 5. Transferred value matches or exceeds required amount
  */
-export async function verifyCeloUsdcDepositReceipt(
-  params: VerifyDepositParams,
+export async function verifyCeloAssetDepositReceipt(
+  params: VerifyCeloAssetDepositParams,
 ): Promise<VerifyDepositResult> {
   const {
     txHash,
     expectedSender,
     expectedRecipient,
     expectedAmountBaseUnits,
+    expectedTokenAddress,
   } = params;
 
   if (!isAddress(expectedSender) || !isAddress(expectedRecipient)) {
@@ -66,8 +77,19 @@ export async function verifyCeloUsdcDepositReceipt(
     };
   }
 
+  // A token contract that is not an address can never be matched, and guessing
+  // one would verify a deposit against the wrong asset.
+  if (!isAddress(expectedTokenAddress)) {
+    return {
+      valid: false,
+      code: "INVALID_TOKEN_ADDRESS",
+      reason: "Expected token address is invalid",
+    };
+  }
+
   const checksummedSender = getAddress(expectedSender);
   const checksummedRecipient = getAddress(expectedRecipient);
+  const checksummedToken = getAddress(expectedTokenAddress);
 
   let receipt: TransactionReceipt | null = null;
 
@@ -107,9 +129,9 @@ export async function verifyCeloUsdcDepositReceipt(
     };
   }
 
-  // Scan logs for Transfer event on Canonical USDC contract
+  // Scan logs for a Transfer event on the expected token contract
   for (const log of receipt.logs) {
-    if (getAddress(log.address) !== CANONICAL_CELO_USDC_ADDRESS) {
+    if (getAddress(log.address) !== checksummedToken) {
       continue;
     }
 
@@ -163,7 +185,32 @@ export async function verifyCeloUsdcDepositReceipt(
   return {
     valid: false,
     code: "NO_MATCHING_TRANSFER",
-    reason:
-      "No matching Transfer(from, to, value) found in receipt to the expected Paycrest deposit address on canonical Celo USDC contract",
+    reason: `No matching Transfer(from, to, value) found in receipt to the expected Paycrest deposit address on the expected Celo token contract ${checksummedToken}`,
   };
+}
+
+/**
+ * The historical USDC refusal wording. The generic verifier names the expected
+ * token contract, but this wrapper's callers have always been told by name that
+ * the deposit must land on the canonical Celo USDC contract, so its result is
+ * kept byte-identical.
+ */
+const LEGACY_USDC_NO_MATCHING_TRANSFER_REASON =
+  "No matching Transfer(from, to, value) found in receipt to the expected Paycrest deposit address on canonical Celo USDC contract";
+
+/**
+ * USDC deposit verification: Circle's canonical Celo USDC contract is the only
+ * accepted token, and every other rule is the shared asset rule above.
+ */
+export async function verifyCeloUsdcDepositReceipt(
+  params: VerifyDepositParams,
+): Promise<VerifyDepositResult> {
+  const result = await verifyCeloAssetDepositReceipt({
+    ...params,
+    expectedTokenAddress: CANONICAL_CELO_USDC_ADDRESS,
+  });
+  if (result.code === "NO_MATCHING_TRANSFER") {
+    return { ...result, reason: LEGACY_USDC_NO_MATCHING_TRANSFER_REASON };
+  }
+  return result;
 }

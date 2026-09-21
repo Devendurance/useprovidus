@@ -32,6 +32,8 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
     preview,
     previewLoading,
     previewError,
+    asset,
+    selectAsset,
     confirmedPayment,
     confirmPayment,
     refreshPreview,
@@ -106,6 +108,36 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
         </div>
       </div>
 
+      {/* Payment asset selector: switching requests a fresh preview via selectAsset */}
+      {activeIntent && activeIntent.type === "airtime" && activeIntent.readyForConfirmation && !paymentInstructions ? (
+        <div className="border-b border-ledger-edge/80 bg-receipt-field/60 px-3 pt-3 sm:px-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-ledger-edge bg-clear-paper px-3 py-2">
+            <span className="font-proof text-[11px] text-receipt-grey">
+              Pay with:
+            </span>
+            <div className="flex items-center gap-1.5" role="group" aria-label="Payment asset">
+              {(["USDC", "CNGN"] as const).map((symbol) => {
+                const selected = asset === symbol;
+                return (
+                  <button
+                    key={symbol}
+                    type="button"
+                    onClick={() => {
+                      if (!selected && !previewLoading && !preparingPayment) selectAsset(symbol);
+                    }}
+                    disabled={previewLoading || preparingPayment || selected}
+                    aria-pressed={selected}
+                    className="inline-flex min-h-[30px] items-center rounded-[6px] border px-2.5 py-1 font-display text-[11px] font-semibold transition-all disabled:cursor-default border-ledger-edge bg-clear-paper text-receipt-grey hover:border-ledger hover:text-ledger-stone disabled:opacity-60 data-[selected=true]:border-ledger data-[selected=true]:bg-ledger-stone data-[selected=true]:text-clear-paper"
+                    data-selected={selected}
+                  >
+                    {symbol === "CNGN" ? "cNGN" : symbol}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* Active Intent Draft Card Preview (Docked if active) */}
       {activeIntent ? (
         <div className="border-b border-ledger-edge/80 bg-receipt-field/60 p-3 sm:p-4">

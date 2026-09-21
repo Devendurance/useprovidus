@@ -577,6 +577,120 @@ function run() {
   ]);
   assert.equal("amountIn" in fetchBody, false);
 
+  // --- cNGN order currency contract (asset-agnostic corridor) ---
+  // The provider's reported token decides whether an order may be bound: a
+  // cNGN-priced quote is only payable by a cNGN order, and a legacy USDC
+  // expectation may never accept one.
+  const cngnResponse = {
+    status: "success",
+    data: {
+      id: "order-cngn-123",
+      status: "initiated",
+      amount: "50",
+      senderFee: "0.1",
+      transactionFee: "0.05",
+      rate: "900",
+      token: "CNGN",
+      providerAccount: {
+        network: "celo",
+        receiveAddress: receive,
+        validUntil,
+      },
+    },
+  };
+
+  const normCngn = normalizeCashOutOrderResponse(cngnResponse, {
+    ...expectedInfo,
+    currency: "CNGN",
+  });
+  assert.equal(normCngn.ok, true);
+  if (normCngn.ok) {
+    assert.equal(normCngn.order.currency, "CNGN");
+    assert.equal(normCngn.order.amount, "50");
+    assert.equal(normCngn.order.senderFee, "0.1");
+    assert.equal(normCngn.order.transactionFee, "0.05");
+    assert.equal(normCngn.order.totalUsdcToSend, "50.15");
+    assert.equal(normCngn.order.rate, "900");
+  }
+
+  // The reported token is compared case-insensitively.
+  const lowercaseToken = JSON.parse(
+    JSON.stringify(cngnResponse),
+  ) as typeof cngnResponse;
+  lowercaseToken.data.token = "cngn";
+  const normCngnLower = normalizeCashOutOrderResponse(lowercaseToken, {
+    ...expectedInfo,
+    currency: "CNGN",
+  });
+  assert.equal(normCngnLower.ok, true);
+  if (normCngnLower.ok) {
+    assert.equal(normCngnLower.order.currency, "CNGN");
+  }
+
+  // A USDC-priced provider order can never satisfy a cNGN expectation...
+  const usdcTokenResponse = JSON.parse(
+    JSON.stringify(cngnResponse),
+  ) as typeof cngnResponse;
+  usdcTokenResponse.data.token = "USDC";
+  const normUsdcAsCngn = normalizeCashOutOrderResponse(usdcTokenResponse, {
+    ...expectedInfo,
+    currency: "CNGN",
+  });
+  assert.equal(normUsdcAsCngn.ok, false);
+  if (!normUsdcAsCngn.ok) {
+    assert.equal(normUsdcAsCngn.code, "ORDER_RESPONSE_UNSAFE");
+    assert.equal(normUsdcAsCngn.message, "Unexpected order currency");
+  }
+
+  // ...and a cNGN order can never satisfy the legacy USDC default.
+  const normCngnAsLegacy = normalizeCashOutOrderResponse(
+    cngnResponse,
+    expectedInfo,
+  );
+  assert.equal(normCngnAsLegacy.ok, false);
+  if (!normCngnAsLegacy.ok) {
+    assert.equal(normCngnAsLegacy.code, "ORDER_RESPONSE_UNSAFE");
+    assert.equal(normCngnAsLegacy.message, "Unexpected order currency");
+  }
+
+  // The outgoing payload carries the asset the order was priced in; an absent
+  // currency keeps the legacy USDC wire value.
+  const cngnPayload = buildOfframpOrderPayload({
+    amount: "1",
+    reference: "p4b_cngn_ref",
+    refundAddress: refund,
+    institution: "GTBINGLA",
+    accountIdentifier: "0123456789",
+    accountName: "TEST USER",
+    currency: "CNGN",
+  });
+  assert.equal(cngnPayload.amount, "1");
+  assert.equal(cngnPayload.source.currency, "CNGN");
+  assert.equal(cngnPayload.source.network, "celo");
+  assert.equal(cngnPayload.destination.currency, "NGN");
+  assert.equal(cngnPayload.reference, "p4b_cngn_ref");
+
+  const defaultCurrencyPayload = buildOfframpOrderPayload({
+    amount: "1",
+    reference: "p4b_default_ref",
+    refundAddress: refund,
+    institution: "GTBINGLA",
+    accountIdentifier: "0123456789",
+    accountName: "TEST USER",
+  });
+  assert.equal(defaultCurrencyPayload.source.currency, "USDC");
+
+  const explicitUsdcPayload = buildOfframpOrderPayload({
+    amount: "1",
+    reference: "p4b_usdc_ref",
+    refundAddress: refund,
+    institution: "GTBINGLA",
+    accountIdentifier: "0123456789",
+    accountName: "TEST USER",
+    currency: "USDC",
+  });
+  assert.equal(explicitUsdcPayload.source.currency, "USDC");
+
   console.log("order self-check (P4B.4): all assertions passed");
 }
 

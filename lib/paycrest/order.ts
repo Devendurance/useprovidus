@@ -12,6 +12,7 @@ import {
 } from "@/lib/money/decimal";
 import { validateUsdcAmount } from "@/lib/money/usdc-amount";
 import { CANONICAL_CELO_USDC } from "@/lib/celo/usdc";
+import type { CorridorToken } from "@/lib/paycrest/types";
 
 /** Providus safety margin before Paycrest validUntil (ms). */
 export const PAYMENT_EXPIRY_SAFETY_MS = 60_000;
@@ -35,6 +36,8 @@ export type NormalizedCashOutOrder = {
   reference: string;
   status: string;
   amount: string;
+  /** Crypto asset for `amount`/`totalUsdcToSend`; absent = legacy USDC. */
+  currency?: CorridorToken;
   rate: string | null;
   senderFee: string;
   transactionFee: string;
@@ -147,6 +150,8 @@ export function normalizeCashOutOrderResponse(
     accountName: string;
     accountIdentifierMasked: string;
     reference: string;
+    /** Asset expected from the frozen preview; absent = USDC. */
+    currency?: CorridorToken;
   },
 ): OrderNormalizeResult {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -314,10 +319,14 @@ export function normalizeCashOutOrderResponse(
     };
   }
 
-  const currency = asString(
+  const expectedCurrency: CorridorToken = expected.currency ?? "USDC";
+  const reportedCurrency = asString(
     dig(data, "token", "currency", "cryptoCurrency", "fromCurrency"),
   );
-  if (currency && currency.toUpperCase() !== "USDC") {
+  if (
+    reportedCurrency &&
+    reportedCurrency.toUpperCase() !== expectedCurrency.toUpperCase()
+  ) {
     return {
       ok: false,
       code: "ORDER_RESPONSE_UNSAFE",
@@ -334,6 +343,10 @@ export function normalizeCashOutOrderResponse(
       reference: expected.reference,
       status,
       amount,
+      // Additive-optional like every other asset field: absent is the legacy
+      // USDC default, so a USDC order keeps its exact normalized shape and the
+      // cash-out API response is unchanged. Only a non-USDC order states it.
+      ...(expectedCurrency === "USDC" ? {} : { currency: expectedCurrency }),
       rate,
       senderFee,
       transactionFee,

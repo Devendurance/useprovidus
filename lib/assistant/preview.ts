@@ -1,10 +1,14 @@
 /**
  * Server-only airtime preview: the inverse-quote boundary.
  *
- * The Paycrest sell rate is NGN per 1 USDC, so the USDC amount a user must
- * provide for a given NGN airtime value is `amountNgn / rate`, rounded upward
- * at 6 USDC fractional digits. All arithmetic is exact decimal-string math —
- * never floating point — so a preview can never under-fund a payment.
+ * The Paycrest sell rate is NGN per 1 unit of the quote's asset, so the crypto
+ * amount a user must provide for a given NGN airtime value is `amountNgn /
+ * rate`, rounded upward at 6 base-unit decimals — the scale both supported Celo
+ * assets use. USDC is read at a single-unit notional; cNGN's corridor is
+ * minimum-gated by the provider, so it is read at the airtime value itself and
+ * never below a gate this module would have to know. All arithmetic is exact
+ * decimal-string math — never floating point — so a preview can never
+ * under-fund a payment.
  */
 
 import "server-only";
@@ -23,6 +27,11 @@ import {
   normalizePaymentNetwork,
   normalizePhoneNumber,
 } from "@/lib/assistant/validation";
+import {
+  getPaymentAsset,
+  normalizePaymentAssetSymbol,
+  type PaymentAssetSymbol,
+} from "@/lib/celo/assets";
 import { addDecimalStrings, divideDecimalStrings } from "@/lib/money/decimal";
 import { getCorridorQuote } from "@/lib/paycrest/server/client";
 import type { CorridorQuote, PaycrestResult } from "@/lib/paycrest/types";
@@ -36,8 +45,21 @@ export const SELL_NOTIONAL_USDC = "1";
 /** P4 fee: airtime previews carry no separate fee. */
 export const PREVIEW_FEE_USDC = "0";
 
-/** Fractional USDC digits the inverse quote is rounded (up) to. */
+/**
+ * Fractional base-unit digits the inverse quote is rounded (up) to. Both
+ * supported Celo payment assets carry 6 decimals, so the same scale prices the
+ * frozen `amountUsdc` / `totalUsdc` wire fields either way.
+ */
 export const PREVIEW_USDC_DECIMALS = 6;
+
+/**
+ * cNGN's sell corridor is minimum-gated by the provider, so a quote can be
+ * refused for a value USDC's single-unit probe still answers. The refusal names
+ * cNGN and stays retryable; the provider's minimum is never hardcoded and no
+ * rate is ever assumed in its place.
+ */
+const CNGN_RATE_UNAVAILABLE_MESSAGE =
+  "No cNGN sell rate is available for this amount right now; the cNGN provider minimum for this corridor may not be met";
 
 export type AirtimePreviewErrorCode =
   | "INCOMPLETE_INTENT"
@@ -68,6 +90,11 @@ export interface AirtimePreviewIntent {
   amountNgn: string;
   phone: string;
   network: PaymentNetwork;
+  /**
+   * Asset the airtime value is priced in. Absent or blank is the legacy USDC
+   * default; an unsupported value is refused before any network call.
+   */
+  asset?: PaymentAssetSymbol;
 }
 
 export interface AirtimePreviewOptions {
@@ -78,6 +105,11 @@ export interface AirtimePreviewOptions {
    * normalized address, and only this wallet may later consume it.
    */
   walletAddress?: string;
+  /**
+   * Asset seam for a caller that prices through the options. The intent's own
+   * `asset` is authoritative and always wins when it is present.
+   */
+  asset?: PaymentAssetSymbol;
 }
 
 function failure(
@@ -93,6 +125,17 @@ type IntentCheck =
   | { ok: false; error: AirtimePreviewError };
 
 /**
+ * The asset a preview is priced in. An absent or blank value is the legacy USDC
+ * default; every other value must name a supported symbol, so an unsupported
+ * asset can never reach the rate lookup or be persisted on a quote.
+ */
+function normalizePreviewAsset(value: unknown): PaymentAssetSymbol | null {
+  if (value === undefined || value === null) return "USDC";
+  if (typeof value === "string" && value.trim() === "") return "USDC";
+  return normalizePaymentAssetSymbol(value);
+}
+
+/**
  * Canonicalizes the caller's fields and rejects an incomplete or invalid
  * intent *before* any network call, so a preview is never tied to partial
  * input.
@@ -101,7 +144,20 @@ function normalizePreviewIntent(raw: {
   amountNgn: string;
   phone: string;
   network: PaymentNetwork;
+  asset?: PaymentAssetSymbol;
 }): IntentCheck {
+  const asset = normalizePreviewAsset(raw.asset);
+  if (asset === null) {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_INTENT",
+        message: "Airtime payment asset is not valid",
+        retryable: false,
+      },
+    };
+  }
+
   const hasAmount = typeof raw.amountNgn === "string" && raw.amountNgn.trim() !== "";
   const hasPhone = typeof raw.phone === "string" && raw.phone.trim() !== "";
   const hasNetwork =
@@ -133,7 +189,7 @@ function normalizePreviewIntent(raw: {
     };
   }
 
-  return { ok: true, intent: { amountNgn, phone, network } };
+  return { ok: true, intent: { amountNgn, phone, network, asset } };
 }
 
 /**
@@ -152,12 +208,13 @@ function normalizePreviewWallet(value: string | undefined): string | null {
  * Builds the frozen `AirtimePreview` for a normalized airtime intent and
  * persists it as the server-authoritative quote.
  *
- * Fetches the Paycrest sell corridor rate with a 1 USDC notional and treats it
- * as NGN per 1 USDC, computes the exact ceiling inverse quote, stamps the
- * 5-minute TTL and the intent fingerprint, then stores the whole quote bound
- * to the caller's wallet. Never returns a preview for an incomplete intent, an
- * invalid wallet, a failed quote, an unusable rate, or a quote that could not
- * be persisted — an unpersisted quote could never be consumed for payment.
+ * Fetches the Paycrest sell corridor rate for the quote's asset and treats it
+ * as NGN per 1 unit of that asset, computes the exact ceiling inverse quote,
+ * stamps the 5-minute TTL and the intent fingerprint, then stores the whole
+ * quote bound to the caller's wallet. Never returns a preview for an incomplete
+ * intent, an unsupported asset, an invalid wallet, a failed quote, an unusable
+ * rate, or a quote that could not be persisted — an unpersisted quote could
+ * never be consumed for payment.
  *
  * Every call that reaches the rate lookup emits one safe `preview_timing`
  * record holding only durations, so a slow Paycrest read or a slow write is
@@ -171,9 +228,16 @@ export async function buildAirtimePreview(
 ): Promise<AirtimePreviewResult> {
   const startedAt = Date.now();
 
-  const checked = normalizePreviewIntent(intent);
+  const checked = normalizePreviewIntent({
+    ...intent,
+    // The intent is authoritative; the options are only a seam for callers that
+    // do not carry the asset on the intent itself.
+    asset: intent?.asset ?? options?.asset,
+  });
   if (!checked.ok) return { ok: false, error: checked.error };
-  const { amountNgn, phone, network } = checked.intent;
+  const { amountNgn, phone, network, asset } = checked.intent;
+  const paymentAsset = getPaymentAsset(asset);
+  const isCngn = paymentAsset.paycrestToken === "CNGN";
 
   const walletAddress = normalizePreviewWallet(options?.walletAddress);
   if (walletAddress === null) {
@@ -215,9 +279,14 @@ export async function buildAirtimePreview(
   const rateLookupStartedAt = Date.now();
   let quote: PaycrestResult<CorridorQuote>;
   try {
-    quote = await getCorridorQuote("sell", SELL_NOTIONAL_USDC, {
-      fetchFn: options?.fetchFn,
-    });
+    // USDC answers at a single-unit notional. cNGN is minimum-gated downstream,
+    // so its corridor is read at the airtime value itself: the returned rate is
+    // still NGN per 1 cNGN, just at a notional the provider will quote.
+    quote = await getCorridorQuote(
+      "sell",
+      isCngn ? amountNgn : SELL_NOTIONAL_USDC,
+      { fetchFn: options?.fetchFn, token: paymentAsset.paycrestToken },
+    );
   } catch (error) {
     // A lookup that throws is still timed, and the error is rethrown unchanged:
     // instrumentation must never alter or mask a failure.
@@ -233,7 +302,13 @@ export async function buildAirtimePreview(
   }
   if (!quote.data.available) {
     return withTiming(
-      failure("RATE_UNAVAILABLE", "No Paycrest sell rate is available right now", true),
+      failure(
+        "RATE_UNAVAILABLE",
+        isCngn
+          ? CNGN_RATE_UNAVAILABLE_MESSAGE
+          : "No Paycrest sell rate is available right now",
+        true,
+      ),
     );
   }
 
@@ -247,6 +322,8 @@ export async function buildAirtimePreview(
     );
   }
 
+  // Base units of the quote's asset, at the scale the frozen `amountUsdc` and
+  // `totalUsdc` wire fields carry: 6 decimals for both USDC and cNGN.
   const amountUsdc = divideDecimalStrings(
     amountNgn,
     rate,
@@ -283,6 +360,7 @@ export async function buildAirtimePreview(
       amountNgn,
       phone,
       network,
+      asset: paymentAsset.symbol,
       rate,
       amountUsdc,
       feeUsdc,
@@ -316,6 +394,9 @@ export async function buildAirtimePreview(
       amountNgn,
       phone,
       network,
+      // Additive-optional: USDC keeps the frozen legacy shape, where an absent
+      // asset means USDC, and only a non-USDC quote states what it was priced in.
+      ...(isCngn ? { asset: paymentAsset.symbol } : {}),
       amountUsdc,
       feeUsdc,
       totalUsdc,

@@ -1,0 +1,1 @@
+ALTER TABLE "airtime_previews" ADD COLUMN "asset" text DEFAULT 'USDC' NOT NULL;

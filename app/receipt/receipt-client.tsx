@@ -9,6 +9,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { RouteCheckCTA } from "@/components/ui/route-check-cta";
 import { useProvidusWallet } from "@/hooks/use-providus-wallet";
 import { formatDecimalForDisplay } from "@/lib/money/decimal";
+import { CANONICAL_CELO_CNGN_ADDRESS, getPaymentAsset } from "@/lib/celo/assets";
 import { CELO_EXPLORER_URL } from "@/lib/wallet/celo";
 import { ACTIVE_CELO_ATTRIBUTION_TAG } from "@/lib/celo/attribution";
 import type { PublicTransactionDto } from "@/lib/transactions/types";
@@ -131,12 +132,17 @@ export function ReceiptClient() {
   const tx = data?.transaction;
   const isAirtime = tx?.type === "airtime";
   const fulfilment = tx?.fulfilment;
+  let settlementSymbol: "USDC" | "CNGN" = "USDC";
+  try {
+    settlementSymbol = getPaymentAsset(tx?.asset).symbol;
+  } catch {
+    settlementSymbol = "USDC";
+  }
   const isCompleted = isReceiptComplete(
     tx?.type,
     data?.isFiatFinal,
     data?.isAirtimeDelivered,
   );
-
   return (
     <div className="container-providus py-10 sm:py-14">
       <div className="max-w-2xl">
@@ -241,7 +247,7 @@ export function ReceiptClient() {
                   {isAirtime ? "Airtime Top-Up" : "Cash-Out"}
                 </span>
                 <CardTitle className="text-xl mt-0.5">
-                  {tx.amountNgn ? `₦${formatDecimalForDisplay(tx.amountNgn)}` : `${tx.amountUsdc} USDC`}
+                  {tx.amountNgn ? `₦${formatDecimalForDisplay(tx.amountNgn)}` : `${tx.amountUsdc} ${settlementSymbol}`}
                 </CardTitle>
               </div>
               <div className="flex items-center gap-2">
@@ -268,11 +274,17 @@ export function ReceiptClient() {
                 </div>
               ) : null}
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 border-b border-ledger-edge/40 py-1">
-                <dt className="text-receipt-grey">Celo USDC paid</dt>
+                <dt className="text-receipt-grey">{settlementSymbol === "CNGN" ? "Celo cNGN paid" : "Celo USDC paid"}</dt>
                 <dd className="text-right font-semibold text-ledger-stone tabular-nums">
-                  {tx.metadata?.totalUsdcToSend ? `${tx.metadata.totalUsdcToSend} USDC` : `${tx.amountUsdc} USDC`}
+                  {tx.metadata?.totalUsdcToSend ? `${tx.metadata.totalUsdcToSend} ${settlementSymbol}` : `${tx.amountUsdc} ${settlementSymbol}`}
                 </dd>
               </div>
+              {settlementSymbol === "CNGN" ? (
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 border-b border-ledger-edge/40 py-1">
+                  <dt className="text-receipt-grey">Settlement token contract</dt>
+                  <dd className="max-w-[65%] break-all text-right font-mono text-ledger-stone">{CANONICAL_CELO_CNGN_ADDRESS}</dd>
+                </div>
+              ) : null}
 
               {tx.celoTxHash ? (
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 border-b border-ledger-edge/40 py-1">

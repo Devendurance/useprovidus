@@ -17,7 +17,7 @@ import {
   CheckCircle2,
   Tag,
 } from "lucide-react";
-import { CANONICAL_CELO_USDC } from "@/lib/celo/usdc";
+import { getPaymentAsset, type PaymentAsset, type PaymentAssetSymbol } from "@/lib/celo/assets";
 import { CELO_CHAIN_ID, CELO_EXPLORER_URL } from "@/lib/wallet/celo";
 import {
   ACTIVE_CELO_ATTRIBUTION_TAG,
@@ -35,6 +35,7 @@ export interface PaymentInstructions {
   baseUsdc?: string;
   senderFeeUsdc?: string;
   transactionFeeUsdc?: string;
+  asset?: PaymentAssetSymbol;
 }
 
 export type DepositProgressionStatus =
@@ -48,7 +49,7 @@ export type DepositProgressionStatus =
 
 export interface PaymentInstructionsCardProps {
   instructions: PaymentInstructions;
-  preview?: { amountUsdc?: string } | null;
+  preview?: { amountUsdc?: string; asset?: PaymentAssetSymbol } | null;
   status?: DepositProgressionStatus;
   depositStatus?: DepositProgressionStatus;
   depositHash?: string | null;
@@ -84,9 +85,18 @@ export function PaymentInstructionsCard({
   const [localSubmitting, setLocalSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  let asset: PaymentAsset;
+  let assetError: string | null = null;
+  try {
+    asset = getPaymentAsset(instructions.asset);
+  } catch {
+    asset = getPaymentAsset(undefined);
+    assetError = "Payment asset is unsupported. Request a fresh quote before paying.";
+  }
+  const assetSymbol = asset.symbol;
   const depositStatus = propDepositStatus ?? status;
   const currentStatus = depositStatus;
-  const displayError = depositError ?? error ?? localError;
+  const displayError = assetError ?? depositError ?? error ?? localError;
   // Check if Wagmi context is available for direct wallet submission
   const wagmiContext = useContext(WagmiContext);
   const hasWagmi = Boolean(wagmiContext);
@@ -154,7 +164,8 @@ export function PaymentInstructionsCard({
 
   const isActionDisabled = Boolean(depositHash)
     ? isSettling || localSubmitting || isVerifyingActive || isFulfilmentTerminalOrActive
-    : isExpired ||
+    : Boolean(assetError) ||
+      isExpired ||
       depositStatus === "submitting" ||
       depositStatus === "verifying" ||
       depositStatus === "settling" ||
@@ -186,6 +197,7 @@ export function PaymentInstructionsCard({
 
     // 2. Initial transfer: Only when NO depositHash exists
     if (
+      assetError ||
       isExpired ||
       depositStatus === "submitting" ||
       depositStatus === "verifying" ||
@@ -220,7 +232,7 @@ export function PaymentInstructionsCard({
 
     setLocalSubmitting(true);
     try {
-      const amountBaseUnits = usdcToBaseUnits(instructions.totalUsdcToSend, 6);
+      const amountBaseUnits = usdcToBaseUnits(instructions.totalUsdcToSend, asset.decimals);
       const taggedCalldata = buildTaggedTransferCalldata(
         instructions.receiveAddress as Address,
         amountBaseUnits,
@@ -228,7 +240,7 @@ export function PaymentInstructionsCard({
 
       wagmiSend.sendTransaction(
         {
-          to: CANONICAL_CELO_USDC.address,
+          to: asset.address,
           data: taggedCalldata,
           chainId: CELO_CHAIN_ID,
         },
@@ -419,7 +431,7 @@ export function PaymentInstructionsCard({
 
       {/* Main Payment Details Grid */}
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {/* Authoritative USDC Amount Box */}
+        {/* Authoritative Asset Amount Box */}
         <div className="rounded-[10px] border border-ledger-edge bg-receipt-field p-3.5">
           <div className="flex items-center justify-between">
             <span className="font-proof text-xs text-receipt-grey">
@@ -434,7 +446,7 @@ export function PaymentInstructionsCard({
             <span className="font-proof tabular-nums text-2xl font-bold text-ledger-stone">
               {formatDecimalForDisplay(instructions.totalUsdcToSend)}
             </span>
-            <span className="font-proof text-sm text-receipt-grey">USDC</span>
+            <span className="font-proof text-sm text-receipt-grey">{assetSymbol}</span>
           </div>
 
           {/* Truthful Fee Breakdown */}
@@ -443,17 +455,17 @@ export function PaymentInstructionsCard({
               <span className="text-receipt-grey">Base deposit:</span>
               <span className="font-proof tabular-nums text-ledger-stone">
                 {instructions.baseUsdc
-                  ? `${formatDecimalForDisplay(instructions.baseUsdc)} USDC`
+                  ? `${formatDecimalForDisplay(instructions.baseUsdc)} ${assetSymbol}`
                   : preview?.amountUsdc
-                    ? `${formatDecimalForDisplay(preview.amountUsdc)} USDC`
-                    : `${formatDecimalForDisplay(instructions.totalUsdcToSend)} USDC`}
+                    ? `${formatDecimalForDisplay(preview.amountUsdc)} ${assetSymbol}`
+                    : `${formatDecimalForDisplay(instructions.totalUsdcToSend)} ${assetSymbol}`}
               </span>
             </div>
             <div className="flex items-center justify-between font-proof">
               <span className="text-receipt-grey">Provider fee (Paycrest):</span>
               <span className="font-proof tabular-nums text-ledger-stone">
                 {instructions.senderFeeUsdc
-                  ? `${formatDecimalForDisplay(instructions.senderFeeUsdc)} USDC`
+                  ? `${formatDecimalForDisplay(instructions.senderFeeUsdc)} ${assetSymbol}`
                   : "Included"}
               </span>
             </div>
@@ -461,19 +473,21 @@ export function PaymentInstructionsCard({
               <span className="text-receipt-grey">Network fee:</span>
               <span className="font-proof tabular-nums text-ledger-stone">
                 {instructions.transactionFeeUsdc
-                  ? `${formatDecimalForDisplay(instructions.transactionFeeUsdc)} USDC`
-                  : "0 USDC"}
+                  ? `${formatDecimalForDisplay(instructions.transactionFeeUsdc)} ${assetSymbol}`
+                  : `0 ${assetSymbol}`}
               </span>
             </div>
             <div className="flex items-center justify-between font-proof border-t border-ledger-edge/40 pt-1 font-semibold text-ledger-stone">
               <span>Total to send:</span>
               <span className="font-proof tabular-nums">
-                {formatDecimalForDisplay(instructions.totalUsdcToSend)} USDC
+                {formatDecimalForDisplay(instructions.totalUsdcToSend)} {assetSymbol}
               </span>
             </div>
           </div>
           <p className="mt-2 text-[11px] font-proof text-receipt-grey border-t border-ledger-edge/60 pt-2">
-            Canonical Circle USDC on Celo ({CANONICAL_CELO_USDC.decimals} decimals). Do not send more or less.
+            {assetSymbol === "CNGN"
+              ? `cNGN on Celo (${asset.decimals} decimals, Africa Stablecoin Consortium). Do not send more or less.`
+              : `Canonical Circle USDC on Celo (${asset.decimals} decimals). Do not send more or less.`}
           </p>
         </div>
 

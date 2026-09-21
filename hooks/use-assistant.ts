@@ -12,6 +12,7 @@ import type {
   AssistantChatResponse,
   UserConversationMessage,
 } from "@/lib/assistant/types";
+import { normalizePaymentAssetSymbol, type PaymentAssetSymbol } from "@/lib/celo/assets";
 import type {
   PaymentInstructions,
   DepositProgressionStatus,
@@ -50,10 +51,12 @@ export function isPreviewFresh(
 
 /**
  * Checks whether an AirtimePreview matches the current active intent.
+ * Asset-aware with USDC defaulting: absent preview/intent asset is USDC.
  */
 export function doesPreviewMatchIntent(
   preview: AirtimePreview | null,
   intent: PaymentIntent | null,
+  asset?: unknown,
 ): boolean {
   if (
     !preview ||
@@ -63,6 +66,11 @@ export function doesPreviewMatchIntent(
   ) {
     return false;
   }
+  const expectedAsset: PaymentAssetSymbol =
+    normalizePaymentAssetSymbol(asset) ?? "USDC";
+  const previewAsset: PaymentAssetSymbol =
+    normalizePaymentAssetSymbol(preview.asset) ?? "USDC";
+  if (previewAsset !== expectedAsset) return false;
   return (
     preview.amountNgn === intent.amountNgn &&
     preview.phone === intent.phone &&
@@ -145,6 +153,12 @@ export function coerceRehydratedInstructions(
   ) {
     return null;
   }
+  const rawAsset = candidate.asset;
+  const assetIsAbsent =
+    rawAsset === undefined ||
+    rawAsset === null ||
+    (typeof rawAsset === "string" && rawAsset.trim() === "");
+  if (!assetIsAbsent && normalizePaymentAssetSymbol(rawAsset) === null) return null;
   const frozen: PaymentInstructions = Object.freeze({
     transactionId,
     receiveAddress,
@@ -153,6 +167,7 @@ export function coerceRehydratedInstructions(
     ...(typeof candidate.baseUsdc === "string" ? { baseUsdc: candidate.baseUsdc } : {}),
     ...(typeof candidate.senderFeeUsdc === "string" ? { senderFeeUsdc: candidate.senderFeeUsdc } : {}),
     ...(typeof candidate.transactionFeeUsdc === "string" ? { transactionFeeUsdc: candidate.transactionFeeUsdc } : {}),
+    ...(assetIsAbsent ? {} : { asset: normalizePaymentAssetSymbol(rawAsset) as PaymentAssetSymbol }),
   });
   return frozen;
 }
@@ -222,6 +237,7 @@ export interface UseAssistantState {
   previewId: string | null;
   previewLoading: boolean;
   previewError: string | null;
+  asset: PaymentAssetSymbol;
   confirmedPayment: ConfirmedPaymentState | null;
   paymentInstructions: PaymentInstructions | null;
   preparingPayment: boolean;
@@ -242,6 +258,7 @@ export interface UseAssistantOptions {
 export interface UseAssistantResult extends UseAssistantState {
   send(message: string): Promise<void>;
   reset(): void;
+  selectAsset(asset: PaymentAssetSymbol): void;
   confirmPayment(walletOverride?: string): Promise<void>;
   refreshPreview(): Promise<void>;
   editIntent(): void;
@@ -295,6 +312,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [asset, setAsset] = useState<PaymentAssetSymbol>("USDC");
   const [confirmedPayment, setConfirmedPayment] =
     useState<ConfirmedPaymentState | null>(null);
 
@@ -320,6 +338,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     paymentInstructions,
   );
   const messagesRef = useRef<ConversationMessage[]>(messages);
+  const assetRef = useRef<PaymentAssetSymbol>(asset);
   const prevIntentTupleRef = useRef<string | null>(null);
 
   // Wallet address resolution
@@ -351,6 +370,10 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     messagesRef.current = messages;
   }, [messages]);
 
+  useEffect(() => {
+    assetRef.current = asset;
+  }, [asset]);
+
   // Clean up any pending request on unmount
   useEffect(() => {
     return () => {
@@ -369,6 +392,8 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       previewAbortControllerRef.current = null;
     }
     prevIntentTupleRef.current = null;
+    assetRef.current = "USDC";
+    setAsset("USDC");
     setMessages([]);
     setActiveIntent(null);
     setError(null);
@@ -387,6 +412,24 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     setRehydratedTransactionId(null);
     setRehydrating(false);
     setRehydrationError(null);
+  }, []);
+
+  const selectAsset = useCallback((next: PaymentAssetSymbol) => {
+    const normalized = normalizePaymentAssetSymbol(next) ?? "USDC";
+    if (assetRef.current === normalized) return;
+    setAsset(normalized);
+    assetRef.current = normalized;
+    prevIntentTupleRef.current = null;
+    setPreview(null);
+    setPreviewId(null);
+    setConfirmedPayment(null);
+    setPaymentInstructions(null);
+    setPreviewError(null);
+    setPreparingPayment(false);
+    setPreparationError(null);
+    setDepositStatus("pending");
+    setDepositHash(null);
+    setDepositError(null);
   }, []);
 
   const send = useCallback(async (content: string) => {
@@ -475,7 +518,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     }
   }, []);
 
-  const fetchPreview = useCallback(async (intent: AirtimeIntent) => {
+  const fetchPreview = useCallback(async (intent: AirtimeIntent, assetOverride?: PaymentAssetSymbol) => {
     if (
       !intent.amountNgn ||
       !intent.phone ||
@@ -495,11 +538,15 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     setPreviewError(null);
 
     try {
+      const requestedAsset = assetOverride ?? assetRef.current;
       const params = new URLSearchParams({
         amountNgn: intent.amountNgn,
         phone: intent.phone,
         network: intent.network,
       });
+      if (requestedAsset !== "USDC") {
+        params.set("asset", requestedAsset);
+      }
 
       const currentWallet = targetWalletRef.current;
       if (currentWallet) {
@@ -556,10 +603,11 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
         return;
       }
 
+      const currentAsset = assetRef.current;
       const expectedFingerprint = await computeIntentFingerprintClient(currentActive);
       if (
         json.preview.intentFingerprint !== expectedFingerprint ||
-        !doesPreviewMatchIntent(json.preview, currentActive)
+        !doesPreviewMatchIntent(json.preview, currentActive, currentAsset)
       ) {
         // Discard stale or mismatched preview from out-of-order response
         return;
@@ -618,7 +666,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       return;
     }
 
-    const currentTuple = `${activeIntent.amountNgn ?? ""}:${activeIntent.phone ?? ""}:${activeIntent.network ?? ""}`;
+    const currentTuple = `${activeIntent.amountNgn ?? ""}:${activeIntent.phone ?? ""}:${activeIntent.network ?? ""}:${asset}`;
 
     if (currentTuple !== prevIntentTupleRef.current) {
       prevIntentTupleRef.current = currentTuple;
@@ -627,9 +675,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       setConfirmedPayment(null);
       setPaymentInstructions(null);
       setPreviewError(null);
-      fetchPreview(activeIntent);
+      fetchPreview(activeIntent, asset);
     }
-  }, [activeIntent, fetchPreview]);
+  }, [activeIntent, asset, fetchPreview]);
 
   // Auto-invalidate confirmedPayment as soon as quote expiresAt is reached,
   // unless paymentInstructions have already been generated (in which case validUntil governs).
@@ -667,6 +715,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       const currentIntent = activeIntentRef.current;
       const currentPreview = previewRef.current;
       const currentPreviewId = previewIdRef.current;
+      const currentAsset = assetRef.current;
       const targetWallet =
         walletOverride ??
         targetWalletRef.current ??
@@ -690,8 +739,8 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
         return;
       }
 
-      // Matching check: intent fields must match preview
-      if (!doesPreviewMatchIntent(currentPreview, currentIntent)) {
+      // Matching check: intent fields and selected asset must match preview
+      if (!doesPreviewMatchIntent(currentPreview, currentIntent, currentAsset)) {
         setPreparationError("Quote does not match the active intent. Please refresh.");
         return;
       }
@@ -732,6 +781,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
           baseUsdc?: string;
           senderFeeUsdc?: string;
           transactionFeeUsdc?: string;
+          asset?: PaymentAssetSymbol;
           error?: { code?: string; message?: string };
         } | null = null;
 
@@ -766,6 +816,20 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
           return;
         }
 
+        const rawResponseAsset: unknown = json.asset;
+        const responseAssetAbsent =
+          rawResponseAsset === undefined ||
+          rawResponseAsset === null ||
+          (typeof rawResponseAsset === "string" && rawResponseAsset.trim() === "");
+        const responseAsset = responseAssetAbsent
+          ? undefined
+          : normalizePaymentAssetSymbol(rawResponseAsset);
+        const resolvedAsset = responseAsset ?? "USDC";
+        if (responseAsset === null || resolvedAsset !== currentAsset) {
+          setPreparationError("Quote does not match the active intent. Please refresh.");
+          return;
+        }
+
         const instructions: PaymentInstructions = Object.freeze({
           transactionId: json.transactionId,
           receiveAddress: json.receiveAddress,
@@ -774,12 +838,15 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
           ...(typeof json.baseUsdc === "string" ? { baseUsdc: json.baseUsdc } : {}),
           ...(typeof json.senderFeeUsdc === "string" ? { senderFeeUsdc: json.senderFeeUsdc } : {}),
           ...(typeof json.transactionFeeUsdc === "string" ? { transactionFeeUsdc: json.transactionFeeUsdc } : {}),
+          ...(resolvedAsset === "USDC" ? {} : { asset: resolvedAsset }),
         });
 
+        const snapshotAsset = normalizePaymentAssetSymbol(currentPreview.asset) ?? "USDC";
         const snapshot: ConfirmedPaymentState = Object.freeze({
           amountNgn: currentPreview.amountNgn,
           phone: currentPreview.phone,
           network: currentPreview.network,
+          ...(snapshotAsset === "USDC" ? {} : { asset: snapshotAsset }),
           amountUsdc: currentPreview.amountUsdc,
           feeUsdc: currentPreview.feeUsdc,
           totalUsdc: currentPreview.totalUsdc,
@@ -1000,7 +1067,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     ) {
       return;
     }
-    await fetchPreview(currentIntent);
+    await fetchPreview(currentIntent, assetRef.current);
   }, [fetchPreview]);
 
   const editIntent = useCallback(() => {
@@ -1131,6 +1198,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     previewId,
     previewLoading,
     previewError,
+    asset,
     confirmedPayment,
     paymentInstructions,
     preparingPayment,
@@ -1143,6 +1211,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     rehydrationError,
     send,
     reset,
+    selectAsset,
     confirmPayment,
     refreshPreview,
     editIntent,

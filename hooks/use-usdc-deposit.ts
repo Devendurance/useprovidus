@@ -7,7 +7,7 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import type { Address, Hash } from "viem";
-import { CANONICAL_CELO_USDC } from "@/lib/celo/usdc";
+import { getPaymentAsset, type PaymentAsset } from "@/lib/celo/assets";
 import { usdcToBaseUnits } from "@/lib/money/decimal";
 import {
   calculateMaxCeloGasFee,
@@ -135,11 +135,19 @@ export function useUsdcDeposit(onConfirmed?: (hash: Hash) => void) {
         return;
       }
 
+      let asset: PaymentAsset;
+      try {
+        asset = getPaymentAsset(order.currency);
+      } catch {
+        setLocalError("Unsupported payment asset");
+        return;
+      }
+
       let value: bigint;
       try {
-        value = usdcToBaseUnits(order.totalUsdcToSend, CANONICAL_CELO_USDC.decimals);
+        value = usdcToBaseUnits(order.totalUsdcToSend, asset.decimals);
       } catch {
-        setLocalError("Invalid USDC total for transfer");
+        setLocalError(`Invalid ${asset.symbol} total for transfer`);
         return;
       }
 
@@ -152,16 +160,16 @@ export function useUsdcDeposit(onConfirmed?: (hash: Hash) => void) {
       setUiPhase("submitting");
 
       try {
-        // c. USDC Balance Refetch & Verification
+        // c. Asset Balance Refetch & Verification
         const balance = await publicClient.readContract({
-          address: CANONICAL_CELO_USDC.address,
+          address: asset.address,
           abi: erc20BalanceOfAbi,
           functionName: "balanceOf",
           args: [walletAddress],
         });
 
         if (balance < value) {
-          setLocalError("Insufficient USDC balance");
+          setLocalError(`Insufficient ${asset.symbol} balance`);
           setUiPhase("idle");
           return;
         }
@@ -175,7 +183,7 @@ export function useUsdcDeposit(onConfirmed?: (hash: Hash) => void) {
         // e. CELO Native Gas Check with tagged calldata
         const celoBalance = await publicClient.getBalance({ address: walletAddress });
         const gasEstimate = await publicClient.estimateGas({
-          to: CANONICAL_CELO_USDC.address,
+          to: asset.address,
           data: taggedCalldata,
           account: walletAddress,
         });
@@ -190,7 +198,7 @@ export function useUsdcDeposit(onConfirmed?: (hash: Hash) => void) {
 
         // f. Explicit Simulation with tagged calldata
         await publicClient.call({
-          to: CANONICAL_CELO_USDC.address,
+          to: asset.address,
           data: taggedCalldata,
           account: walletAddress,
         });
@@ -205,7 +213,7 @@ export function useUsdcDeposit(onConfirmed?: (hash: Hash) => void) {
 
         // h. Wallet Execution with tagged calldata
         sendTransaction({
-          to: CANONICAL_CELO_USDC.address,
+          to: asset.address,
           data: taggedCalldata,
           chainId: CELO_CHAIN_ID,
         });

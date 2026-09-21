@@ -7,6 +7,8 @@
  * Docs: https://docs.paycrest.io/api-reference/sender/initiate-payment-order-v2
  */
 
+import type { CorridorToken } from "@/lib/paycrest/types";
+
 export type OfframpOrderPayloadInput = {
   amount: string;
   reference: string;
@@ -16,11 +18,13 @@ export type OfframpOrderPayloadInput = {
   accountName: string;
   /** Payment narration; required by V2FiatRecipient. */
   memo?: string;
+  /** Crypto asset sent on Celo; absent = USDC. */
+  currency?: CorridorToken;
 };
 
 /**
- * Exact JSON body sent to Paycrest for USDC/celo → NGN bank offramp.
- * - amount: decimal string (not number)
+ * Exact JSON body sent to Paycrest for USDC or cNGN on celo → NGN bank offramp.
+ * - amount: decimal string (not number) in base units of `source.currency`
  * - amountIn omitted (defaults to crypto per OpenAPI)
  * - memo always set (required by schema)
  * - no rate/senderFee unless caller adds later via a different builder
@@ -29,7 +33,7 @@ export function buildOfframpOrderPayload(input: OfframpOrderPayloadInput): {
   amount: string;
   source: {
     type: "crypto";
-    currency: "USDC";
+    currency: CorridorToken;
     network: "celo";
     refundAddress: string;
   };
@@ -54,7 +58,7 @@ export function buildOfframpOrderPayload(input: OfframpOrderPayloadInput): {
     amount: input.amount,
     source: {
       type: "crypto",
-      currency: "USDC",
+      currency: input.currency ?? "USDC",
       network: "celo",
       refundAddress: input.refundAddress,
     },
