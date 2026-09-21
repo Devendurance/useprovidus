@@ -281,7 +281,7 @@ function stripLeadingComments(source: string): string {
   }
 }
 
-const PROVIDER_MODULES = ["types.ts", "deepseek.ts", "prompts.ts", "index.ts"];
+const PROVIDER_MODULES = ["types.ts", "deepseek.ts", "groq.ts", "provider-chain.ts", "prompts.ts", "index.ts"];
 
 async function run() {
   console.log("Starting LLM provider layer self-check...");
@@ -533,6 +533,7 @@ async function run() {
       { status: 401, code: "AUTHENTICATION", retryable: false },
       { status: 403, code: "AUTHENTICATION", retryable: false },
       { status: 400, code: "INVALID_REQUEST", retryable: false },
+      { status: 402, code: "UPSTREAM_UNAVAILABLE", retryable: true },
       { status: 404, code: "INVALID_REQUEST", retryable: false },
       { status: 408, code: "TIMEOUT", retryable: true },
       { status: 429, code: "RATE_LIMITED", retryable: true },
@@ -956,8 +957,10 @@ async function run() {
         `lib/ai/${moduleName} must start with import "server-only";`,
       );
       // Logging stays forbidden here except for the one frozen, secret-free
-      // failure diagnostic in `deepseek.ts`: a single `console.error` call.
-      // Any second call site, or any other console method, fails this check.
+      // failure diagnostic in `deepseek.ts`/`groq.ts` and the one frozen
+      // fallback transition in `provider-chain.ts`: a single `console.error`
+      // call each. Any second call site, or any other console method, fails
+      // this check.
       const consoleCalls = moduleSource.match(/console\s*\.\s*[A-Za-z]+\s*\(/g) ?? [];
       if (moduleName === "deepseek.ts") {
         assert.deepEqual(
@@ -969,6 +972,28 @@ async function run() {
           moduleSource.includes('tag: "deepseek_failure"'),
           true,
           "lib/ai/deepseek.ts must emit the frozen deepseek_failure tag",
+        );
+      } else if (moduleName === "groq.ts") {
+        assert.deepEqual(
+          consoleCalls,
+          ["console.error("],
+          "lib/ai/groq.ts may only emit the frozen failure diagnostic",
+        );
+        assert.equal(
+          moduleSource.includes('tag: "groq_failure"'),
+          true,
+          "lib/ai/groq.ts must emit the frozen groq_failure tag",
+        );
+      } else if (moduleName === "provider-chain.ts") {
+        assert.deepEqual(
+          consoleCalls,
+          ["console.error("],
+          "lib/ai/provider-chain.ts may only emit the frozen fallback diagnostic",
+        );
+        assert.equal(
+          moduleSource.includes('tag: "assistant_provider_fallback"'),
+          true,
+          "lib/ai/provider-chain.ts must emit the frozen fallback tag",
         );
       } else {
         assert.deepEqual(consoleCalls, [], `lib/ai/${moduleName} must never log`);
@@ -997,10 +1022,17 @@ async function run() {
     assert.match(envExample, /^DEEPSEEK_API_KEY=\s*$/m, "env.example must document DEEPSEEK_API_KEY");
     assert.match(envExample, /^DEEPSEEK_BASE_URL=https:\/\/api\.deepseek\.com$/m);
     assert.match(envExample, /^DEEPSEEK_MODEL=deepseek-chat$/m);
+    assert.match(envExample, /^GROQ_API_KEY=\s*$/m, "env.example must document GROQ_API_KEY");
+    assert.match(envExample, /^GROQ_MODEL=openai\/gpt-oss-120b$/m);
     assert.equal(
       /NEXT_PUBLIC_DEEPSEEK/.test(envExample),
       false,
       "DeepSeek configuration must never be public",
+    );
+    assert.equal(
+      /NEXT_PUBLIC_GROQ/.test(envExample),
+      false,
+      "Groq configuration must never be public",
     );
 
     // -------------------------------------------------------------

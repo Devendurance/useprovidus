@@ -18,8 +18,11 @@ import "server-only";
 import {
   LlmProviderError,
   buildAssistantPrompt,
+  createAssistantProviderChain,
   createDeepSeekProvider,
+  createGroqProvider,
   type LlmProvider,
+  type ProviderChain,
 } from "@/lib/ai";
 import type {
   AssistantChatResponse,
@@ -88,15 +91,28 @@ export function isAffirmativeConfirmation(message: string): boolean {
 }
 
 let providerOverride: LlmProvider | null = null;
+let chainOverride: ProviderChain | null = null;
 
 /**
  * Test seam: replaces the production provider for scoped self-checks. The
- * production path always constructs the env-driven adapter.
+ * production path always constructs the env-driven adapter. When set, the
+ * override is the entire chain: no Groq fallback is attempted, so legacy
+ * single-provider self-checks keep their exact error mapping.
  */
 export function setAssistantProviderForTesting(
   provider: LlmProvider | null,
 ): void {
   providerOverride = provider;
+}
+
+/**
+ * Test seam: replaces the full DeepSeek → Groq chain for provider-fallback
+ * self-checks. Takes precedence over setAssistantProviderForTesting.
+ */
+export function setAssistantProviderChainForTesting(
+  chain: ProviderChain | null,
+): void {
+  chainOverride = chain;
 }
 
 function chatTurn(
@@ -221,19 +237,31 @@ export async function resolveAssistantTurn(
     return { ok: true, turn, activeIntent };
   }
 
-  // 3. Conversational / intent candidate path.
-  const provider = providerOverride ?? createDeepSeekProvider();
+  // 3. Conversational / intent candidate path. DeepSeek is primary; Groq
+  // receives at most one attempt and only for eligible provider failures.
+  // A legacy single-provider test override bypasses the chain entirely.
+  const completionRequest = {
+    messages: buildAssistantPrompt({ history, activeIntent, userMessage: message }),
+    temperature: MODEL_TEMPERATURE,
+    maxTokens: MODEL_MAX_TOKENS,
+    responseFormat: "json_object" as const,
+    ...(signal ? { signal } : {}),
+  };
 
   let content: string;
   try {
-    const completion = await provider.complete({
-      messages: buildAssistantPrompt({ history, activeIntent, userMessage: message }),
-      temperature: MODEL_TEMPERATURE,
-      maxTokens: MODEL_MAX_TOKENS,
-      responseFormat: "json_object",
-      ...(signal ? { signal } : {}),
-    });
-    content = completion.content;
+    if (chainOverride) {
+      content = (await chainOverride.complete(completionRequest)).response.content;
+    } else if (providerOverride) {
+      content = (await providerOverride.complete(completionRequest)).content;
+    } else {
+      content = (
+        await createAssistantProviderChain({
+          createPrimary: () => createDeepSeekProvider(),
+          createFallback: () => createGroqProvider(),
+        }).complete(completionRequest)
+      ).response.content;
+    }
   } catch (error) {
     return modelErrorResponse(error);
   }

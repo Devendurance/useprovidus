@@ -9,4 +9,6 @@ import "server-only";
 
 export * from "@/lib/ai/types";
 export * from "@/lib/ai/deepseek";
+export * from "@/lib/ai/groq";
+export * from "@/lib/ai/provider-chain";
 export * from "@/lib/ai/prompts";
