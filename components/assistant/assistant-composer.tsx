@@ -25,7 +25,7 @@ export function AssistantComposer({
   onSend,
   pending = false,
   disabled = false,
-  placeholder = "Type a message or airtime request (e.g. 'Buy ₦500 MTN for 08012345678')...",
+  placeholder = "Type a message or airtime request (e.g. 'Buy ₦500 MTN airtime')...",
   className,
 }: AssistantComposerProps) {
   const [content, setContent] = useState("");

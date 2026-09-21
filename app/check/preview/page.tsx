@@ -9,9 +9,9 @@ import { LinkButton } from "@/components/ui/link-button";
 import { PreviewQuerySummary } from "@/components/check/preview-query-summary";
 
 export const metadata: Metadata = {
-  title: "Cash-out review",
+  title: "Bank cash-out review",
   description:
-    "A truthful placeholder for an active Providus cash-out review.",
+    "A truthful placeholder for an active Providus bank cash-out review.",
 };
 
 export default function CheckPreviewPage() {
@@ -20,10 +20,10 @@ export default function CheckPreviewPage() {
       <div className="max-w-2xl">
         <p className="font-proof text-receipt-grey">Review not started</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
-          No active cash-out review
+          No active bank cash-out review
         </h1>
         <p className="mt-3 text-receipt-grey leading-relaxed">
-          This page only displays a review when a cash-out session has supplied
+          This page only displays a review when a bank cash-out session has supplied
           a current quote and verified bank recipient. No amount, provider or
           settlement result is being invented here.
         </p>
@@ -47,7 +47,7 @@ export default function CheckPreviewPage() {
           <EmptyState
             variant="surface"
             icon={<Lock className="h-5 w-5" />}
-            title="Start from Move Money"
+            title="Start bank cash-out"
             description="Enter a Celo USDC amount, choose a Nigerian bank account and request a current Paycrest quote before reviewing the transfer."
             action={
               <LinkButton href="/check" variant="ghost" size="md">
@@ -60,7 +60,7 @@ export default function CheckPreviewPage() {
           <Card variant="verdict" className="opacity-95">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-proof text-receipt-grey">Value Line</p>
+                <p className="font-proof text-receipt-grey">Payment path</p>
                 <CardTitle className="mt-1">Structure only</CardTitle>
               </div>
               <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 font-proof text-[12px] text-receipt-grey">
@@ -89,7 +89,7 @@ export default function CheckPreviewPage() {
             </ul>
             <div className="mt-5">
               <LinkButton href="/check" variant="ghost" size="md">
-                Open Move Money
+                Open bank cash-out
               </LinkButton>
             </div>
           </Card>

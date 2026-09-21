@@ -1,75 +1,58 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  Coins,
-  Eye,
-  LineChart,
-  MapPinned,
-  ShieldCheck,
-} from "lucide-react";
-import { ValueLine } from "@/components/providus/value-line";
-import { RouteCheckCTA } from "@/components/ui/route-check-cta";
+import { ArrowRight, Coins, ExternalLink, Eye, ShieldCheck } from "lucide-react";
+import { CELO_EXPLORER_URL } from "@/lib/wallet/celo";
 
 const INK = "#1A1A1A";
+const LIVE_PROOF_TX_HASH =
+  "0xfb952e0f2670c64cc6829d6419d736cc0ff152e8bec7fd30cbbdf837496e0ce9";
 
 const PILLARS = [
   {
-    title: "Name the payment",
+    title: "Ask naturally",
     message:
-      "Start with the Nigerian bank cash-out you want to make from your Celo USDC.",
-    proof: "Amount, recipient and current quote stay visible.",
+      "Tell Providus what you want to pay in ordinary language. Supported requests become a typed, validated PaymentIntent.",
+    proof:
+      "The web dashboard asks for missing or ambiguous details before review.",
     icon: Eye,
   },
   {
-    title: "Review before approval",
+    title: "Approve explicitly",
     message:
-      "See the recipient, fees, exchange rate, expiry and total USDC before money moves.",
-    proof: "No silent wallet approval or hidden settlement step.",
-    icon: MapPinned,
-  },
-  {
-    title: "Approve on Celo",
-    message:
-      "You explicitly sign the exact Celo USDC transfer to the Paycrest order.",
-    proof: "Providus never takes custody of your funds.",
+      "Review the recipient, network, amount, quote, fees, expiry and total before your connected wallet signs.",
+    proof:
+      "No money moves on a model's say-so; you approve the exact action and sign the exact Celo transfer.",
     icon: Coins,
   },
   {
-    title: "Track what happened",
+    title: "Verify the outcome",
     message:
-      "Celo confirmation and Nigerian bank settlement are separate stages.",
-    proof: "A deposit confirmation is not presented as payout completion.",
+      "Providus separates Celo confirmation, NGN settlement and last-mile fulfilment, then gives you evidence of what happened.",
+    proof:
+      "A Celo deposit or provider acknowledgement is not delivery proof by itself.",
     icon: ShieldCheck,
-  },
-  {
-    title: "Keep the proof",
-    message:
-      "Payment history and receipts show only the stages Providus can verify.",
-    proof: "Unverified outcomes stay clearly marked while they are checked.",
-    icon: LineChart,
   },
 ] as const;
 
 const STEPS = [
   {
     n: "01",
-    title: "State the payment",
-    body: "Choose a Celo USDC cash-out and enter the amount you want to send.",
+    title: "Request",
+    body: "Tell the web dashboard what you want to pay in ordinary language.",
   },
   {
     n: "02",
-    title: "Verify the recipient",
-    body: "Select a Nigerian bank and confirm the account name before review.",
+    title: "Approve",
+    body: "Review the exact terms, approve the action and sign the Celo transfer yourself.",
   },
   {
     n: "03",
-    title: "Review and approve",
-    body: "Check the live quote, fees, expiry and total, then sign in your wallet.",
+    title: "Execute",
+    body: "Deterministic code carries the approved payment through the current rails.",
   },
   {
     n: "04",
-    title: "Follow settlement",
-    body: "Celo confirms the deposit first; Nigerian bank delivery is tracked separately.",
+    title: "Prove",
+    body: "Providus reconciles each stage and shows evidence for the outcome it can verify.",
   },
 ] as const;
 
@@ -383,28 +366,30 @@ export default function HomePage() {
         <div className="mx-auto grid min-h-[calc(100svh-64px)] max-w-[1440px] grid-cols-1 items-start gap-5 px-4 py-12 min-[600px]:px-6 min-[600px]:py-16 md:min-h-[650px] md:px-8 lg:min-h-[calc(100svh-81px)] lg:grid-cols-[40%_60%] lg:items-center lg:gap-0 lg:px-8 lg:py-0">
           <div className="relative z-10 max-w-[520px]">
             <p className="mb-4 inline-flex items-center border-b border-[#1A1A1A] pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/75 lg:text-[12px]">
-              Providus · approval-first payments
+              Celo-native payment execution
             </p>
-            <h1 className="max-w-[520px] font-hero text-[28px] font-bold leading-[1.05] tracking-[-0.03em] text-[#1A1A1A] min-[600px]:text-[36px] lg:text-[clamp(52px,4.5vw,72px)] lg:leading-none">
-              Turn Celo stablecoins into everyday Nigerian payments.
+            <h1 className="max-w-[520px] font-hero text-[38px] font-bold leading-[1.05] tracking-[-0.03em] text-[#1A1A1A] min-[600px]:text-[48px] lg:text-[clamp(52px,4.5vw,72px)] lg:leading-none">
+              Ask. Approve. Prove.
             </h1>
-            <p className="mt-5 max-w-[360px] text-[14px] leading-[22px] text-[#1A1A1A]/75 min-[600px]:text-[15px] min-[600px]:leading-6 lg:mt-7 lg:max-w-[440px] lg:text-[18px] lg:leading-7">
-              Start with a reviewed Celo USDC cash-out to a Nigerian bank
-              account. See the recipient, current quote and approval boundary
-              before money moves.
+            <p className="mt-5 max-w-[360px] text-[14px] leading-[22px] text-[#1A1A1A]/75 min-[600px]:text-[15px] min-[600px]:leading-6 lg:mt-7 lg:max-w-[500px] lg:text-[18px] lg:leading-7">
+              Tell Providus what you want to pay. It prepares the exact terms, waits for your approval, executes through Celo and local payment rails, verifies each stage, and gives you a receipt for the outcome.
             </p>
             <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6 lg:mt-7 lg:gap-7">
-              <RouteCheckCTA />
               <Link
-                href="/how-it-works"
-                className="inline-flex min-h-11 items-center border-b-[1.5px] border-[#1A1A1A] px-1 text-[13px] font-semibold text-[#1A1A1A]/80 transition-opacity hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1A1A1A] lg:text-[15px]"
+                href="/dashboard"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[2px] border-[1.5px] border-[#1A1A1A] bg-[#1A1A1A] px-4 py-2 text-[13px] font-semibold leading-none text-[#F5F2EA] transition-[transform,background-color,color] duration-150 ease-out hover:bg-[#F5F2EA] hover:text-[#1A1A1A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1A1A1A] motion-reduce:transition-none lg:min-h-[52px] lg:px-6 lg:text-[15px]"
               >
-                How it works
+                Try Providus <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+              <Link
+                href="/how-it-works#trust"
+                className="inline-flex min-h-11 items-center gap-2 border-b-[1.5px] border-[#1A1A1A] px-1 text-[13px] font-semibold text-[#1A1A1A]/80 transition-opacity hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1A1A1A] lg:text-[15px]"
+              >
+                See how it works <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
             </div>
-            <p className="mt-6 max-w-[360px] text-[11px] leading-[18px] text-[#1A1A1A]/60 lg:mt-7 lg:max-w-[440px] lg:text-[13px] lg:leading-5">
-              Quotes are time-sensitive estimates. A Celo deposit confirmation
-              is not presented as final Nigerian bank delivery.
+            <p className="mt-6 max-w-[360px] text-[11px] leading-[18px] text-[#1A1A1A]/60 lg:mt-7 lg:max-w-[480px] lg:text-[13px] lg:leading-5">
+              Current channel: web dashboard. Current flows: conversational airtime and a separate Nigerian bank cash-out.
             </p>
           </div>
           <div className="relative mt-4 min-h-[360px] min-[600px]:min-h-[430px] md:min-h-[470px] lg:-ml-[clamp(56px,7.5vw,120px)] lg:mt-0 lg:h-full lg:min-h-[calc(100svh-81px)]">
@@ -415,41 +400,48 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      <section className="flex min-h-[calc(100svh-81px)] items-center border-y border-[#1A1A1A]/20 bg-[#F5F2EA] py-12 sm:py-16">
-        <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 md:px-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/60">
-                The payment line
-              </p>
-              <p className="mt-1 text-sm text-[#1A1A1A]/75">
-                See the important details before you approve.
-              </p>
-            </div>
-            <p className="max-w-[440px] text-xs leading-5 text-[#1A1A1A]/60 sm:text-right">
-              The live cash-out flow fills this line with the amount, recipient,
-              current quote, fees and estimated NGN receive.
-            </p>
-          </div>
-          <div className="mt-6">
-            <ValueLine compact />
-          </div>
-        </div>
-      </section>
-      <section className="flex min-h-[calc(100svh-81px)] items-center bg-[#CBD2C4] py-16 sm:py-20">
-        <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 md:px-8">
+
+      <section className="border-y border-[#1A1A1A]/20 bg-[#F5F2EA] py-16 sm:py-20">
+        <div className="mx-auto grid w-full max-w-[1200px] gap-8 px-4 sm:px-6 md:grid-cols-[1.15fr_0.85fr] md:items-stretch md:px-8">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/60">
-              The Providus point of view
+              One line
             </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-[#1A1A1A] sm:text-3xl">
-              Prudence in motion.
+            <h2 className="mt-3 text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#1A1A1A] sm:text-3xl">
+              Providus turns approved messages into verified real-world payments.
             </h2>
-            <p className="mt-3 leading-7 text-[#1A1A1A]/70">
-              Say the payment. Review it. Approve it. Prove the result.
+            <p className="mt-4 leading-7 text-[#1A1A1A]/70">
+              Providus is a safety-first conversational payment execution layer that turns user-approved requests into verified real-world payments.
             </p>
           </div>
-          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <article className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#CBD2C4] p-6 sm:p-8">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/60">
+              Technical principle
+            </p>
+            <h3 className="mt-3 text-xl font-semibold leading-tight tracking-[-0.02em] text-[#1A1A1A] sm:text-2xl">
+              LLM owns language. Deterministic code owns money.
+            </h3>
+            <p className="mt-4 text-sm leading-6 text-[#1A1A1A]/70">
+              Language can interpret a request and explain a recorded state. Deterministic code validates payment terms, enforces approval, controls provider calls, reconciles outcomes and builds the receipt.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="flex min-h-[calc(100svh-81px)] items-center bg-[#CBD2C4] py-16 sm:py-20">
+        <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 md:px-8">
+          <div className="max-w-3xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/60">
+              Narrative tension
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#1A1A1A] sm:text-3xl lg:text-4xl">
+              Conversational payments aren’t the hard part. Proving the real-world outcome is.
+            </h2>
+            <p className="mt-4 max-w-2xl leading-7 text-[#1A1A1A]/70">
+              A conversation can express intent, but real payments cross asynchronous systems with different failure and timing rules. Providus makes the approval boundary and each state visible instead of treating a submitted transaction as delivery.
+            </p>
+          </div>
+          <ul className="mt-10 grid gap-4 md:grid-cols-3">
             {PILLARS.map((pillar, index) => {
               const Icon = pillar.icon;
               return (
@@ -479,33 +471,105 @@ export default function HomePage() {
           </ul>
         </div>
       </section>
-      <section className="flex min-h-[calc(100svh-81px)] items-center border-t border-[#1A1A1A]/20 bg-[#F5F2EA] py-16 sm:py-20">
+
+      <section className="border-t border-[#1A1A1A]/20 bg-[#F5F2EA] py-16 sm:py-20">
+        <div className="mx-auto grid w-full max-w-[1200px] gap-10 px-4 sm:px-6 md:px-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/60">
+              Live E2E proof · one completed run
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#1A1A1A] sm:text-3xl">
+              ₦1,000 MTN airtime on Celo mainnet.
+            </h2>
+            <p className="mt-4 max-w-xl leading-7 text-[#1A1A1A]/70">
+              A human-gated run reached the masked recipient <code className="font-proof text-[#1A1A1A]">*******6560</code>. The proof records the payment as a completed mainnet execution with separate NGN and airtime stages.
+            </p>
+            <a
+              href={`${CELO_EXPLORER_URL}/tx/${LIVE_PROOF_TX_HASH}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#1A1A1A] underline decoration-[#1A1A1A]/40 underline-offset-4 transition-opacity hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1A1A1A]"
+            >
+              Open the Celo payment proof <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+            </a>
+            <dl className="mt-8 grid max-w-xl gap-3 sm:grid-cols-2">
+              <div className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#CBD2C4] p-4">
+                <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-[#1A1A1A]/55">
+                  Request
+                </dt>
+                <dd className="mt-1 font-semibold text-[#1A1A1A]">₦1,000 MTN airtime</dd>
+              </div>
+              <div className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#CBD2C4] p-4">
+                <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-[#1A1A1A]/55">
+                  Network
+                </dt>
+                <dd className="mt-1 font-semibold text-[#1A1A1A]">Celo mainnet</dd>
+              </div>
+              <div className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#CBD2C4] p-4">
+                <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-[#1A1A1A]/55">
+                  NGN stage
+                </dt>
+                <dd className="mt-1 font-semibold text-[#1A1A1A]">NGN delivered</dd>
+              </div>
+              <div className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#CBD2C4] p-4">
+                <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-[#1A1A1A]/55">
+                  Final stage
+                </dt>
+                <dd className="mt-1 font-semibold text-[#1A1A1A]">Airtime delivered</dd>
+              </div>
+            </dl>
+            <p className="mt-6 max-w-xl text-xs leading-5 text-[#1A1A1A]/60">
+              This is one recorded execution, not a promise that every future payment will deliver. Providus reports each stage only when it can verify it.
+            </p>
+          </div>
+          <aside className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#1A1A1A] p-6 text-[#F5F2EA] sm:p-8">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#CBD2C4]/70">
+              What the proof separates
+            </p>
+            <ul className="mt-6 space-y-4 text-sm leading-6 text-[#F5F2EA]/80">
+              <li className="flex gap-3">
+                <span className="font-proof text-[#CBD2C4]">01</span>
+                <span>Celo mainnet payment confirmation.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="font-proof text-[#CBD2C4]">02</span>
+                <span>NGN settlement delivered.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="font-proof text-[#CBD2C4]">03</span>
+                <span>MTN airtime delivered to the masked recipient.</span>
+              </li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section className="flex min-h-[calc(100svh-81px)] items-center border-t border-[#1A1A1A]/20 bg-[#CBD2C4] py-16 sm:py-20">
         <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 md:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-xl">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/55">
-                A clear handoff
+                Execution path
               </p>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-[#1A1A1A] sm:text-3xl">
-                How a cash-out works
+                From request to proof, with a human approval boundary.
               </h2>
               <p className="mt-3 leading-7 text-[#1A1A1A]/70">
-                From payment intent to settlement tracking—transparent at every
-                step. No custody and no silent approval.
+                The short version is simple: ask, approve, execute and prove. The full path keeps every handoff legible.
               </p>
             </div>
             <Link
-              href="/how-it-works"
+              href="/how-it-works#trust"
               className="inline-flex items-center gap-2 self-start border-b-[1.5px] border-[#1A1A1A] pb-1 text-sm font-semibold text-[#1A1A1A] transition-opacity hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1A1A1A] sm:self-auto"
             >
-              Full explanation <ArrowRight className="h-4 w-4" aria-hidden />
+              See every stage <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
           </div>
           <ol className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((step) => (
               <li
                 key={step.n}
-                className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#CBD2C4] p-5"
+                className="rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#F5F2EA] p-5"
               >
                 <span className="text-xs font-semibold tracking-[0.14em] text-[#1A1A1A]/55">
                   {step.n}
@@ -521,39 +585,53 @@ export default function HomePage() {
           </ol>
         </div>
       </section>
-      <section className="flex min-h-[calc(100svh-81px)] items-center border-t-[1.5px] border-[#1A1A1A] bg-[#1A1A1A] py-16 text-[#F5F2EA] sm:py-20">
-        <div className="mx-auto grid w-full max-w-[1200px] gap-10 px-4 sm:px-6 md:px-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+
+      <section className="border-t-[1.5px] border-[#1A1A1A] bg-[#1A1A1A] py-16 text-[#F5F2EA] sm:py-20">
+        <div className="mx-auto grid w-full max-w-[1200px] gap-10 px-4 sm:px-6 md:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#CBD2C4]/65">
-              Clear boundaries
+              Current scope
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
-              Product boundaries
+              One execution layer, bounded by what is shipped.
             </h2>
             <ul className="mt-6 space-y-3 text-sm leading-6 text-[#F5F2EA]/75">
-              <li>Providus does not custody user funds.</li>
-              <li>You review and sign every Celo USDC transfer yourself.</li>
-              <li>
-                Quotes are estimates with freshness and assumptions—not final
-                prices.
-              </li>
-              <li>
-                Celo confirmation and Nigerian bank settlement remain separate
-                states.
-              </li>
+              <li>Web dashboard conversational airtime: Celo USDC → Paycrest NGN settlement → ClubKonnect airtime.</li>
+              <li>Separate Nigerian bank cash-out through Paycrest.</li>
+              <li>Human approval and browser-wallet signing stay explicit; Providus does not custody user funds.</li>
+              <li>Celo confirmation, NGN settlement and airtime delivery remain separate states.</li>
+              <li>Quotes are estimates with freshness and assumptions.</li>
             </ul>
           </div>
-          <div className="rounded-[8px] border-[1.5px] border-[#F5F2EA] bg-[#CBD2C4] p-6 text-[#1A1A1A] sm:p-8">
-            <p className="text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
-              Ready to move money?
+          <aside className="rounded-[8px] border-[1.5px] border-[#F5F2EA] bg-[#CBD2C4] p-6 text-[#1A1A1A] sm:p-8">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/60">
+              Roadmap, not shipped
             </p>
-            <p className="mt-3 text-sm leading-6 text-[#1A1A1A]/70">
-              Cash out Celo USDC to a verified Nigerian bank account. Review the
-              live quote before you approve the transfer.
+            <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
+              More surfaces can use the same proof layer later.
+            </h3>
+            <ul className="mt-5 space-y-2 text-sm leading-6 text-[#1A1A1A]/70">
+              <li>iMessage/Photon, WhatsApp, Telegram and MiniPay.</li>
+              <li>Data bundles, electricity, cable and other utility categories.</li>
+              <li>Additional rails and fulfilment providers.</li>
+            </ul>
+            <p className="mt-5 border-t border-[#1A1A1A]/20 pt-4 text-xs leading-5 text-[#1A1A1A]/60">
+              These are future adapters and categories, not current availability.
             </p>
-            <div className="mt-6">
-              <RouteCheckCTA emphasis="flat" />
-            </div>
+          </aside>
+          <div className="flex flex-col items-start gap-4 border-t border-[#F5F2EA]/20 pt-8 sm:flex-row sm:items-center sm:gap-6 lg:col-span-2">
+            <Link
+              href="/dashboard"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[2px] border-[1.5px] border-[#F5F2EA] bg-[#F5F2EA] px-5 py-2 text-sm font-semibold text-[#1A1A1A] transition-colors hover:bg-[#CBD2C4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5F2EA]"
+            >
+              Try Providus <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link
+              href="/check"
+              className="inline-flex min-h-11 items-center gap-2 border-b-[1.5px] border-[#F5F2EA] pb-1 text-sm font-semibold text-[#F5F2EA] transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5F2EA]"
+            >
+              Open the separate bank cash-out <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
           </div>
         </div>
       </section>

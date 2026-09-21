@@ -193,11 +193,11 @@ export function AirtimePreviewCard({
                 Airtime Payment Preview
               </h3>
               <span className="rounded border border-ledger-edge bg-receipt-field px-1.5 py-0.5 font-proof text-[10px] text-receipt-grey">
-                Quote guarantee
+                Current quote
               </span>
             </div>
             <p className="font-proof text-[11px] text-receipt-grey">
-              Deterministic inverse quote · Celo USDC
+              Current Celo USDC amount for this airtime
             </p>
           </div>
         </div>
@@ -207,17 +207,17 @@ export function AirtimePreviewCard({
           {loading ? (
             <span className="inline-flex items-center gap-1.5 rounded border border-quote-blue/40 bg-quote-blue/10 px-2 py-0.5 font-proof text-xs font-semibold text-quote-blue">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Fetching quote...
+              Getting current quote...
             </span>
           ) : isPreparing ? (
             <span className="inline-flex items-center gap-1.5 rounded border border-quote-blue/40 bg-quote-blue/10 px-2 py-0.5 font-proof text-xs font-semibold text-quote-blue">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Preparing payment order...
+              Preparing payment...
             </span>
           ) : isExpired ? (
             <span className="inline-flex items-center gap-1.5 rounded border border-loss-red/40 bg-loss-red/10 px-2 py-0.5 font-proof tabular-nums text-xs font-semibold text-loss-red">
               <Clock className="h-3.5 w-3.5" />
-              Quote expired — refresh needed to confirm
+              Quote expired — refresh to review again
             </span>
           ) : isConfirmed ? (
             <span className="inline-flex items-center gap-1.5 rounded border border-provident-green/40 bg-provident-green/10 px-2.5 py-0.5 font-proof text-xs font-semibold text-deep-provision">
@@ -238,10 +238,10 @@ export function AirtimePreviewCard({
         <div className="mt-4 flex flex-col items-center justify-center rounded-[10px] border border-ledger-edge bg-receipt-field/40 p-8 text-center">
           <Loader2 className="h-6 w-6 animate-spin text-quote-blue mb-2" />
           <p className="font-display text-sm font-semibold text-ledger-stone">
-            Generating inverse quote...
+            Getting a current quote...
           </p>
           <p className="font-proof text-xs text-receipt-grey mt-0.5">
-            Querying corridor rate from Paycrest for Celo USDC settlement
+            Checking the current Celo USDC amount for airtime delivery
           </p>
         </div>
       ) : null}
@@ -288,10 +288,10 @@ export function AirtimePreviewCard({
           <Loader2 className="h-4 w-4 animate-spin text-quote-blue shrink-0" />
           <div>
             <span className="font-semibold text-quote-blue">
-              Preparing payment order with Paycrest
+              Preparing your payment
             </span>
             <span className="text-receipt-grey ml-1.5">
-              Locking corridor quote and generating deposit instructions...
+              Saving the current quote and preparing payment instructions...
             </span>
           </div>
         </div>
@@ -340,7 +340,7 @@ export function AirtimePreviewCard({
             <div className="rounded-[10px] border border-ledger-edge bg-receipt-field p-3.5">
               <div className="flex items-center justify-between">
                 <span className="font-proof text-xs text-receipt-grey">
-                  Settlement on Celo
+                  Celo payment
                 </span>
                 <span className="inline-flex items-center gap-1 rounded bg-quote-blue/10 px-1.5 py-0.5 font-proof text-[10px] font-bold text-quote-blue border border-quote-blue/30">
                   <Coins className="h-3 w-3" />
@@ -350,7 +350,7 @@ export function AirtimePreviewCard({
 
               <div className="mt-1 flex items-baseline justify-between">
                 <span className="font-proof text-xs text-receipt-grey">
-                  Estimated base deposit:
+                  Estimated Celo amount:
                 </span>
                 <span className="font-proof tabular-nums text-xl font-bold text-ledger-stone">
                   {formatDecimalForDisplay(preview.amountUsdc)}{" "}
@@ -361,28 +361,28 @@ export function AirtimePreviewCard({
               {/* Breakdown */}
               <div className="mt-2.5 space-y-1 border-t border-ledger-edge/60 pt-2 text-[11px]">
                 <div className="flex items-center justify-between font-proof">
-                  <span className="text-receipt-grey">Estimated base deposit:</span>
+                  <span className="text-receipt-grey">Celo amount:</span>
                   <span className="font-proof tabular-nums text-ledger-stone">
                     {formatDecimalForDisplay(preview.amountUsdc)} USDC
                   </span>
                 </div>
                 <div className="flex items-center justify-between font-proof">
-                  <span className="text-receipt-grey">Provider fee:</span>
+                  <span className="text-receipt-grey">Payment provider fee:</span>
                   <span className="font-proof text-receipt-grey text-right">
-                    Finalized when payment order is created
+                    Shown when payment is prepared
                   </span>
                 </div>
                 <p className="font-proof text-[10px] text-receipt-grey">
-                  Final amount shown before wallet approval
+                  You will see the total before wallet approval
                 </p>
                 <div className="flex items-center justify-between font-proof border-t border-ledger-edge/40 pt-1 text-receipt-grey">
-                  <span>Exchange Rate:</span>
+                  <span>Current rate:</span>
                   <span className="font-proof tabular-nums text-ledger-stone">
                     {formattedRate}
                   </span>
                 </div>
                 <div className="flex items-center justify-between font-proof border-t border-ledger-edge/40 pt-1 text-receipt-grey">
-                  <span>Quote Expiry:</span>
+                  <span>Quote valid until:</span>
                   <span className="font-proof tabular-nums text-ledger-stone">
                     {preview.expiresAt ? (
                       isExpired ? (
@@ -413,7 +413,7 @@ export function AirtimePreviewCard({
                     Quote expired — refresh needed to confirm
                   </span>
                   <span className="text-receipt-grey ml-1.5">
-                    Rate guarantee has lapsed (5m TTL). Please refresh to recalculate before confirming.
+                    This quote is no longer current. Refresh to recalculate before approving.
                   </span>
                 </div>
               </div>
@@ -437,10 +437,10 @@ export function AirtimePreviewCard({
               <ShieldCheck className="h-4 w-4 shrink-0 text-provident-green mt-0.5" />
               <div>
                 <p className="font-semibold text-deep-provision">
-                  Payment confirmed
+                  Details confirmed
                 </p>
                 <p className="mt-0.5 text-receipt-grey">
-                  Payment preparation in progress. Deposit instructions will appear shortly.
+                  Payment instructions are ready. Your wallet approval is still required.
                 </p>
               </div>
             </div>
@@ -466,8 +466,8 @@ export function AirtimePreviewCard({
                   type="button"
                   onClick={handleRefresh}
                   disabled={loading || isPreparing}
-                  aria-label="Refresh quote rate"
-                  title="Fetch fresh quote from Paycrest"
+                  aria-label="Refresh current quote"
+                  title="Get a new quote"
                   className="inline-flex items-center gap-1 rounded-[8px] border border-ledger-edge bg-clear-paper px-2.5 py-1.5 font-display text-xs font-semibold text-receipt-grey transition-all hover:border-ledger hover:text-ledger-stone active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-50"
                 >
                   <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
@@ -507,7 +507,7 @@ export function AirtimePreviewCard({
                     </>
                   ) : (
                     <>
-                      <span>Confirm Airtime Payment</span>
+                      <span>Review and continue</span>
                       <ArrowRight className="h-3.5 w-3.5" />
                     </>
                   )}

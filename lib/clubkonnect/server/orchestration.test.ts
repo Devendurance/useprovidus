@@ -258,7 +258,14 @@ class CompletedCashOutRepository extends InMemoryTransactionRepository {
 class SettledAirtimeWithoutPaycrestMilestoneRepository extends InMemoryTransactionRepository {
   override async findById(id: string): Promise<TransactionRecord | null> {
     const record = await super.findById(id);
-    return record ? { ...record, paycrestStatus: null } : null;
+    if (!record) return null;
+    const metadata = { ...(record.metadata ?? {}) };
+    delete metadata.paycrest_fiat_delivery_confirmed;
+    return {
+      ...record,
+      paycrestStatus: null,
+      metadata,
+    };
   }
 }
 
@@ -314,6 +321,131 @@ async function run() {
       false,
       "credential-bearing URLs must never be persisted",
     );
+  });
+
+  await scenario("validated fiat finality survives raw settling", async () => {
+    const repo = new InMemoryTransactionRepository();
+    const txId = await seedSettledAirtime(repo);
+    const transitioned = await repo.updateStatus(txId, {
+      status: "settled",
+      paycrestStatus: "settling",
+    });
+    if (!transitioned.ok) assert.fail(`settling progression failed: ${transitioned.message}`);
+
+    assert.equal(
+      transitioned.record.metadata?.paycrest_fiat_delivery_confirmed,
+      true,
+      "validated must persist a monotonic fiat-delivery fact",
+    );
+    const stage = computeTransactionStage(transitioned.record);
+    assert.equal(stage.isFiatFinal, true);
+    assert.equal(stage.isFiatDelivered, true);
+    assert.equal(stage.isProtocolSettled, false);
+
+    const calls = installFetchStub(
+      clubKonnectStub({ purchase: () => purchaseResponse("200") }),
+    );
+    const result = await fulfilAirtimeOrder(txId, {
+      repository: repo,
+      skipFloatCheck: true,
+    });
+    if (!result.ok) assert.fail(`fulfil after validated failed: ${result.message}`);
+    assert.equal(result.status, "completed");
+    assert.equal(endpointCalls(calls, AIRTIME_ENDPOINT).length, 1);
+
+    const protocolRepo = new InMemoryTransactionRepository();
+    const protocolTxId = await seedSettledAirtime(protocolRepo);
+    const rawSettling = await protocolRepo.updateStatus(protocolTxId, {
+      status: "settled",
+      paycrestStatus: "settling",
+    });
+    if (!rawSettling.ok) assert.fail(`protocol settling failed: ${rawSettling.message}`);
+    const rawSettled = await protocolRepo.updateStatus(protocolTxId, {
+      status: "settled",
+      paycrestStatus: "settled",
+    });
+    if (!rawSettled.ok) assert.fail(`protocol settled failed: ${rawSettled.message}`);
+    assert.equal(rawSettled.record.metadata?.paycrest_fiat_delivery_confirmed, true);
+  });
+  await scenario("client metadata cannot self-authorize fiat finality", async () => {
+    const repo = new InMemoryTransactionRepository();
+    const created = await repo.create({
+      id: "tx_p6_spoofed_marker_0001",
+      idempotencyKey: "idem_p6_spoofed_marker_0001",
+      type: "airtime",
+      walletAddress: "0x21e5fc03e4305cc8cfb874253c6d66a8bdb0bcda",
+      amountUsdc: "0.500000",
+      amountNgn: AMOUNT_NGN,
+      paycrestReference: "ref_p6_spoofed_marker_0001",
+      paycrestStatus: "deposited",
+      metadata: {
+        phone: PHONE,
+        network: "mtn",
+        paycrest_fiat_delivery_confirmed: true,
+      },
+    });
+    if (!created.ok) assert.fail(`spoofed marker create failed: ${created.message}`);
+    assert.equal(created.record.metadata?.paycrest_fiat_delivery_confirmed, undefined);
+
+    const settling = await repo.updateStatus(created.record.id, {
+      status: "settling",
+      paycrestStatus: "deposited",
+    });
+    if (!settling.ok) assert.fail(`spoofed marker settling failed: ${settling.message}`);
+    const settled = await repo.updateStatus(created.record.id, {
+      status: "settled",
+      paycrestStatus: "deposited",
+    });
+    if (!settled.ok) assert.fail(`spoofed marker settlement failed: ${settled.message}`);
+    const result = await fulfilAirtimeOrder(created.record.id, {
+      repository: repo,
+      skipFloatCheck: true,
+    });
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.code, "NOT_ELIGIBLE");
+  });
+
+  await scenario("pre-fiat rows remain blocked", async () => {
+    const repo = new InMemoryTransactionRepository();
+    const created = await repo.create({
+      id: "tx_p6_pre_fiat_0001",
+      idempotencyKey: "idem_p6_pre_fiat_0001",
+      type: "airtime",
+      walletAddress: "0x21e5fc03e4305cc8cfb874253c6d66a8bdb0bcda",
+      amountUsdc: "0.500000",
+      amountNgn: AMOUNT_NGN,
+      paycrestReference: "ref_p6_pre_fiat_0001",
+      metadata: {
+        phone: PHONE,
+        network: "mtn",
+        rate: "1500",
+        totalUsdcToSend: "0.500000",
+      },
+    });
+    if (!created.ok) assert.fail(`pre-fiat create failed: ${created.message}`);
+    const settling = await repo.updateStatus(created.record.id, {
+      status: "settling",
+      paycrestStatus: "deposited",
+    });
+    if (!settling.ok) assert.fail(`pre-fiat settling failed: ${settling.message}`);
+    const preFiat = await repo.updateStatus(created.record.id, {
+      status: "settled",
+      paycrestStatus: "deposited",
+    });
+    if (!preFiat.ok) assert.fail(`pre-fiat seed failed: ${preFiat.message}`);
+
+    const calls = installFetchStub(
+      clubKonnectStub({ purchase: () => purchaseResponse("200") }),
+    );
+    const result = await fulfilAirtimeOrder(created.record.id, {
+      repository: repo,
+      skipFloatCheck: true,
+    });
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.equal(result.code, "NOT_ELIGIBLE");
+    assert.equal(endpointCalls(calls, AIRTIME_ENDPOINT).length, 0);
   });
 
   /* ------------------------------------------------------------------ */
@@ -1117,7 +1249,7 @@ async function run() {
         assert.equal(result.code, "NOT_ELIGIBLE", milestone);
         assert.equal(
           result.message,
-          "Transaction must have confirmed Paycrest fiat delivery (validated or settled)",
+          "Transaction must have confirmed Paycrest fiat delivery before fulfilment",
         );
         assert.equal(
           calls.length,
@@ -1158,7 +1290,7 @@ async function run() {
       assert.equal(result.code, "NOT_ELIGIBLE");
       assert.equal(
         result.message,
-        "Transaction must have confirmed Paycrest fiat delivery (validated or settled)",
+        "Transaction must have confirmed Paycrest fiat delivery before fulfilment",
       );
       assert.equal(
         calls.length,

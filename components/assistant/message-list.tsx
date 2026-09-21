@@ -14,9 +14,9 @@ export interface MessageListProps {
 }
 
 const STARTER_SUGGESTIONS = [
-  "Buy ₦500 airtime for 08012345678",
-  "Buy ₦1000 MTN airtime",
-  "What is the status of tx_sample_123?",
+  "Buy ₦1,000 MTN airtime",
+  "Buy ₦500 Airtel airtime",
+  "How do I approve an airtime payment?",
   "How does Celo USDC cash-out work?",
 ];
 
@@ -49,11 +49,12 @@ export function MessageList({
             <Sparkles className="h-6 w-6" aria-hidden="true" />
           </div>
           <h3 className="mt-3 font-display text-lg font-semibold text-ledger-stone">
-            Providus Intent Assistant
+            Ask for supported airtime
           </h3>
           <p className="mt-1 max-w-md text-sm text-receipt-grey leading-relaxed">
-            Clarify a target payment or check transaction status.
-            Try one of the prompts below to get started.
+            Describe the airtime you need. Providus prepares the payment details
+            for your review, then you approve in your wallet before anything is
+            paid.
           </p>
 
           {onSelectSuggestion ? (

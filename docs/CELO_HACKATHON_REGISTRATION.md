@@ -113,27 +113,22 @@ Current metadata intentionally stays conservative:
 
 ### One-line description
 
-> **Providus is a Celo payments agent that turns stablecoins into everyday Nigerian financial actions — starting with bank cash-outs and expanding into user-approved airtime, data and utility payments.**
+> **Providus turns approved messages into verified real-world payments through a safety-first conversational payment execution layer.**
 
 ### Current shipped proof
 
-- Celo USDC → Nigerian bank cash-out through Paycrest has been used successfully in real mainnet tests.
-- Wallet connection and Celo USDC transfer flow exist.
-- Paycrest quote, bank verification and order creation exist.
+- Web conversational assistant with deterministic airtime `PaymentIntent` validation.
+- Celo mainnet USDC wallet flow with explicit human approval.
+- Paycrest quotes, order creation, authoritative fee binding, and fiat-delivery reconciliation.
+- Neon PostgreSQL + Drizzle durable transaction state.
+- ClubKonnect airtime fulfilment with deterministic RequestID, one-shot claim protection, and terminal-status reconciliation.
+- Evidence-linked receipt/status surface.
+- Separate Celo USDC → Nigerian bank cash-out flow through Paycrest.
+- One completed human-gated live airtime run documented in `docs/live-airtime-e2e.md`.
 
-### Current code limitations
+### Historical baseline note
 
-The current repository does **not yet** provide durable fiat-finality tracking after the Celo deposit.
-
-It also does not yet contain:
-
-- durable transaction persistence;
-- Paycrest post-deposit reconciliation;
-- ClubKonnect integration;
-- AI/payment command parsing;
-- airtime/data/electricity/cable orchestration.
-
-These are implementation targets, not shipped claims.
+The limitations listed in the original registration snapshot described the pre-P0/P6 implementation baseline. They are superseded as current-state claims by the live P6.10 evidence and current architecture. This registration record is retained for submission history; it does not claim data bundles, electricity, cable, additional providers, or future conversational channels are shipped.
 
 ---
 

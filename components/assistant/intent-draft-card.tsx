@@ -140,15 +140,15 @@ export function IntentDraftCard({
                 id="unsupported-intent-title"
                 className="font-display text-base font-semibold text-ledger-stone"
               >
-                Unsupported Request: <span className="capitalize">{intent.type}</span>
+                Not available yet: <span className="capitalize">{intent.type}</span>
               </h3>
               <span className="rounded border border-ledger-edge bg-receipt-field px-2 py-0.5 font-proof text-xs text-receipt-grey">
                 Read-only preview
               </span>
             </div>
             <p className="mt-2 text-sm text-receipt-grey leading-relaxed">
-              Providus conversational intent engine currently supports Nigerian airtime top-ups.
-              Support for {intent.type} payments is not yet enabled on the Celo value ledger.
+              Providus currently supports Nigerian airtime payments here. {intent.type} payments
+              are not available in this assistant yet.
             </p>
           </div>
         </div>
@@ -188,10 +188,10 @@ export function IntentDraftCard({
               id="airtime-intent-title"
               className="font-display text-base font-semibold text-ledger-stone"
             >
-              Airtime Payment Intent Draft
+              Airtime payment details
             </h3>
             <p className="font-proof text-[11px] text-receipt-grey">
-              Read-only preview · upcoming capability
+              Live payment details · you approve in your wallet
             </p>
           </div>
         </div>
@@ -200,12 +200,12 @@ export function IntentDraftCard({
           {readyForConfirmation ? (
             <span className="inline-flex items-center gap-1 rounded border border-provident-green/40 bg-provident-green/10 px-2 py-0.5 font-proof text-xs font-semibold text-deep-provision">
               <CheckCircle2 className="h-3.5 w-3.5 text-provident-green" />
-              Draft Complete
+              Details ready
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded border border-rate-amber/40 bg-rate-amber/10 px-2 py-0.5 font-proof text-xs font-semibold text-rate-amber">
               <Clock className="h-3.5 w-3.5 text-rate-amber" />
-              In Progress
+              Missing details
             </span>
           )}
         </div>
@@ -284,11 +284,11 @@ export function IntentDraftCard({
           <Info className="h-4 w-4 shrink-0 text-rate-amber mt-0.5" aria-hidden="true" />
           <div>
             <p className="font-semibold text-rate-amber">
-              Network suggestion unconfirmed: {network.toUpperCase()}
+              Please confirm the network: {network.toUpperCase()}
             </p>
             <p className="mt-0.5 text-receipt-grey leading-relaxed">
-              Mobile number portability means phone prefixes are not guaranteed. Please confirm
-              by replying &quot;Yes&quot; or naming the network (e.g. &quot;MTN&quot; or &quot;Airtel&quot;) in chat.
+              Phone prefixes may not match the current network. Confirm by replying
+              &quot;Yes&quot; or naming the network (for example, &quot;MTN&quot; or &quot;Airtel&quot;) in chat.
             </p>
           </div>
         </div>
@@ -298,7 +298,7 @@ export function IntentDraftCard({
       {missingFields && missingFields.length > 0 ? (
         <div className="mt-3 rounded-[10px] border border-ledger-edge bg-receipt-field p-3 text-xs">
           <p className="font-proof font-medium text-receipt-grey">
-            Required before draft is complete:
+            Still needed before you can review:
           </p>
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {missingFields.map((field) => (
@@ -314,18 +314,18 @@ export function IntentDraftCard({
         </div>
       ) : null}
 
-      {/* Read-only informational notice; this surface does not execute payments. */}
+      {/* Payment execution notice; draft validation only, order via preview approval. */}
       <div className="mt-3 flex items-center justify-between border-t border-ledger-edge/70 pt-3">
         <p className="text-xs text-receipt-grey flex items-center gap-1.5">
           <Info className="h-3.5 w-3.5 text-quote-blue shrink-0" aria-hidden="true" />
           <span>
             {readyForConfirmation
-              ? "All parameters validated. This draft is informational only — payment execution is not available yet."
-              : "Draft is being refined through chat conversation."}
+              ? "Payment details are ready. Review them first; your connected wallet must approve the exact Celo USDC transfer before anything is paid."
+              : "Tell us the missing detail to finish these payment details."}
           </span>
         </p>
         <span className="font-proof text-[10px] text-receipt-grey uppercase tracking-wider">
-          Informational only
+          Details check
         </span>
       </div>
     </div>

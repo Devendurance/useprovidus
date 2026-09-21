@@ -1,299 +1,356 @@
-# Providus PRD
+# Providus Product Requirements
 
-**Product:** Providus<br/>
-**Category:** Celo-native Nigerian payments agent<br/>
-**Primary hackathon:** Celo Agents at Work<br/>
+**Status:** P6.14 synchronized current product requirements
+**Category:** Safety-first conversational payment execution layer
+**Canonical one-liner:** Providus turns approved messages into verified real-world payments.
+**Primary hackathon:** Celo Agents at Work
 **Primary track:** Real World Adoption
-**Product principle:** **Say the payment. Review it. Approve it. Prove the result.**
+**Network:** Celo mainnet (`42220`)
+**Public trust surface:** [/how-it-works#trust](/how-it-works#trust)
 
----
+This PRD carries the same P6.14 trust story as [`README.md`](../README.md), [`docs/PROVIDUS_ARCHITECTURE.md`](./PROVIDUS_ARCHITECTURE.md), and [`docs/positioning.md`](./positioning.md); the public-facing copy lives in the [/how-it-works#trust](/how-it-works#trust) section and is linked, not duplicated, here.
 
-## 1. Executive summary
+> **LLM owns language; deterministic code owns money.**
 
-Providus turns Celo stablecoins into useful Nigerian financial actions.
+## 1. Product definition
 
-Today, the product already supports a real **Celo USDC → Nigerian bank cash-out** path through Paycrest.
+Providus turns a supported, user-approved request into a reconciled real-world payment. It sits between the conversation surface and the external rails: validating intent, enforcing approval, coordinating Celo and provider adapters, persisting state, recovering unknown outcomes, and presenting evidence of what completed.
 
-The next hackathon experience adds a command-first payment layer so a user can type requests such as:
+Providus is not a wallet, a custodial LLM, a standalone off-ramp, a VTU frontend, Paycrest replacement, or ClubKonnect replacement. Paycrest and ClubKonnect are current adapters. Providus does not claim multi-provider production support today.
 
-- “Send ₦500 airtime to this number.”
-- “Buy 1GB MTN data for me.”
-- “Pay my electricity bill.”
-- “Renew my GOtv subscription.”
+## 2. Product promise
 
-Providus interprets the request, shows the exact recipient/service/amount and estimated USDC cost, requires explicit approval, then coordinates the underlying payment rails.
+A user tells Providus what should happen. Providus prepares the exact payment, waits for explicit approval, executes through the appropriate rails, verifies the real-world outcome, and provides proof.
 
-For the deadline, the first complete new vertical slice is:
+The promise is bounded by supported flows and provider availability. A Celo deposit, provider acknowledgement, or intermediate state is never presented as final delivery.
 
-> **Celo USDC → Paycrest → confirmed NGN settlement → ClubKonnect → airtime.**
+## 3. Problem
 
-Data is next only if airtime is stable. Electricity and cable remain later because they need stronger verification and reconciliation.
+Celo USDC is usable onchain, while everyday Nigerian spending still depends on local settlement and utility rails. Users should not need to understand off-ramp APIs, rate and fee calculations, bank settlement states, VTU network codes, provider retries, payment references, and multiple dashboards.
 
----
+The user’s responsibility is to state the desired outcome, review the exact action, and approve the payment. Providus handles the orchestration without hiding the state boundaries or uncertainty.
 
-## 2. Problem
+The core tension is:
 
-Celo stablecoins are useful onchain, but everyday Nigerian spending still happens through local bank and utility rails.
+> **Conversational payments aren’t the hard part. Proving the real-world outcome is.**
 
-A user who holds USDC should not need to understand:
+## 4. Goals
 
-- off-ramp APIs;
-- exchange-rate endpoints;
-- bank settlement state;
-- VTU network codes;
-- provider retries;
-- payment references;
-- multiple dashboards.
+- Turn supported natural-language requests into typed, deterministic `PaymentIntent`s.
+- Require explicit human approval before order creation and wallet signing.
+- Keep language interpretation separate from financial authority.
+- Bind provider-authoritative fees and exact payment totals before the transfer.
+- Verify Celo deposits against expected sender, receiver, token, and amount.
+- Reconcile Paycrest fiat delivery separately from protocol completion.
+- Trigger ClubKonnect only after durable fiat-final truth is recorded (set when authoritative fiat delivery `validated` is observed; upstream `settled` also satisfies it).
+- Prevent duplicate fulfilment through deterministic RequestIDs and durable claims.
+- Recover unknown outcomes through references and reconciliation, never blind retries.
+- Persist a truthful transaction lifecycle across refreshes and restarts.
+- Give users an evidence-linked receipt for the stages and outcome actually available.
+- Preserve the existing bank cash-out flow.
 
-The user’s job should be to express the desired outcome and approve the exact payment.
+## 5. Non-goals
 
-Providus handles the rail complexity without hiding what is happening.
+- Custody of private keys, seed phrases, or user funds.
+- Autonomous spending without explicit approval.
+- Replacing wallets, Paycrest, ClubKonnect, banks, or utility providers.
+- Claiming a Celo deposit proves NGN delivery.
+- Claiming provider acknowledgement is final success.
+- Automatic Paycrest-to-ClubKonnect fund movement.
+- Production support for unshipped channels, providers, utility categories, or rails.
+- First/only/best category claims.
+- Photon/iMessage integration in this milestone.
+- Data bundles, electricity, cable, remittances, or broad multi-country expansion in the current slice.
 
----
+## 6. Users and user stories
 
-## 3. Current shipped product
+### Primary user
 
-### Live
+A Nigerian stablecoin user with Celo USDC who wants to complete a local payment without manually coordinating a wallet, off-ramp, settlement status, and utility provider.
 
-- Celo mainnet wallet connection.
-- Celo USDC balance/payment flow.
-- Paycrest live sell quote.
-- Nigerian institution/account verification.
-- Paycrest off-ramp order creation.
-- Direct USDC transfer to the Paycrest per-order receive address.
-- Real USDC → NGN bank cash-out has been successfully exercised.
+### Airtime sender
 
-### Known current limitation
+“I want to say ‘Send ₦1,000 MTN airtime to this number,’ review the recipient, network, amount, fees, and total, approve it, and know whether the airtime was delivered.”
 
-The app currently treats the Celo transaction receipt as its last programmatic checkpoint.
+### Cash-out user
 
-It does not yet durably track Paycrest through final NGN delivery.
+“I want to cash out Celo USDC to a verified Nigerian bank account, see the current quote and fees before signing, and distinguish on-chain deposit confirmation from Nigerian delivery.”
 
-That gap must be fixed before automatic utility fulfilment is allowed.
+### Judge or integrator
 
-### On-ramp
+“I want to see that conversation is not money authority, that provider mutations are deterministic, and that the receipt reflects real evidence rather than a guessed success flag.”
 
-Naira → Celo USDC architecture exists conceptually/partially, but provider support is not ready enough to make it the current hackathon focus.
+## 7. Current shipped scope
 
----
+### Shipped
 
-## 4. Target user
+- Web dashboard conversational assistant.
+- Multi-turn clarification and status explanations.
+- Deterministic/schema-validated airtime `PaymentIntent`.
+- Celo mainnet wallet connection and canonical Circle USDC.
+- Explicit approval before Paycrest order creation.
+- Explicit browser-wallet signing before the USDC transfer.
+- Paycrest live quotes, order creation, authoritative fee binding, and reconciliation.
+- Neon PostgreSQL (managed Postgres) + Drizzle durable transaction persistence.
+- ClubKonnect server-only airtime adapter, readiness handling, deterministic RequestIDs, one-shot claims, status normalization, and reconciliation.
+- Evidence-linked receipt/status surface.
+- Owner-scoped receipt evidence: explicit receipt and payment-instruction reads are wallet-checked server-side before any DTO or evidence is returned, while the default status endpoint remains a sanitized public status read.
+- Existing Nigerian bank cash-out through Paycrest.
+- ERC-8021 attribution tag `celo_8190b99392a2` on eligible transfers.
+- One completed human-gated Celo mainnet airtime run documented in `docs/live-airtime-e2e.md`.
 
-### Primary
+The live run demonstrates one complete request → receipt chain. It is not a universal guarantee for every transaction.
 
-A Nigerian stablecoin user who has Celo USDC and wants to turn it into an everyday local payment without manually navigating multiple providers.
+### Current limits
 
-### Secondary
+- Airtime is the shipped utility category.
+- The current production channel is the web dashboard.
+- Paycrest and ClubKonnect are the current settlement and fulfilment adapters.
+- Additional providers and channels are roadmap-only extension points, not shipped support.
 
-- freelancers/remote workers receiving stablecoins;
-- family members paying airtime/data for someone else;
-- crypto-native users who want simple NGN utility payments;
-- agents/apps that may later invoke a safe Providus payment action.
+## 8. Core user journey
 
----
+1. User opens the dashboard and states a supported payment request.
+2. Conversation layer asks for missing or ambiguous fields.
+3. The model produces a candidate structured intent.
+4. Deterministic validation produces a usable `PaymentIntent` or a clear unsupported/error state.
+5. Providus shows exact recipient, network, amount, quote, fees, expiry, Celo network, and total.
+6. User explicitly approves the exact action.
+7. Providus creates and durably binds the Paycrest order and provider-authoritative fees.
+8. User explicitly signs the exact Celo USDC transfer in the browser wallet.
+9. Server verifies the on-chain deposit.
+10. Paycrest status is reconciled until durable fiat-final truth is recorded (set when the authoritative fiat-delivery condition is observed; a later raw `settling` event never clears it).
+11. Providus calls ClubKonnect through the fulfilment adapter using the stored transaction and deterministic RequestID, gated on that durable truth.
+12. ClubKonnect is reconciled to a documented terminal result.
+13. Receipt/status UI presents the approved terms and available execution, settlement, fulfilment, and outcome evidence.
 
-## 5. Core experience
+## 9. PaymentIntent model
 
-### Command flow
-
-1. User opens the Providus dashboard.
-2. User enters a natural command.
-3. Providus parses the payment intent.
-4. Providus asks for any missing critical field.
-5. Providus fetches the current Paycrest quote/fee information.
-6. Providus shows a confirmation card.
-7. User explicitly approves.
-8. Providus creates a durable transaction record and Paycrest order.
-9. User signs the Celo USDC transfer.
-10. Providus tracks Paycrest until the documented fiat-delivery condition.
-11. Providus triggers ClubKonnect airtime fulfilment.
-12. Providus reconciles ClubKonnect to a final result.
-13. User receives a truthful receipt.
-
----
-
-## 6. Airtime confirmation card
-
-Must show:
-
-- action: airtime;
-- recipient phone number;
-- mobile network;
-- NGN face value;
-- estimated/quoted USDC amount;
-- provider/payment fees separately where available;
-- total USDC to be sent;
-- quote freshness / expiry;
-- Celo mainnet;
-- explicit confirmation CTA.
-
-The user must be able to correct the network before payment.
-
-A phone prefix may be used only as a suggestion because mobile number portability can make prefix-based detection wrong.
-
----
-
-## 7. MVP scope
-
-### Must have before a real airtime demo
-
-- existing bank cash-out remains working;
-- financial amount-integrity bug fixed;
-- active ERC-8021 hackathon attribution tag wired correctly;
-- durable transaction persistence;
-- Paycrest post-deposit reconciliation;
-- deterministic airtime intent parser;
-- command box + confirmation card;
-- server-only ClubKonnect client;
-- provider readiness/balance check where available;
-- unique ClubKonnect RequestID;
-- ClubKonnect final-state reconciliation;
-- receipt/history state;
-- explicit approval before money movement;
-- no blind payment retries;
-- mobile-usable flow;
-- test coverage for duplicate and partial-failure paths.
-
-### Should have if time remains
-
-- data bundle purchase;
-- richer natural-language aliases;
-- transaction history on dashboard;
-- polished progress timeline;
-- shareable payment receipt.
-
-### Defer
-
-- electricity;
-- cable TV;
-- every VTU category;
-- IPO payments;
-- cNGN redesign solely to chase a bounty;
-- remittance expansion;
-- broad multi-country support;
-- autonomous payment without confirmation;
-- Kotani integration;
-- custody;
-- broad LLM agent framework;
-- custom smart contracts.
-
----
-
-## 8. Intent model
-
-Executable MVP intent:
+The first executable intent is airtime:
 
 ```ts
-type AirtimeIntent = {
-  type: "airtime"
-  amountNgn: string
-  phone: string
+type PaymentIntent = {
+  type: "airtime" | "data" | "electricity" | "cable" | "unsupported"
+  amountNgn?: string
+  phone?: string
   network?: "mtn" | "airtel" | "glo" | "9mobile"
+  missingFields: string[]
+  readyForConfirmation: boolean
 }
 ```
 
-The parser can be deterministic for reliability.
+Rules:
 
-If an LLM is later added:
+- LLM output is a candidate, never an authorization.
+- Deterministic schema and domain validation runs after model interpretation.
+- Missing or ambiguous payment-critical fields stop execution.
+- Network suggestions are editable; phone prefixes are not certainty because of number portability.
+- Approved amount, recipient, network, and action cannot be silently changed.
+- Unsupported intents return a clear non-executable state.
 
-- it may interpret language;
-- it may not silently invent recipients;
-- it may not change amount/network after confirmation;
-- it may not authorize a transaction;
-- payment-critical fields must be schema validated.
+## 10. Approval boundary
 
-Unsupported commands should return a clear “not available yet” state rather than pretending to execute.
+Approval is explicit and staged:
 
----
+- **Order approval:** user reviews the quote and authorizes Paycrest order creation.
+- **Wallet approval:** user separately clicks/signs the exact bound Celo USDC transfer in the connected browser wallet.
+- **Fulfilment gate:** deterministic code verifies the Celo deposit and durable fiat-final truth before calling ClubKonnect. Fulfilment depends on that durable monotonic marker, never on a raw equality check against the latest provider status string.
 
-## 9. Settlement model
+The receipt shows approved payment terms and execution/settlement/fulfilment evidence available for the transaction. It does not claim a standalone approval-event snapshot unless that event is explicitly persisted and rendered.
 
-### Provider roles
-
-**Paycrest**
-- crypto → NGN off-ramp;
-- quote/order/settlement rail.
-
-**ClubKonnect**
-- local VTU/utility fulfilment;
-- first target: airtime.
-
-### Critical assumption
-
-Paycrest does **not** automatically fund ClubKonnect.
-
-Hackathon operating model:
-
-1. Providus maintains a small prepaid NGN ClubKonnect float.
-2. User payment settles through Paycrest.
-3. Providus confirms the Paycrest fiat-delivery condition.
-4. Providus spends from the prepaid ClubKonnect balance to fulfil airtime.
-5. Paycrest NGN proceeds economically replenish the operating float through an external process unless a direct integration is later proven.
-
-Do not claim an automatic Paycrest → ClubKonnect transfer unless it is actually implemented and verified.
-
-A designated Providus NGN payout destination must exist before a live airtime order is attempted.
-
----
-
-## 10. Transaction states
-
-Internal state must be more truthful than a single “success” flag.
-
-Recommended:
+## 11. Execution pipeline
 
 ```text
-pending
-settling
-settled
-processing
-completed
-failed
-refunded
+Web today (future iMessage / WhatsApp / Telegram / MiniPay are roadmap-only)
+→ Conversation Layer
+→ PaymentIntent Engine
+→ Human Approval Boundary
+→ Providus Execution Engine
+→ two separate provider edges:
+     SettlementRail / Paycrest (current)      → Celo USDC → NGN settlement
+     FulfilmentProvider / ClubKonnect (current for airtime) → airtime fulfilment
+→ Reconciliation + Recovery
+→ Verified Outcome
+→ Receipt
 ```
 
-Interpretation:
+The engine fans out to two provider edges, and they stay separate: neither settlement nor fulfilment can trigger the other, and Paycrest does not fund ClubKonnect.
 
-- `pending` — intent/order exists; payment not yet confirmed;
-- `settling` — Celo payment sent/confirmed, Paycrest fiat delivery pending;
-- `settled` — required Paycrest fiat-delivery milestone reached (`validated` fiat delivery confirmed); for `cash_out` this is the effective terminal business outcome, while for utility transactions it enables downstream fulfilment;
-- `processing` — ClubKonnect fulfilment submitted/reconciling;
-- `completed` — airtime final success verified;
-- `failed` — terminal failure requiring user-facing explanation/review;
-- `refunded` — refund actually occurred.
+### Trust ownership
 
-Never write `refunded` merely because fulfilment failed.
+| Owner | Owns | Does not own |
+|---|---|---|
+| **User** | Approval of the exact bound terms and the browser-wallet USDC signature | No money movement without both |
+| **LLM** | Language interpretation, clarification, structured candidate data | Validation authority, payment-critical fields, provider calls, wallet signing, success states, refunds |
+| **Deterministic Providus code** | `PaymentIntent` validation, quote/fee binding, execution eligibility, durable state, reconciliation, fulfilment gating, recovery, receipts | No unevidenced success or completion claim |
+| **Paycrest** | Celo USDC → NGN settlement | Fulfilment or fulfilment gating |
+| **ClubKonnect** | Airtime fulfilment | When it is called, or whether its result ends the Providus lifecycle |
+| **Celo** | On-chain payment evidence | NGN delivery or utility fulfilment |
+| **Neon PostgreSQL + Drizzle** | Durable transaction state | Provider truth that has not been reconciled |
 
----
+**Provider acknowledgement is never final success.**
 
-## 11. Reliability rules
+### Providus-owned responsibilities
 
-- Initial provider acknowledgement is not final success.
-- Unknown request outcome is not permission to create another order.
-- Duplicate callbacks/polls must not trigger duplicate airtime.
-- Quote expiry forces a fresh confirmation when economics change materially.
-- Persist an orchestration before crossing irreversible provider boundaries.
-- Upstream amount returned by Paycrest must exactly match the approved amount.
-- Every provider mutation gets a unique/idempotent reference.
-- No full account numbers/API keys in logs.
-- Payment and provider calls stay server-side except the user’s wallet signature.
+- intent validation;
+- approval boundaries;
+- exact fee and amount binding;
+- durable state and idempotency;
+- orchestration and provider call eligibility;
+- Celo verification;
+- settlement and fulfilment reconciliation;
+- safe recovery from unknown outcomes;
+- terminal outcome classification;
+- receipt evidence assembly.
 
----
+### Current adapters
 
-## 12. Celo / hackathon requirements
+| Adapter role | Current implementation | Status |
+|---|---|---|
+| SettlementRail | Paycrest | Shipped |
+| FulfilmentProvider | ClubKonnect | Shipped for airtime |
+| Channel | Web dashboard | Shipped |
 
-Current Agents at Work identity:
+### Future adapters
+
+Everything in this subsection is **roadmap-only**: not shipped, not production-supported, and not a current product claim. iMessage/Photon, WhatsApp, Telegram, MiniPay, additional settlement rails, and additional fulfilment providers are future adapters. They must feed the same intent, approval, execution, state, reconciliation, and receipt path rather than introduce independent payment engines. The web dashboard is the only shipped channel.
+
+## 12. Settlement and fulfilment semantics
+
+Paycrest statuses have distinct meanings:
+
+- `initiated` — order created, awaiting deposit.
+- `deposited` — Paycrest detected the on-chain deposit.
+- `pending` / `fulfilling` — settlement is in progress.
+- `validated` — provider confirmed fiat delivery; the authoritative condition that sets the durable fiat-final marker permitting downstream utility fulfilment.
+- `settling` — protocol escrow settlement is in progress.
+- `settled` — Paycrest protocol completion is recorded; it is tracked separately from the fiat-delivery event.
+- `refunded` — deposit returned to the user; must be verified, never inferred.
+
+The current airtime operating model uses a Providus NGN fulfilment float. Paycrest does not automatically fund ClubKonnect.
+
+Fiat finality is durable and monotonic. The authoritative fiat-delivery status is `validated` (upstream `settled` also satisfies the condition because it subsumes that delivery and records protocol completion). When either authoritative status is observed, the transaction records a persisted fiat-final boolean. Fulfilment requires that durable truth rather than a raw equality check against the latest provider string, so a later raw `settling` event — normal protocol escrow-release progression after fiat delivery — never clears the marker and never re-blocks fulfilment.
+
+The three values are distinct and must never be collapsed into one success flag:
+
+- **`validated`** — authoritative fiat delivery; sets the durable monotonic fiat-final marker and is the safe point to trigger downstream utility fulfilment.
+- **`settling`** — later protocol progression (escrow release in progress); it never clears fiat delivery, never re-blocks fulfilment, and never proves protocol completion.
+- **`settled`** — protocol completion; it also subsumes prior fiat delivery, so it satisfies the fiat-final gate.
+
+The raw Paycrest lifecycle stays recorded distinctly and is never rewritten.
+
+**Provider acknowledgement is never final success.** `initiated`, `deposited`, `pending`, `fulfilling`, and a pre-delivery `settling` read are progress signals, not delivery; a Celo deposit is not NGN settlement.
+
+ClubKonnect status handling is conservative:
+
+- `100` and `300` are non-terminal processing/acknowledgement states.
+- `200` is terminal success and permits `completed`.
+- `201` and unknown responses require reconciliation and are not success.
+- `417` is terminal provider-float failure.
+
+**ClubKonnect acknowledgement is never final success.** A callback, `100`/`300`, or a successful transport response cannot permit `completed`; only numeric `200` does. An unresolved RequestID is a recovery branch — reconciled against the durable reference recorded at claim time — never a retry with a new reference.
+
+## 13. Transaction lifecycle
+
+Internal status is type-aware:
+
+| Status | Meaning |
+|---|---|
+| `pending` | Order exists; awaiting Celo USDC deposit. |
+| `settling` | Deposit verified; Paycrest fiat delivery pending. |
+| `settled` | The durable fiat-final milestone or Paycrest protocol completion has been recorded. The fiat-final marker is set when authoritative fiat delivery (`validated`) is observed and is never cleared afterwards; upstream `settled` also records protocol completion. Terminal for direct cash-out; enables utility fulfilment for airtime. |
+| `processing` | ClubKonnect fulfilment is claimed or in flight. |
+| `completed` | Airtime terminal success is verified. |
+| `failed` | Documented terminal failure. |
+| `refunded` | Refund actually verified. |
+
+The public labels rendered to users come only from `lib/transactions/status.ts`; the `/how-it-works` trust section renders the same set:
+
+Awaiting payment · Celo deposit confirmed · NGN payout in progress · NGN settlement processing · NGN settlement confirmed · Airtime request submitting · Airtime processing · Provider status unresolved · Airtime delivered · Airtime fulfilment failed · Failed · Refunded · Recovery required · Fiat delivery confirmed (cash-out) · Paycrest protocol settled (cash-out) · Completed (cash-out only) · Fulfilment processing (cash-out only)
+
+- `deposit_confirming` is declared in the stage union but never emitted; it is not a public label and must not be presented as one.
+- Exceptional branches are `failed`, `recovery_required`, and `refunded`. The airtime reconciliation-required branch (`Provider status unresolved`) is a recovery branch, not a failure and not a success.
+- These labels describe observed stage and recovery needs; they do not weaken the terminal-state rules and never upgrade a provider acknowledgement into success.
+
+## 14. Receipt and evidence requirements
+
+A receipt/status surface may show:
+
+- requested action and approved payment terms;
+- transaction identifier;
+- Celo transaction and verification state;
+- Paycrest order/reference and reconciled status;
+- fiat-delivery condition and protocol settlement separately;
+- durable fiat-final state, presented monotonically rather than as the latest raw status alone;
+- ClubKonnect RequestID/order/status evidence;
+- lifecycle timestamps and terminal outcome;
+- sanitized failure or recovery explanation.
+
+Receipt access is scoped:
+
+- `GET /api/transactions/[id]` without owner scope remains a sanitized public status read for compatibility and carries no owner-only evidence.
+- An explicit owner-scoped receipt request (`scope=receipt`) and the opt-in payment-instruction request must include a valid `walletAddress`. The server checks that address against the stored transaction wallet before reconciliation and before DTO/evidence serialization. Missing or invalid context returns no transaction DTO or evidence; a mismatch returns a generic forbidden response rather than transaction detail.
+- The receipt UI requests owner scope with the connected wallet and compares wallets locally, but that client-side check is defence-in-depth, never the authorization boundary.
+
+ERC-8021 attribution is described from the recorded tag and transfer evidence as “Attribution configured” or as the “ERC-8021 attribution tag”. The receipt must not render “Verified” from the static tag alone.
+
+It must not:
+
+- invent success from a provider acknowledgement;
+- equate Celo deposit with NGN delivery;
+- expose secrets, full bank details, or unnecessary PII;
+- claim a standalone approval event that is not persisted/rendered;
+- imply verified ERC-8021 attribution from a static tag without supporting transfer evidence.
+
+## 15. Recovery and idempotency
+
+- **No blind retry.** An unknown-outcome mutation is recorded and reconciled through its original reference; it is never repeated.
+- **Durable reference.** The Paycrest order reference and the deterministic ClubKonnect RequestID are persisted with the transaction so recovery survives refreshes and restarts.
+- Persist state before irreversible multi-provider orchestration.
+- Use one idempotency key/order binding per approved transaction.
+- Unknown Paycrest order-creation outcomes are recorded and blocked from blind retry; the original reference is routed to safe recovery/reconciliation when available.
+- Duplicate callbacks and polls are idempotent.
+- ClubKonnect fulfilment has a deterministic RequestID and one-shot mutation claim.
+- Unknown ClubKonnect responses query/reconcile the same RequestID; they never create a second purchase.
+- Never write `refunded` without evidence of an actual refund.
+- Never treat provider callbacks as permission to duplicate fulfilment.
+- Never treat a provider acknowledgement as final success.
+
+## 16. Privacy and security
+
+- Provider keys remain server-only.
+- No private keys or seed phrases reach Providus.
+- Wallet signing remains in the user’s connected browser wallet.
+- Bank identifiers and phone numbers are minimized and masked in logs/UI where appropriate.
+- Credential-bearing URLs and raw provider payloads are redacted.
+- Exact decimal arithmetic is used for payment values.
+- No autonomous background spending in the current product.
+
+## 17. Roadmap
+
+Roadmap-only — not shipped, not production-supported, and not a current product claim:
+
+- data bundles;
+- electricity payments;
+- cable TV subscriptions;
+- iMessage/Photon proof or adapter;
+- WhatsApp, Telegram, MiniPay, and other channel adapters;
+- additional settlement rails;
+- additional fulfilment providers;
+- recurring/session-key spending;
+- broader remittance and multi-country support;
+- general-purpose autonomous agent framework.
+
+These items must reuse the canonical execution and proof architecture after their rails, approval boundaries, and reconciliation behavior are implemented and verified.
+
+## 18. Celo and hackathon requirements
 
 ```text
-ERC-8004: https://8004scan.io/agents/celo/9851
-Agent ID: 9851
+ERC-8004 Agent ID: 9851
+Active attribution tag: celo_8190b99392a2
 ```
 
-Current locked attribution tag:
-
-```text
-celo_8190b99392a2
-```
+Eligible Celo transfers use the active ERC-8021 attribution tag. The obsolete tag `celo_91fed90b97fc` must not be used.
 
 Registered tracks:
 
@@ -303,120 +360,41 @@ Registered tracks:
 - `judges-favorite`;
 - `cpay-feedback`.
 
-All eligible new Celo transactions intended for hackathon attribution must use the active tag once ERC-8021 support is correctly implemented.
+## 19. Success criteria
 
-Do not use the old hackathon tag `celo_91fed90b97fc`.
-
----
-
-## 13. Track strategy
-
-### Real World Adoption
-
-The product itself should prove the track:
-
-- stablecoin holder;
-- real Nigerian need;
-- user approval;
-- real local payout/fulfilment;
-- truthful receipt.
-
-### Value Moved
-
-Use real economic activity only.
-
-Prefer transactions involving genuine usage/independent participants rather than self-generated volume.
-
-### AskBots Growth
-
-Baseline review must happen before the P0 hardening changes. Preserve findings and scores, implement improvements, then complete the second review.
-
-### Judges’ Favorite
-
-Win attention through one coherent end-to-end experience, not feature count:
-
-> command → confirm → Celo → local rail → proof.
-
-### buy feedback
-
-Treat beta testing/feedback as a separate track workstream. Do not distort the core Providus architecture merely to satisfy it.
-
----
-
-## 14. Security & privacy
-
-- Paycrest and ClubKonnect keys are server-only.
-- `.env` must stay out of git.
-- If a secret is found in git history, rotate it.
-- Never print credential values in diagnostics.
-- Bank account details should be minimized and masked in logs.
-- Phone numbers should be minimized in logs.
-- Use exact decimal arithmetic.
-- Validate all provider payloads.
-- Never blindly retry a payment.
-- User approval is required before wallet submission.
-- No autonomous background spending in this MVP.
-
----
-
-## 15. Success metrics
-
-### Product north star
+The product north star is:
 
 > **Completed real-world payments from Celo stablecoins with truthful end-to-end proof.**
 
-### Hackathon evidence
+Evidence includes real user approval, Celo verification, authoritative fiat delivery, terminal utility fulfilment, no duplicate fulfilment, and a truthful receipt. One live run is evidence of one successful run, not a guarantee across all conditions.
 
-- successful tagged Celo mainnet payment activity after attribution implementation;
-- real Paycrest settlement;
-- completed airtime fulfilment;
-- number of genuine users/signers;
-- repeat usage if achieved organically;
-- zero duplicate fulfilment incidents;
-- AskBots baseline-to-round-2 improvement;
-- public demo quality;
-- useful buy feedback submission.
-
-Do not optimize metrics through spam or meaningless transactions.
-
----
-
-## 16. Demo script
-
-Ideal submission demo:
+## 20. Demo narrative
 
 1. User connects a Celo wallet holding USDC.
-2. User types: `Send ₦500 airtime to 080...`
-3. Providus parses the command.
-4. Confirmation card shows phone, network, NGN amount, USDC total and fee.
-5. User corrects/accepts the network and approves.
-6. Wallet signs the tagged Celo USDC transaction.
-7. Providus shows `Settling with Paycrest`.
-8. Paycrest fiat delivery is reconciled.
-9. Providus moves to `Delivering airtime`.
-10. ClubKonnect final success is reconciled.
-11. Receipt shows completed airtime and transaction evidence.
-12. Existing bank cash-out remains available as a separate proven flow.
+2. User requests Nigerian airtime conversationally.
+3. Providus validates the `PaymentIntent` and shows the exact terms.
+4. User approves order creation and signs the exact wallet transfer.
+5. Providus verifies the Celo deposit.
+6. Paycrest `validated` is reconciled as fiat delivery and records durable monotonic fiat-final truth; `settled` is tracked separately as protocol completion.
+7. ClubKonnect fulfilment is submitted — gated on that durable truth — and reconciled by deterministic RequestID.
+8. Status `200` verifies delivery.
+9. Receipt shows the approved terms and available execution/settlement/fulfilment evidence.
+10. Existing bank cash-out remains a separate supported flow.
 
-If final provider settlement cannot be demonstrated safely before the deadline, do not fake a completed state.
+## 21. Definition of done for future changes
 
----
+A future utility or channel is not shipped until:
 
-## 17. Definition of done
-
-The airtime MVP is done only when:
-
-- existing cash-out regressions pass;
-- repo secrets are not exposed;
-- active attribution tag is correctly encoded;
-- transaction survives page refresh/server restart;
-- user intent is validated;
+- its `PaymentIntent` is validated;
 - approval is explicit;
-- Paycrest order amount integrity is enforced;
-- Paycrest settlement is programmatically reconciled;
-- ClubKonnect fulfilment is idempotent;
-- provider acknowledgement is not treated as final success;
-- a terminal completed/failed state is truthful;
-- one explicitly approved mainnet demo can run end to end;
-- README/docs distinguish shipped functionality from future categories;
-- project remains ready for final Celo Builders submission.
+- payment-critical values are bound and immutable;
+- provider state is reconciled;
+- unknown outcomes are recoverable without blind retry;
+- fulfilment is idempotent;
+- terminal success is independently verified;
+- receipts distinguish evidence from inference;
+- secrets and PII remain protected;
+- the P6.14 trust story stays synchronized across `/how-it-works#trust`, `README.md`, this PRD, `docs/PROVIDUS_ARCHITECTURE.md`, and `docs/positioning.md`;
+- current bank cash-out behavior remains intact.
+
+Until then the item stays roadmap-only and must not be described as shipped capability.

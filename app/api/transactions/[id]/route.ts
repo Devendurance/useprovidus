@@ -18,6 +18,25 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
+const OWNER_SCOPE_REQUIRED_ERROR = "Wallet context is required";
+const OWNER_SCOPE_INVALID_ERROR = "Invalid wallet context";
+const OWNER_SCOPE_FORBIDDEN_ERROR = "Forbidden";
+
+/**
+ * Refusal body for an owner-scoped read that never proved ownership. Fixed
+ * machine-readable wording only: a rejected caller learns nothing about the
+ * transaction — not its existence, id, owner, amounts, or provider state.
+ */
+function ownerScopeError(
+  status: 400 | 401 | 403,
+  error: string,
+): NextResponse {
+  return NextResponse.json(
+    { ok: false, error },
+    { status, headers: NO_STORE },
+  );
+}
+
 
 /**
  * Outcome of an opt-in rehydration read. `omitted` is the legacy body for a read
@@ -121,7 +140,23 @@ export async function GET(
   // plain DTO, never ownership proof for payable instructions.
   const wantsInstructions =
     url.searchParams.get("paymentInstructions") === "true";
+  // An explicit owner-scoped receipt read and the opt-in payment-instruction
+  // read are both owner-scoped: plain status polling stays public and sanitized,
+  // but these reads are answered only to the wallet that owns the row.
+  const ownerScoped =
+    wantsInstructions || url.searchParams.get("scope") === "receipt";
   const requestedWallet = (url.searchParams.get("walletAddress") ?? "").trim();
+
+  // The owner gate runs before the lookup, before reconciliation, and before any
+  // DTO is built: a caller without a wallet context never learns whether the
+  // transaction exists, never triggers a provider call, and never receives
+  // transaction evidence.
+  if (ownerScoped && requestedWallet === "") {
+    return ownerScopeError(401, OWNER_SCOPE_REQUIRED_ERROR);
+  }
+  if (ownerScoped && !isAddress(requestedWallet)) {
+    return ownerScopeError(400, OWNER_SCOPE_INVALID_ERROR);
+  }
 
   const repo = getTransactionRepository();
   const byId = await repo.findById(id);
@@ -137,6 +172,20 @@ export async function GET(
       { ok: false, error: `Transaction ${id} not found` },
       { status: 404, headers: NO_STORE },
     );
+  }
+
+  // Ownership is proven against the stored row before anything else happens: a
+  // mismatched wallet, or a row whose stored owner is missing or malformed, gets
+  // one generic refusal and no transaction evidence.
+  if (
+    ownerScoped &&
+    !(
+      isAddress(requestedWallet) &&
+      isAddress(tx.walletAddress) &&
+      requestedWallet.toLowerCase() === tx.walletAddress.toLowerCase()
+    )
+  ) {
+    return ownerScopeError(403, OWNER_SCOPE_FORBIDDEN_ERROR);
   }
 
   const shouldReconcile =

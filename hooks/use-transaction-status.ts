@@ -22,6 +22,88 @@ export interface TransactionStatusState {
 
 const POLL_INTERVAL_MS = 5000;
 
+export function isTerminalTransactionState(
+  stage: string | undefined,
+  status: string | undefined,
+): boolean {
+  return (
+    stage === "airtime_delivered" ||
+    stage === "failed" ||
+    stage === "recovery_required" ||
+    status === "completed" ||
+    status === "failed" ||
+    status === "refunded"
+  );
+}
+
+export function shouldPollTransactionStatus(
+  stage: string | undefined,
+  type: string | undefined,
+  status: string | undefined,
+): boolean {
+  if (isTerminalTransactionState(stage, status)) {
+    return false;
+  }
+
+  if (type === "airtime") {
+    return (
+      stage === "settling" ||
+      stage === "deposit_confirmed" ||
+      stage === "settled" ||
+      stage === "airtime_submitting" ||
+      stage === "airtime_processing" ||
+      stage === "airtime_reconciliation_required"
+    );
+  }
+
+  return stage === "settling" || stage === "deposit_confirmed";
+}
+
+interface PollableTransactionResult {
+  stage?: string;
+  transaction?: {
+    type?: string;
+    status?: string;
+  };
+}
+
+export function createTransactionPollingController(
+  request: () => Promise<PollableTransactionResult | null>,
+  setTimer: (callback: () => void, delayMs: number) => number,
+  clearTimer: (timerId: number) => void,
+) {
+  let active = true;
+  let timerId: number | null = null;
+
+  const poll = async () => {
+    const result = await request();
+    if (!active || !result) return;
+    if (
+      shouldPollTransactionStatus(
+        result.stage,
+        result.transaction?.type,
+        result.transaction?.status,
+      )
+    ) {
+      timerId = setTimer(() => void poll(), POLL_INTERVAL_MS);
+    }
+  };
+
+  return {
+    start(stage: string | undefined, type: string | undefined, status: string | undefined) {
+      if (shouldPollTransactionStatus(stage, type, status)) {
+        timerId = setTimer(() => void poll(), POLL_INTERVAL_MS);
+      }
+    },
+    stop() {
+      active = false;
+      if (timerId !== null) {
+        clearTimer(timerId);
+      }
+    },
+  };
+}
+
 export function useTransactionStatus(
   transactionId: string | null | undefined,
   options?: {
@@ -30,8 +112,11 @@ export function useTransactionStatus(
     onAirtimeDelivered?: () => void;
   },
 ) {
+  const enabled = options?.enabled !== false;
+  const onFiatSettled = options?.onFiatSettled;
+  const onAirtimeDelivered = options?.onAirtimeDelivered;
   const [state, setState] = useState<TransactionStatusState>({
-    loading: Boolean(transactionId && options?.enabled !== false),
+    loading: Boolean(transactionId && enabled),
     transaction: null,
     stage: "awaiting_payment",
     stageLabel: "Awaiting payment",
@@ -47,7 +132,12 @@ export function useTransactionStatus(
   const settledCalledRef = useRef(false);
   const airtimeDeliveredCalledRef = useRef(false);
   const fulfilTriggeredRef = useRef<Record<string, boolean>>({});
-
+  const onFiatSettledRef = useRef(onFiatSettled);
+  const onAirtimeDeliveredRef = useRef(onAirtimeDelivered);
+  useEffect(() => {
+    onFiatSettledRef.current = onFiatSettled;
+    onAirtimeDeliveredRef.current = onAirtimeDelivered;
+  }, [onFiatSettled, onAirtimeDelivered]);
   const fetchStatus = useCallback(
     async (id: string, reconcile = false) => {
       try {
@@ -95,12 +185,12 @@ export function useTransactionStatus(
 
           if (data.isFiatFinal && !settledCalledRef.current) {
             settledCalledRef.current = true;
-            options?.onFiatSettled?.();
+            onFiatSettledRef.current?.();
           }
 
           if (data.isAirtimeDelivered && !airtimeDeliveredCalledRef.current) {
             airtimeDeliveredCalledRef.current = true;
-            options?.onAirtimeDelivered?.();
+            onAirtimeDeliveredRef.current?.();
           }
 
           // When an airtime transaction reaches a settled state with Paycrest
@@ -152,7 +242,7 @@ export function useTransactionStatus(
         return null;
       }
     },
-    [options],
+    [],
   );
 
   const confirmDeposit = useCallback(
@@ -194,80 +284,44 @@ export function useTransactionStatus(
     },
     [transactionId, fetchStatus],
   );
-
-  // State-driven polling effect: runs and continues polling whenever stage is settling or deposit_confirmed
   useEffect(() => {
-    if (!transactionId || options?.enabled === false) {
+    if (!transactionId || !enabled) {
       return;
     }
 
-    const isAirtime = state.transaction?.type === "airtime";
-    const shouldPoll = isAirtime
-      ? state.stage === "settling" ||
-        state.stage === "deposit_confirmed" ||
-        state.stage === "settled" ||
-        state.stage === "airtime_submitting" ||
-        state.stage === "airtime_processing" ||
-        state.stage === "airtime_reconciliation_required"
-      : state.stage === "settling" ||
-        state.stage === "deposit_confirmed" ||
-        state.stage === "airtime_submitting" ||
-        state.stage === "airtime_processing" ||
-        state.stage === "airtime_reconciliation_required";
-
-    if (!shouldPoll) {
-      return;
-    }
-
-    let active = true;
-    let timerId: number | null = null;
-
-    const poll = async () => {
-      const result = await fetchStatus(transactionId, true);
-      if (!active) return;
-      const currentStage = result?.stage;
-      const isResultAirtime = result?.transaction?.type === "airtime";
-      const continuePolling = isResultAirtime
-        ? currentStage === "settling" ||
-          currentStage === "deposit_confirmed" ||
-          currentStage === "settled" ||
-          currentStage === "airtime_submitting" ||
-          currentStage === "airtime_processing" ||
-          currentStage === "airtime_reconciliation_required"
-        : currentStage === "settling" ||
-          currentStage === "deposit_confirmed" ||
-          currentStage === "airtime_submitting" ||
-          currentStage === "airtime_processing" ||
-          currentStage === "airtime_reconciliation_required";
-
-      if (continuePolling) {
-        timerId = window.setTimeout(poll, POLL_INTERVAL_MS);
-      }
-    };
-    timerId = window.setTimeout(poll, POLL_INTERVAL_MS);
+    const controller = createTransactionPollingController(
+      () => fetchStatus(transactionId, true),
+      (callback, delayMs) => window.setTimeout(callback, delayMs),
+      (timerId) => window.clearTimeout(timerId),
+    );
+    controller.start(
+      state.stage,
+      state.transaction?.type,
+      state.transaction?.status,
+    );
 
     return () => {
-      active = false;
-      clearTimeout(timerId as number);
+      controller.stop();
     };
   }, [
     transactionId,
     state.stage,
     state.transaction?.type,
-    options?.enabled,
+    state.transaction?.status,
+    enabled,
     fetchStatus,
   ]);
 
   // On initial mount, fetch current transaction state
   useEffect(() => {
-    if (!transactionId || options?.enabled === false) return;
+    if (!transactionId || !enabled) return;
     const timer = setTimeout(() => {
-      fetchStatus(transactionId, true);
+      fetchStatus(transactionId, false);
     }, 0);
     return () => {
       clearTimeout(timer);
     };
-  }, [transactionId, options?.enabled, fetchStatus]);
+  }, [transactionId, enabled, fetchStatus]);
 
   const refetch = useCallback(() => {
     if (transactionId) {

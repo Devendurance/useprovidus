@@ -9,8 +9,8 @@ import { cn } from "@/lib/cn";
 
 const NAV = [
   { href: "/how-it-works", label: "How it works" },
-  { href: "/check", label: "Move Money" },
-  { href: "/receipt", label: "Receipt" },
+  { href: "/check", label: "Bank cash-out" },
+  { href: "/receipt", label: "Receipts" },
   { href: "/dashboard", label: "Dashboard" },
 ] as const;
 
@@ -66,10 +66,10 @@ export function SiteHeader() {
         <div className="hidden items-center gap-3 md:flex">
           <ConnectWalletButton />
           <Link
-            href="/check"
-            className="inline-flex h-11 min-h-11 items-center justify-center rounded-[8px] border-[1.5px] border-ink bg-cream px-5 text-sm font-semibold text-ink transition-colors hover:bg-ink hover:text-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            href="/dashboard"
+            className="inline-flex h-11 min-h-11 items-center justify-center rounded-[8px] border-[1.5px] border-ink bg-ink px-5 text-sm font-semibold text-cream transition-colors hover:bg-cream hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
-            Move Money
+            Try Providus
           </Link>
         </div>
 
@@ -112,11 +112,11 @@ export function SiteHeader() {
             <div className="mt-3 flex flex-col gap-2 border-t border-ink/20 pt-4">
               <ConnectWalletButton fullWidth />
               <Link
-                href="/check"
+                href="/dashboard"
                 onClick={() => setOpen(false)}
-                className="inline-flex h-11 min-h-11 items-center justify-center rounded-[8px] border-[1.5px] border-ink bg-cream px-7 text-base font-semibold text-ink transition-colors hover:bg-ink hover:text-cream"
+                className="inline-flex h-11 min-h-11 items-center justify-center rounded-[8px] border-[1.5px] border-ink bg-ink px-7 text-base font-semibold text-cream transition-colors hover:bg-cream hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
-                Move Money
+                Try Providus
               </Link>
             </div>
           </nav>

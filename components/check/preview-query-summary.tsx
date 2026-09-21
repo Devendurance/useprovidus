@@ -44,8 +44,8 @@ export function PreviewQuerySummary() {
       <Card variant="flat">
         <CardTitle className="text-base">Your inputs</CardTitle>
         <CardDescription>
-          No cash-out details in this session. Start from Move Money to request
-          a live quote and verify a Nigerian bank recipient.
+          No bank cash-out details in this session. Start from Bank cash-out to
+          request a live quote and verify a Nigerian bank recipient.
         </CardDescription>
       </Card>
     );
@@ -71,8 +71,8 @@ export function PreviewQuerySummary() {
     <Card variant="flat">
       <CardTitle className="text-base">Your inputs</CardTitle>
       <CardDescription>
-        Carried from a legacy link. These labels are not a live quote and do
-        not authorize a transfer.
+        Older link values are shown for context only. These labels are not a
+        live quote and do not authorize a transfer.
       </CardDescription>
       <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         {rows.map((row) => (

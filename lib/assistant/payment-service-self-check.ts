@@ -32,7 +32,13 @@
  *      its own id with the owning wallet and intact metadata, `null` for every
  *      other refusal, and `PAYMENT_ORDER_EXPIRED` only when that ownership and
  *      status context is already proven — and it stays a pure read that never
- *      reconciles or otherwise calls the provider.
+ *      reconciles or otherwise calls the provider;
+ *  11. an owner-scoped read (`paymentInstructions=true` or `scope=receipt`) is
+ *      gated server-side before reconciliation and before any DTO is built: the
+ *      owning wallet is served, an absent wallet context is refused with 401, a
+ *      malformed one with 400, and another wallet's address with one generic
+ *      403 that carries no transaction field, instruction, or wallet echo —
+ *      while plain status polling stays public.
  *
  * No live Paycrest orders, no ClubKonnect purchases, no blockchain transactions.
  * Run: npx tsx --conditions=react-server lib/assistant/payment-service-self-check.ts
@@ -380,6 +386,29 @@ async function readRehydratedBody(response: Response): Promise<{
     paymentInstructions?: PaymentInstructions | null;
     paymentInstructionsError?: string;
   };
+}
+
+/**
+ * Reads one owner-scope refusal. A refused read is a closed surface: the status
+ * is the only signal, and the body carries no transaction DTO, instruction,
+ * expiry code, or stage evidence.
+ */
+async function readRefusalBody(
+  response: Response,
+  expectedStatus: number,
+  label: string,
+): Promise<Record<string, unknown>> {
+  assert.equal(response.status, expectedStatus, label);
+  assert.equal(response.headers.get("cache-control"), "no-store", label);
+  const body = (await response.json()) as Record<string, unknown>;
+  assert.equal(body.ok, false, label);
+  assert.equal(typeof body.error, "string", label);
+  assert.equal("transaction" in body, false, label);
+  assert.equal("paymentInstructions" in body, false, label);
+  assert.equal("paymentInstructionsError" in body, false, label);
+  assert.equal("stage" in body, false, label);
+  assert.equal("isFiatFinal" in body, false, label);
+  return body;
 }
 
 /** Always-consumable fake: simulates a second caller reaching the pre-order step. */
@@ -1463,30 +1492,88 @@ async function run() {
       assert.equal("paymentInstructionsError" in response, false, label);
     }
 
-    // An opt-in read always answers explicitly. Without an owning wallet there is
-    // nothing to say about the order, so the field is a bare `null`: no expiry
-    // code, no ownership oracle, and no payable instructions.
-    const nullReads: Array<{ label: string; query: string }> = [
-      { label: "missing wallet", query: "?paymentInstructions=true" },
-      { label: "blank wallet", query: "?paymentInstructions=true&walletAddress=%20" },
+    // Owner-scoped reads are gated by the server before reconciliation and
+    // before any DTO is built. A missing wallet context is refused with 401, a
+    // malformed one with 400, and another wallet's address with one generic 403.
+    // Every refusal is closed: no transaction DTO, no instruction, no expiry
+    // code, and no echo of the id, owner, destination, or amount.
+    const refusalReads: Array<{
+      label: string;
+      query: string;
+      status: number;
+    }> = [
+      { label: "missing wallet", query: "?paymentInstructions=true", status: 401 },
+      {
+        label: "blank wallet",
+        query: "?paymentInstructions=true&walletAddress=%20",
+        status: 401,
+      },
       {
         label: "malformed wallet",
         query: "?paymentInstructions=true&walletAddress=0xnot-an-address",
+        status: 400,
       },
       {
         label: "foreign wallet",
         query: `?paymentInstructions=true&walletAddress=${OTHER_WALLET}`,
+        status: 403,
+      },
+      {
+        label: "receipt scope, missing wallet",
+        query: "?scope=receipt",
+        status: 401,
+      },
+      {
+        label: "receipt scope, malformed wallet",
+        query: "?scope=receipt&walletAddress=0xnot-an-address",
+        status: 400,
+      },
+      {
+        label: "receipt scope, foreign wallet",
+        query: `?scope=receipt&walletAddress=${OTHER_WALLET}`,
+        status: 403,
       },
     ];
 
-    for (const { label, query } of nullReads) {
-      const response = await readRehydratedBody(
+    for (const { label, query, status } of refusalReads) {
+      const refusal = await readRefusalBody(
         await rehydrateTransaction(rehydrationSandbox, boundRow.id, query),
+        status,
+        label,
       );
-      assert.equal(response.transaction.id, boundRow.id, label);
-      assert.equal(response.paymentInstructions, null, label);
-      assert.equal("paymentInstructionsError" in response, false, label);
+      const serialized = JSON.stringify(refusal);
+      assert.equal(serialized.includes(boundRow.id), false, `${label}: no id`);
+      assert.equal(
+        serialized.includes(WALLET.toLowerCase()),
+        false,
+        `${label}: no owner wallet`,
+      );
+      assert.equal(
+        serialized.includes(OTHER_WALLET),
+        false,
+        `${label}: no presented wallet echo`,
+      );
+      assert.equal(
+        serialized.includes(RECEIVE_ADDRESS),
+        false,
+        `${label}: no destination address`,
+      );
+      assert.equal(serialized.includes(AMOUNT_USDC), false, `${label}: no amount`);
     }
+
+    // An explicit owner-scoped receipt read serves the same DTO to the owning
+    // wallet, and only to it. It is not an opt-in instruction read: the
+    // rehydration keys stay absent exactly as on the legacy body.
+    const receiptScopeRead = await readRehydratedBody(
+      await rehydrateTransaction(
+        rehydrationSandbox,
+        boundRow.id,
+        `?scope=receipt&walletAddress=${WALLET}`,
+      ),
+    );
+    assert.equal(receiptScopeRead.transaction.id, boundRow.id);
+    assert.equal("paymentInstructions" in receiptScopeRead, false);
+    assert.equal("paymentInstructionsError" in receiptScopeRead, false);
 
     // The paycrestOrderId fallback still serves the DTO, but it is a lookup
     // convenience, never ownership proof: no instructions may be minted from it,
@@ -1607,18 +1694,18 @@ async function run() {
       JSON.stringify(expiredBoundRow),
     );
 
-    // The expiry reason is not an oracle: the same elapsed row read without an
-    // owning wallet, or found by paycrestOrderId rather than its own id, is
-    // refused with a bare null.
-    const expiredForeignWallet = await readRehydratedBody(
+    // The expiry reason is not an oracle: the same elapsed row read with another
+    // wallet's address is refused before the expiry is ever judged, or found by
+    // paycrestOrderId rather than its own id, is refused with a bare null.
+    await readRefusalBody(
       await rehydrateTransaction(
         expiredReadSandbox,
         expiredBoundRow.id,
         `?paymentInstructions=true&walletAddress=${OTHER_WALLET}`,
       ),
+      403,
+      "an unowned read must not learn the expiry reason",
     );
-    assert.equal(expiredForeignWallet.paymentInstructions, null);
-    assert.equal("paymentInstructionsError" in expiredForeignWallet, false);
 
     const expiredByOrderId = await readRehydratedBody(
       await rehydrateTransaction(
@@ -1765,6 +1852,42 @@ async function run() {
       fetchCalls.length,
       1,
       "a read without the payment flag still reconciles",
+    );
+
+    // Ownership is proven before the provider is touched. A receipt-scoped read
+    // of a settling row by the owner still reconciles exactly like the public
+    // reconcile path, while the same read by another wallet is refused without a
+    // single upstream call: the gate can never be jumped by asking to reconcile.
+    stubFetch(() => jsonResponse(500, { status: "error", message: "unexpected" }));
+    const ownedReceiptReconcileRead = await readRehydratedBody(
+      await rehydrateTransaction(
+        settlingSandbox,
+        settlingRow.id,
+        `?reconcile=true&scope=receipt&walletAddress=${WALLET}`,
+      ),
+    );
+    assert.equal(ownedReceiptReconcileRead.transaction.id, settlingRow.id);
+    assert.equal("paymentInstructions" in ownedReceiptReconcileRead, false);
+    assert.equal(
+      fetchCalls.length,
+      1,
+      "an owned receipt read still reconciles like the public path",
+    );
+
+    const foreignReceiptReconcileRead = await rehydrateTransaction(
+      settlingSandbox,
+      settlingRow.id,
+      `?reconcile=true&scope=receipt&walletAddress=${OTHER_WALLET}`,
+    );
+    await readRefusalBody(
+      foreignReceiptReconcileRead,
+      403,
+      "an unowned receipt read must be refused",
+    );
+    assert.equal(
+      fetchCalls.length,
+      1,
+      "an unowned receipt read must never reconcile",
     );
 
     // An unknown id keeps its 404 shape, and the error body carries no

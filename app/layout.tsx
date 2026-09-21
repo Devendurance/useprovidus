@@ -31,24 +31,24 @@ const vt323 = VT323({
 
 export const metadata: Metadata = {
   title: {
-    default: "Providus — Know what arrives before you pay",
+    default: "Providus — Ask. Approve. Prove.",
     template: "%s · Providus",
   },
   description:
-    "A Celo-native Nigerian payments agent that turns approved Celo USDC into a reviewed bank cash-out through Paycrest.",
+    "Providus turns approved messages into verified real-world payments through a safety-first conversational payment execution layer.",
   keywords: [
     "Providus",
     "Celo",
+    "conversational payments",
     "Nigerian payments",
+    "airtime",
     "bank cash-out",
-    "cUSD",
     "stablecoin",
-    "fees",
-    "FX",
   ],
   openGraph: {
-    title: "Providus — Know what arrives before you pay",
-    description: "Turn Celo USDC into a reviewed Nigerian bank cash-out with Providus.",
+    title: "Providus — Ask. Approve. Prove.",
+    description:
+      "Turn approved messages into verified real-world payments with Providus.",
     type: "website",
   },
 };

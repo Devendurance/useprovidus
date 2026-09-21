@@ -1,6 +1,4 @@
 /**
- * Pure cash-out stage derivation.
- *
  * Extracted verbatim from the transaction status route so that read-only
  * consumers (status API, conversational assistant) share one definition of
  * what a transaction state actually means. No I/O, no mutation.
@@ -10,6 +8,7 @@ import type {
   TransactionRecord,
   PublicTransactionDto,
 } from "@/lib/transactions/types";
+import { isFiatDeliveryFinal } from "@/lib/transactions/types";
 
 export type TransactionStage =
   | "awaiting_payment"
@@ -121,12 +120,10 @@ export function computeTransactionStage(
 
     const fulfilment = extractFulfilmentInfo(tx);
     const paycrestStatus = tx.paycrestStatus?.toLowerCase();
-    // Fiat delivery is authoritative only when Paycrest reports a terminal
-    // delivery milestone. Internal transaction progress never proves NGN
-    // delivery, even when the row is already processing or completed.
-    const isFiatDelivered =
-      paycrestStatus === "validated" || paycrestStatus === "settled";
-    const isFiatFinal = isFiatDelivered;
+    // Fiat delivery is a durable monotonic fact. Raw `settling` alone is not
+    // proof, but it cannot revoke a previously recorded `validated` fact.
+    const isFiatFinal = isFiatDeliveryFinal(tx);
+    const isFiatDelivered = isFiatFinal;
     // Protocol settlement is a strictly Paycrest-side terminal fact. Internal
     // progress states only prove fiat delivery, never that Paycrest itself has
     // settled, so they must not be used to infer it.
@@ -395,6 +392,8 @@ export function computeTransactionStage(
   }
 
   // Cash-out flow (preserved exactly)
+  const cashOutFiatFinal = isFiatDeliveryFinal(tx);
+  const cashOutProtocolSettled = tx.paycrestStatus?.toLowerCase() === "settled";
   if (tx.failureCode === "ORDER_CREATION_OUTCOME_UNKNOWN") {
     return {
       stage: "recovery_required",
@@ -415,9 +414,9 @@ export function computeTransactionStage(
       stage: "failed",
       label: "Failed",
       description: tx.failureReason || "Transaction or payment failed.",
-      isFiatFinal: false,
-      isFiatDelivered: false,
-      isProtocolSettled: false,
+      isFiatFinal: cashOutFiatFinal,
+      isFiatDelivered: cashOutFiatFinal,
+      isProtocolSettled: cashOutProtocolSettled,
       isDepositConfirmed: false,
       isAirtimeDelivered: false,
       isReconciliationRequired: false,
@@ -429,9 +428,9 @@ export function computeTransactionStage(
       stage: "failed",
       label: "Refunded",
       description: "Payment was refunded to your refund address.",
-      isFiatFinal: false,
-      isFiatDelivered: false,
-      isProtocolSettled: false,
+      isFiatFinal: cashOutFiatFinal,
+      isFiatDelivered: cashOutFiatFinal,
+      isProtocolSettled: cashOutProtocolSettled,
       isDepositConfirmed: true,
       isAirtimeDelivered: false,
       isReconciliationRequired: false,
@@ -443,11 +442,11 @@ export function computeTransactionStage(
       stage: "settled",
       label: "Completed",
       description: "Payment and utility fulfilment verified successfully.",
-      isFiatFinal: true,
-      isFiatDelivered: true,
+      isFiatFinal: cashOutFiatFinal,
+      isFiatDelivered: cashOutFiatFinal,
       // Protocol settlement is only ever the Paycrest `settled` milestone; a
       // completed row with no such upstream proof is not protocol settled.
-      isProtocolSettled: tx.paycrestStatus?.toLowerCase() === "settled",
+      isProtocolSettled: cashOutProtocolSettled,
       isDepositConfirmed: true,
       isAirtimeDelivered: false,
       isReconciliationRequired: false,
@@ -460,9 +459,9 @@ export function computeTransactionStage(
       label: "Fulfilment processing",
       description:
         "Fiat payout verified. Downstream utility fulfilment in progress.",
-      isFiatFinal: true,
-      isFiatDelivered: true,
-      isProtocolSettled: tx.paycrestStatus?.toLowerCase() === "settled",
+      isFiatFinal: cashOutFiatFinal,
+      isFiatDelivered: cashOutFiatFinal,
+      isProtocolSettled: cashOutProtocolSettled,
       isDepositConfirmed: true,
       isAirtimeDelivered: false,
       isReconciliationRequired: false,
@@ -479,8 +478,8 @@ export function computeTransactionStage(
       description: isProtocolComplete
         ? "Fiat delivery confirmed and Paycrest protocol settlement complete."
         : "Fiat funds have been confirmed delivered into recipient bank account by provider.",
-      isFiatFinal: true,
-      isFiatDelivered: true,
+      isFiatFinal: cashOutFiatFinal,
+      isFiatDelivered: cashOutFiatFinal,
       isProtocolSettled: isProtocolComplete,
       isDepositConfirmed: true,
       isAirtimeDelivered: false,
@@ -497,9 +496,9 @@ export function computeTransactionStage(
         label: "NGN payout in progress",
         description:
           "Celo deposit confirmed. Liquidity provider is disbursing NGN to recipient bank account.",
-        isFiatFinal: false,
-        isFiatDelivered: false,
-        isProtocolSettled: false,
+        isFiatFinal: cashOutFiatFinal,
+        isFiatDelivered: cashOutFiatFinal,
+        isProtocolSettled: cashOutProtocolSettled,
         isDepositConfirmed: true,
         isAirtimeDelivered: false,
         isReconciliationRequired: false,
@@ -512,9 +511,9 @@ export function computeTransactionStage(
         label: "NGN settlement processing",
         description:
           "Celo deposit confirmed. Payout settlement in progress.",
-        isFiatFinal: false,
-        isFiatDelivered: false,
-        isProtocolSettled: false,
+        isFiatFinal: cashOutFiatFinal,
+        isFiatDelivered: cashOutFiatFinal,
+        isProtocolSettled: cashOutProtocolSettled,
         isDepositConfirmed: true,
         isAirtimeDelivered: false,
         isReconciliationRequired: false,

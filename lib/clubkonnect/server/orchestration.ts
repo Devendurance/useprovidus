@@ -43,6 +43,7 @@ import type {
 } from "@/lib/clubkonnect/types";
 import {
   getTransactionRepository,
+  isFiatDeliveryFinal,
   type FulfilmentMutationResult,
   type FulfilmentOutcomeInput,
   type FulfilmentReservationError,
@@ -285,19 +286,15 @@ export async function fulfilAirtimeOrder(
     };
   }
 
-  // Fiat-finality gate: an internal `settled` row is only spendable when
-  // Paycrest itself confirmed fiat delivery. `fulfilled` / `fulfilling` /
-  // `pending` are provider-internal progress (or a stale out-of-order event),
-  // never proof that NGN reached the recipient, so they must not unlock a
-  // purchase. This is checked before the float read, the reservation, and the
-  // attempt claim, so a non-final row mutates nothing and calls no provider.
-  const paycrestStatus = tx.paycrestStatus?.toLowerCase();
-  if (paycrestStatus !== "validated" && paycrestStatus !== "settled") {
+  // Fiat delivery is a durable monotonic fact. Raw Paycrest `settling` may
+  // follow `validated` and must not revoke fulfilment eligibility. This gate
+  // runs before float reads, reservations, and provider calls.
+  if (!isFiatDeliveryFinal(tx)) {
     return {
       ok: false,
       code: "NOT_ELIGIBLE",
       message:
-        "Transaction must have confirmed Paycrest fiat delivery (validated or settled)",
+        "Transaction must have confirmed Paycrest fiat delivery before fulfilment",
       transaction: tx,
     };
   }

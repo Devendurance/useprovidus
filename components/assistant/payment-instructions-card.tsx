@@ -276,7 +276,7 @@ export function PaymentInstructionsCard({
   }> = [
     {
       id: "pending",
-      label: "Pending",
+      label: "Ready",
       state:
         currentStatus === "pending"
           ? "active"
@@ -284,7 +284,7 @@ export function PaymentInstructionsCard({
     },
     {
       id: "awaiting_deposit",
-      label: "Awaiting Deposit",
+      label: "Wallet payment",
       state:
         Boolean(depositHash)
           ? "complete"
@@ -296,7 +296,7 @@ export function PaymentInstructionsCard({
     },
     {
       id: "verifying",
-      label: "Verifying",
+      label: "Checking payment",
       state:
         currentStatus === "verifying" || (Boolean(depositHash) && currentStatus === "error")
           ? "active"
@@ -344,14 +344,14 @@ export function PaymentInstructionsCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-display text-base font-semibold text-ledger-stone">
-                Payment Instructions
+                How to pay
               </h3>
               <span className="rounded border border-ledger-edge bg-receipt-field px-1.5 py-0.5 font-proof text-[10px] text-receipt-grey">
-                Server-Authoritative Order
+                Payment details ready
               </span>
             </div>
             <p className="font-proof text-[11px] text-receipt-grey">
-              Paycrest corridor deposit · Celo USDC
+              Send the exact amount from your wallet
             </p>
           </div>
         </div>
@@ -361,12 +361,12 @@ export function PaymentInstructionsCard({
           {isExpired ? (
             <span className="inline-flex items-center gap-1.5 rounded border border-loss-red/40 bg-loss-red/10 px-2 py-0.5 font-proof tabular-nums text-xs font-semibold text-loss-red">
               <Clock className="h-3.5 w-3.5" />
-              Order Expired
+              Payment window expired
             </span>
           ) : isInsideSafetyMargin ? (
             <span className="inline-flex items-center gap-1.5 rounded border border-rate-amber/40 bg-rate-amber/10 px-2 py-0.5 font-proof tabular-nums text-xs font-semibold text-rate-amber">
               <Clock className="h-3.5 w-3.5 animate-pulse" />
-              Expires in {countdownText} (Safety margin)
+              Expires in {countdownText} (closing soon)
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 rounded border border-quote-blue/40 bg-quote-blue/10 px-2 py-0.5 font-proof tabular-nums text-xs font-semibold text-quote-blue">
@@ -380,7 +380,7 @@ export function PaymentInstructionsCard({
       {/* Status Progression Stepper */}
       <div className="mt-4 rounded-[10px] border border-ledger-edge bg-receipt-field/70 p-3">
         <div className="flex items-center justify-between text-[11px] font-proof text-receipt-grey">
-          <span>Order Progression</span>
+          <span>Payment progress</span>
           <span className="font-semibold text-ledger-stone capitalize">
             {currentStatus.replace("_", " ")}
           </span>
@@ -423,11 +423,11 @@ export function PaymentInstructionsCard({
         <div className="rounded-[10px] border border-ledger-edge bg-receipt-field p-3.5">
           <div className="flex items-center justify-between">
             <span className="font-proof text-xs text-receipt-grey">
-              Authoritative Amount to Send
+              Exact amount to send
             </span>
             <span className="inline-flex items-center gap-1 rounded bg-provident-green/10 px-1.5 py-0.5 font-proof text-[10px] font-bold text-provident-green border border-provident-green/30">
               <ShieldCheck className="h-3 w-3" />
-              Exact Total
+              Exact total
             </span>
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
@@ -481,10 +481,10 @@ export function PaymentInstructionsCard({
         <div className="rounded-[10px] border border-ledger-edge bg-receipt-field p-3.5">
           <div className="flex items-center justify-between">
             <span className="font-proof text-xs text-receipt-grey">
-              Paycrest Receive Address
+              Destination address
             </span>
             <span className="font-proof text-[10px] text-receipt-grey">
-              Corridor Destination
+              Paycrest destination
             </span>
           </div>
           <div className="mt-1 flex items-center justify-between gap-2 rounded-[8px] border border-ledger bg-clear-paper px-2.5 py-1.5">
@@ -517,13 +517,13 @@ export function PaymentInstructionsCard({
       <div className="mt-3 flex items-center justify-between rounded-[10px] border border-quote-blue/30 bg-quote-blue/5 p-2.5 text-xs text-ledger-stone">
         <div className="flex items-center gap-2 font-proof">
           <Tag className="h-3.5 w-3.5 text-quote-blue" />
-          <span className="text-receipt-grey">ERC-8021 Attribution:</span>
+          <span className="text-receipt-grey">Transfer attribution:</span>
           <code className="rounded bg-clear-paper px-1.5 py-0.5 font-mono text-[11px] font-bold text-quote-blue border border-quote-blue/20">
             {ACTIVE_CELO_ATTRIBUTION_TAG}
           </code>
         </div>
         <span className="font-proof text-[10px] text-provident-green font-medium">
-          ✓ Tagged Calldata
+          Attribution configured
         </span>
       </div>
 
@@ -585,7 +585,7 @@ export function PaymentInstructionsCard({
               <div>
                 <p className="font-semibold text-deep-provision">Deposit Confirmed on Celo</p>
                 <p className="font-proof text-receipt-grey text-[11px]">
-                  Server verified receipt. Paycrest is settling the utility order.
+                  Server verified receipt. Paycrest is settling the airtime order.
                 </p>
               </div>
             </div>
@@ -778,7 +778,7 @@ export function PaymentInstructionsCard({
               ) : (
                 <>
                   <Wallet className="h-3.5 w-3.5" />
-                  <span>Pay with Connected Wallet</span>
+                  <span>Pay from connected wallet</span>
                 </>
               )}
             </button>

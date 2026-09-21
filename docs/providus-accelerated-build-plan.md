@@ -6,9 +6,11 @@
 **Primary track:** Real World Adoption
 **Build style:** Small sequential prompts; repo is source of truth; no broad refactors; no live mutation without explicit approval.
 
+> **Historical plan notice:** This dated sprint plan records the pre-P0 baseline and milestone execution order. It is not the current product-state source. P6.10 live evidence, the P6.11 positioning freeze, `README.md`, `docs/providus_PRD.md`, and `docs/PROVIDUS_ARCHITECTURE.md` supersede its baseline gaps for current-state claims. Preserve the historical gap lists and gates as an audit record; do not read them as statements that persistence, reconciliation, ClubKonnect, the assistant, or attribution are currently missing. Persistence terminology has been corrected to the canonical **Neon PostgreSQL + Drizzle** naming; any earlier provider name in this record is superseded.
+
 ---
 
-## 1. Shipping decision
+## 1. Shipping decision (historical plan decision)
 
 Providus will submit as a **Celo-native Nigerian payments agent**.
 
@@ -136,9 +138,9 @@ The previous tag `celo_91fed90b97fc` is obsolete for this hackathon.
 
 ---
 
-## 4. Verified current repository baseline
+## 4. Historical pre-P0 repository baseline
 
-Current stack:
+### Stack at the time of this plan (historical)
 
 - Next.js App Router + TypeScript;
 - wagmi + viem;
@@ -150,7 +152,7 @@ Current stack:
 - Paycrest off-ramp order creation;
 - direct ERC-20 transfer to per-order receive address.
 
-Current gaps:
+Historical gaps at the time of this plan — superseded by later shipped work; see the notice at the top of this document. Airtime was the first utility category delivered; data bundles and other non-airtime categories remain future work:
 
 - no database/persistence;
 - no Paycrest post-deposit status tracking;
@@ -158,9 +160,9 @@ Current gaps:
 - no ClubKonnect integration;
 - no airtime/data/utility code;
 - no conversational payment assistant / structured AI intent layer;
-- attribution tag not currently appended to transaction calldata.
+- attribution tag was not appended to transaction calldata at that time.
 
-Existing bugs from audit:
+Historical audit findings from before P0:
 
 1. upstream amount mismatch can pass validation;
 2. unknown create-order outcome can lead to duplicate retry risk;
@@ -170,7 +172,9 @@ Existing bugs from audit:
 
 ---
 
-## 5. Pre-build requirement — AskBots baseline
+## 5. Pre-build requirement — AskBots baseline (historical)
+
+This requirement was completed before P0; it is retained as an audit record of the plan's ordering.
 
 Before P0 code changes:
 
@@ -184,6 +188,8 @@ Only after the baseline is safely recorded should P0 implementation begin.
 ---
 
 ## 6. Milestones
+
+> **Historical milestone record (superseded).** P0–P8 below are the original sprint plan, gates, and target states as written before implementation. They are an audit record, not a description of current capability; every gap, blocker, and gate they name is historical. Current shipped state is documented in `README.md`, `docs/providus_PRD.md`, and `docs/PROVIDUS_ARCHITECTURE.md`. Where these milestones describe the airtime fulfilment gate as a raw Paycrest status check, the canonical rule is now durable monotonic fiat-finality (see `docs/PROVIDUS_ARCHITECTURE.md` §6).
 
 ### P0 — Financial integrity + Celo attribution hardening
 
@@ -219,7 +225,7 @@ Gate:
 
 Preferred target:
 
-- Supabase Postgres;
+- Neon PostgreSQL (managed Postgres);
 - Drizzle ORM if current repo rules still require it.
 
 Work:
@@ -561,7 +567,7 @@ If the model is unavailable, Providus should fail gracefully or fall back to str
 
 ---
 
-## 8. Test matrix
+## 8. Test matrix (historical plan)
 
 
 ### Existing cash-out regression
@@ -715,9 +721,11 @@ Do not allow the coding agent to jump ahead because it “already knows the next
 
 ---
 
-## 12. Immediate next action
+## 12. Historical immediate-next-action sequence
 
-Current order:
+> **Superseded sequence.** This P0→P8 order is the original planning sequence, preserved as an audit record. It is not the current working order, and the milestones it names are no longer pending work.
+
+Order at the time of this plan:
 
 ```text
 AskBots baseline

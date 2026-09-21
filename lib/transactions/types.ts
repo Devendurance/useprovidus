@@ -41,8 +41,9 @@ export interface TransactionMetadata {
   transactionFee?: string;
   totalUsdcToSend?: string;
   refundAddress?: string;
+  /** Write-once server fact: Paycrest has confirmed fiat delivery. */
+  paycrest_fiat_delivery_confirmed?: boolean;
   clubkonnect_request_id?: FulfilmentMetadata["clubkonnect_request_id"];
-  clubkonnect_order_id?: FulfilmentMetadata["clubkonnect_order_id"];
   clubkonnect_status_code?: FulfilmentMetadata["clubkonnect_status_code"];
   clubkonnect_raw_status?: FulfilmentMetadata["clubkonnect_raw_status"];
   fulfilment_attempts?: FulfilmentMetadata["fulfilment_attempts"];
@@ -255,11 +256,6 @@ export interface PublicFulfilmentDto {
   fulfilledAt: string | null;
   reconciliationRequired: boolean;
 }
-
-/**
- * Public DTO returned to client. Contains no secrets, internal stack traces,
- * or full bank account numbers.
- */
 export interface PublicTransactionDto {
   id: string;
   idempotencyKey: string;
@@ -279,6 +275,8 @@ export interface PublicTransactionDto {
   metadata?: {
     institutionName?: string;
     accountIdentifierMasked?: string;
+    phoneMasked?: string;
+    network?: string;
     rate?: string | null;
     totalUsdcToSend?: string;
   };
@@ -294,6 +292,40 @@ export function isFulfilmentStatus(value: unknown): value is FulfilmentStatus {
     value === "failed" ||
     value === "unknown"
   );
+}
+
+/**
+ * Authoritative Paycrest fiat-delivery fact used by status and fulfilment
+ * consumers. The marker is write-once; legacy rows may safely fall back to a
+ * post-delivery internal state plus a known provider milestone.
+ */
+export function isFiatDeliveryFinal(tx: {
+  status?: TransactionStatus;
+  paycrestStatus?: string | null;
+  metadata?: unknown;
+}): boolean {
+  let marker: unknown;
+  let markerPresent = false;
+  if (
+    typeof tx.metadata === "object" &&
+    tx.metadata !== null &&
+    "paycrest_fiat_delivery_confirmed" in tx.metadata
+  ) {
+    markerPresent = true;
+    marker = tx.metadata.paycrest_fiat_delivery_confirmed;
+  }
+  if (markerPresent) return marker === true;
+
+  const providerStatus = tx.paycrestStatus?.toLowerCase().trim();
+  if (providerStatus === "validated" || providerStatus === "settled") {
+    return true;
+  }
+
+  const postDeliveryState =
+    tx.status === "settled" ||
+    tx.status === "processing" ||
+    tx.status === "completed";
+  return postDeliveryState && providerStatus === "settling";
 }
 
 /**
@@ -386,6 +418,15 @@ export function toPublicTransactionDto(
       ? {
           institutionName: tx.metadata.institutionName,
           accountIdentifierMasked: tx.metadata.accountIdentifierMasked,
+          phoneMasked:
+            typeof tx.metadata.phone === "string"
+              ? tx.metadata.phone.slice(0, -4).replace(/./g, "*") +
+                tx.metadata.phone.slice(-4)
+              : undefined,
+          network:
+            typeof tx.metadata.network === "string"
+              ? tx.metadata.network
+              : undefined,
           rate: tx.metadata.rate,
           totalUsdcToSend: tx.metadata.totalUsdcToSend,
         }

@@ -7,9 +7,9 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { LinkButton } from "@/components/ui/link-button";
 
 export const metadata: Metadata = {
-  title: "Cash-out review",
+  title: "Bank cash-out review",
   description:
-    "The cash-out review is available from an active Move Money session.",
+    "The bank cash-out review is available from an active Providus session.",
 };
 
 const REQUIRED_FIELDS = [
@@ -29,12 +29,12 @@ export default function CheckVerdictPage() {
       <div className="max-w-2xl">
         <p className="font-proof text-receipt-grey">Review unavailable</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ledger-stone sm:text-4xl">
-          No active cash-out review
+          No active bank cash-out review
         </h1>
         <p className="mt-3 text-receipt-grey leading-relaxed">
           Providus only shows a review after a live quote and verified Nigerian
-          bank recipient are available. Start from Move Money to create that
-          state; this legacy URL never fabricates an amount, provider or result.
+          bank recipient are available. Start from Bank cash-out to create that
+          state; this URL never fabricates an amount, provider or result.
         </p>
       </div>
 
@@ -49,7 +49,7 @@ export default function CheckVerdictPage() {
             description="No active cash-out session was found. Enter an amount, request a current Paycrest quote and verify the recipient before approving a Celo USDC transfer."
             action={
               <LinkButton href="/check" variant="ghost" size="md">
-                Open Move Money
+                Open bank cash-out
               </LinkButton>
             }
           />
@@ -57,7 +57,7 @@ export default function CheckVerdictPage() {
           <Card variant="verdict">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-proof text-receipt-grey">Cash-out review</p>
+                <p className="font-proof text-receipt-grey">Bank cash-out review</p>
                 <CardTitle className="mt-1">No review to display</CardTitle>
               </div>
               <span className="rounded-full border border-ledger-edge bg-receipt-field px-3 py-1 font-proof text-[12px] text-receipt-grey">
@@ -84,7 +84,7 @@ export default function CheckVerdictPage() {
 
             <div className="mt-6">
               <p className="mb-3 text-sm font-semibold text-ledger-stone">
-                Value Line
+                Payment path
               </p>
               <ValueLine compact />
             </div>

@@ -8,7 +8,7 @@ let pgClient: Sql | null = null;
 let dbInstance: DbClient | null = null;
 
 /**
- * Returns a typed Drizzle ORM client connected to Supabase Postgres,
+ * Returns a typed Drizzle ORM client connected to Neon PostgreSQL,
  * or null if DATABASE_URL is not configured (e.g. during build / local unit tests).
  */
 export function getDb(): DbClient | null {
@@ -22,7 +22,7 @@ export function getDb(): DbClient | null {
       max: process.env.NODE_ENV === "production" ? 10 : 1,
       idle_timeout: 20,
       connect_timeout: 10,
-      prepare: false, // Recommended for Supabase transaction pooler (port 6543)
+      prepare: false, // Compatible with Neon pooled PostgreSQL connections
     });
     dbInstance = drizzle(pgClient, { schema });
   }

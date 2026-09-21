@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { agentTransactions } from "@/lib/db/schema";
 import { sanitizeFailureReason } from "@/lib/transactions/sanitization";
@@ -27,7 +27,7 @@ import type {
   TransactionStatus,
   UpdateTransactionStatusInput,
 } from "@/lib/transactions/types";
-import { isFulfilmentStatus } from "@/lib/transactions/types";
+import { isFiatDeliveryFinal, isFulfilmentStatus } from "@/lib/transactions/types";
 
 export interface TransactionRepository {
   create(
@@ -101,6 +101,42 @@ function generateTransactionId(): string {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function isAuthoritativeFiatStatus(status?: string | null): boolean {
+  const normalized = status?.toLowerCase().trim();
+  return normalized === "validated" || normalized === "settled";
+}
+
+function mergeFiatDeliveryMetadata(
+  current: TransactionRecord,
+  incomingPaycrestStatus?: string | null,
+): TransactionMetadata | null | undefined {
+  const metadata = current.metadata;
+  if (
+    metadata?.paycrest_fiat_delivery_confirmed === true ||
+    isAuthoritativeFiatStatus(incomingPaycrestStatus) ||
+    isFiatDeliveryFinal(current)
+  ) {
+    return {
+      ...(metadata ?? {}),
+      paycrest_fiat_delivery_confirmed: true,
+    };
+  }
+  return metadata;
+}
+function sanitizeIncomingMetadata(
+  metadata: TransactionMetadata | null | undefined,
+  allowFiatFinal: boolean,
+): TransactionMetadata | null | undefined {
+  if (!metadata) return metadata;
+  const sanitized = { ...metadata };
+  if (allowFiatFinal) {
+    sanitized.paycrest_fiat_delivery_confirmed = true;
+  } else {
+    delete sanitized.paycrest_fiat_delivery_confirmed;
+  }
+  return sanitized;
 }
 const PAYCREST_HAPPY_PATH_RANK: Record<string, number> = {
   initiated: 1,
@@ -831,10 +867,8 @@ export class InMemoryTransactionRepository implements TransactionRepository {
     if (byRef) {
       return { ok: true, record: byRef, reused: true };
     }
-
     const id = input.id ?? generateTransactionId();
     const timestamp = nowIso();
-
     const record: TransactionRecord = {
       id,
       idempotencyKey: input.idempotencyKey,
@@ -851,7 +885,10 @@ export class InMemoryTransactionRepository implements TransactionRepository {
       validUntil: input.validUntil ?? null,
       failureCode: null,
       failureReason: null,
-      metadata: input.metadata ?? null,
+      metadata: sanitizeIncomingMetadata(
+        input.metadata,
+        isAuthoritativeFiatStatus(input.paycrestStatus),
+      ),
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -912,16 +949,36 @@ export class InMemoryTransactionRepository implements TransactionRepository {
       };
     }
 
+    const nextMetadata: TransactionMetadata = {
+      ...(record.metadata ?? {}),
+      ...(input.metadata ?? {}),
+    };
+    const currentMarkerPresent =
+      record.metadata !== null &&
+      record.metadata !== undefined &&
+      Object.prototype.hasOwnProperty.call(
+        record.metadata,
+        "paycrest_fiat_delivery_confirmed",
+      );
+    if (
+      isAuthoritativeFiatStatus(input.paycrestStatus) ||
+      isFiatDeliveryFinal(record)
+    ) {
+      nextMetadata.paycrest_fiat_delivery_confirmed = true;
+    } else if (currentMarkerPresent) {
+      nextMetadata.paycrest_fiat_delivery_confirmed =
+        record.metadata?.paycrest_fiat_delivery_confirmed;
+    } else {
+      delete nextMetadata.paycrest_fiat_delivery_confirmed;
+    }
+
     const updated: TransactionRecord = {
       ...record,
       paycrestOrderId: input.paycrestOrderId,
       receiveAddress: input.receiveAddress,
       validUntil: input.validUntil ?? record.validUntil,
       paycrestStatus: input.paycrestStatus ?? record.paycrestStatus,
-      metadata: {
-        ...(record.metadata ?? {}),
-        ...(input.metadata ?? {}),
-      },
+      metadata: nextMetadata,
       updatedAt: nowIso(),
     };
 
@@ -1025,6 +1082,7 @@ export class InMemoryTransactionRepository implements TransactionRepository {
         const updated: TransactionRecord = {
           ...record,
           paycrestStatus: update.paycrestStatus!,
+          metadata: mergeFiatDeliveryMetadata(record, update.paycrestStatus),
           updatedAt: nowIso(),
         };
         this.records.set(id, updated);
@@ -1039,11 +1097,11 @@ export class InMemoryTransactionRepository implements TransactionRepository {
     )
       ? update.paycrestStatus!
       : record.paycrestStatus;
-
     const updated: TransactionRecord = {
       ...record,
       status: update.status,
       paycrestStatus: nextPaycrestStatus,
+      metadata: mergeFiatDeliveryMetadata(record, update.paycrestStatus),
       celoTxHash: update.celoTxHash ?? record.celoTxHash,
       failureCode: update.failureCode ?? record.failureCode,
       failureReason: update.failureReason
@@ -1222,10 +1280,12 @@ export class DrizzleTransactionRepository implements TransactionRepository {
           paycrestReference: input.paycrestReference,
           paycrestStatus: input.paycrestStatus ?? "initiated",
           receiveAddress: input.receiveAddress ?? null,
-          validUntil: input.validUntil ?? null,
           failureCode: null,
           failureReason: null,
-          metadata: input.metadata ?? null,
+          metadata: sanitizeIncomingMetadata(
+            input.metadata,
+            isAuthoritativeFiatStatus(input.paycrestStatus),
+          ),
           createdAt: timestamp,
           updatedAt: timestamp,
         })
@@ -1315,6 +1375,15 @@ export class DrizzleTransactionRepository implements TransactionRepository {
 
     const timestamp = nowIso();
 
+    const metadataPatch: TransactionMetadata = {
+      ...(input.metadata ?? {}),
+    };
+    if (isAuthoritativeFiatStatus(input.paycrestStatus)) {
+      metadataPatch.paycrest_fiat_delivery_confirmed = true;
+    } else {
+      delete metadataPatch.paycrest_fiat_delivery_confirmed;
+    }
+
     // Atomic conditional update: only update if not already terminal
     const [updated] = await db
       .update(agentTransactions)
@@ -1323,8 +1392,8 @@ export class DrizzleTransactionRepository implements TransactionRepository {
         receiveAddress: input.receiveAddress,
         validUntil: input.validUntil ?? undefined,
         paycrestStatus: input.paycrestStatus ?? undefined,
-        metadata: input.metadata
-          ? sql`coalesce(${agentTransactions.metadata}, '{}'::jsonb) || ${JSON.stringify(input.metadata)}::jsonb`
+        metadata: Object.keys(metadataPatch).length
+          ? sql`coalesce(${agentTransactions.metadata}, '{}'::jsonb) || ${JSON.stringify(metadataPatch)}::jsonb`
           : undefined,
         updatedAt: timestamp,
       })
@@ -1491,10 +1560,33 @@ export class DrizzleTransactionRepository implements TransactionRepository {
           .update(agentTransactions)
           .set({
             paycrestStatus: update.paycrestStatus!,
+            metadata:
+              isAuthoritativeFiatStatus(update.paycrestStatus) ||
+              isFiatDeliveryFinal(current)
+                ? sql`coalesce(${agentTransactions.metadata}, '{}'::jsonb) || '{"paycrest_fiat_delivery_confirmed":true}'::jsonb`
+                : undefined,
             updatedAt: timestamp,
           })
-          .where(eq(agentTransactions.id, id))
+          .where(
+            and(
+              eq(agentTransactions.id, id),
+              current.paycrestStatus === null
+                ? isNull(agentTransactions.paycrestStatus)
+                : eq(agentTransactions.paycrestStatus, current.paycrestStatus),
+            ),
+          )
           .returning();
+        if (!metaUpdated) {
+          const latest = await this.findById(id);
+          if (!latest) {
+            return {
+              ok: false,
+              code: "TRANSACTION_NOT_FOUND",
+              message: `Transaction ${id} not found`,
+            };
+          }
+          return { ok: true, record: latest, isNoop: true };
+        }
         return {
           ok: true,
           record: this.mapRow(metaUpdated),
@@ -1529,6 +1621,11 @@ export class DrizzleTransactionRepository implements TransactionRepository {
       .set({
         status: update.status,
         paycrestStatus: nextPaycrestStatus,
+        metadata:
+          isAuthoritativeFiatStatus(update.paycrestStatus) ||
+          isFiatDeliveryFinal(current)
+            ? sql`coalesce(${agentTransactions.metadata}, '{}'::jsonb) || '{"paycrest_fiat_delivery_confirmed":true}'::jsonb`
+            : undefined,
         celoTxHash: update.celoTxHash ?? undefined,
         failureCode: update.failureCode ?? undefined,
         failureReason: sanitizedReason ?? undefined,
@@ -1539,6 +1636,9 @@ export class DrizzleTransactionRepository implements TransactionRepository {
           eq(agentTransactions.id, id),
           eq(agentTransactions.type, current.type),
           inArray(agentTransactions.status, allowedPrevious),
+          current.paycrestStatus === null
+            ? isNull(agentTransactions.paycrestStatus)
+            : eq(agentTransactions.paycrestStatus, current.paycrestStatus),
         ),
       )
       .returning();
@@ -1855,7 +1955,6 @@ export class DrizzleTransactionRepository implements TransactionRepository {
     if (racedPlan.kind === "error") {
       return fulfilmentFailure(racedPlan.error, racedPlan.message, raced);
     }
-
     return fulfilmentFailure(
       "DATABASE_UNAVAILABLE",
       `Concurrent fulfilment update prevented persisting the outcome for transaction ${input.transactionId}`,

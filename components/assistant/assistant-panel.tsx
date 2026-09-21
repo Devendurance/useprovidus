@@ -80,12 +80,12 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
               <h2 className="font-display text-base font-semibold text-ledger-stone sm:text-lg">
                 Providus Assistant
               </h2>
-              <span className="rounded border border-ledger-edge bg-clear-paper px-1.5 py-0.5 font-proof text-[10px] text-receipt-grey">
-                Upcoming · payment preview
+              <span className="rounded border border-provident-green/40 bg-provident-green/10 px-1.5 py-0.5 font-proof text-[10px] font-semibold text-deep-provision">
+                Live · payment preview
               </span>
             </div>
             <p className="font-proof text-[11px] text-receipt-grey">
-              Intent interpretation & status queries
+              Describe airtime, review payment details, and track delivery
             </p>
           </div>
         </div>
@@ -167,7 +167,7 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
             <span>Resume a pending payment</span>
           </label>
           <p className="mt-1 font-proof text-[11px] leading-relaxed text-receipt-grey">
-            Paste a transaction ID to reload its deposit instructions. Nothing is paid automatically.
+            Enter a payment ID to reload its payment instructions. Nothing is paid automatically.
           </p>
           <div className="mt-2 flex flex-col gap-2 sm:flex-row">
             <input
@@ -233,7 +233,7 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
       <div className="border-t border-ledger-edge/60 bg-receipt-field/40 px-4 py-1.5 text-center">
         <p className="font-proof text-[10px] text-receipt-grey flex items-center justify-center gap-1">
           <ShieldAlert className="h-3 w-3 text-quote-blue" />
-          <span>Informational only · payment execution is not available from chat</span>
+          <span>Your wallet stays in your control · every payment needs your explicit approval</span>
         </p>
       </div>
 

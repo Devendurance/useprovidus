@@ -1,132 +1,209 @@
 # Providus Brand Messaging
 
-## Brand core
+**Status:** Canonical messaging synchronized to P6.12
+**Scope:** Product and brand language. This document does not change product behavior.
 
-### Name
+## Superseded positioning
 
-**Providus** derives from the Latin *providus*: **foreseeing, prudent, prepared**.
+The previous version of this document positioned Providus as a **Celo route-intelligence agent** for on-ramp comparison, with **Route Check**, **Route Verdict**, **Savings Receipt**, and x402 as the core product story. That framing is **superseded**.
 
-It is a better strategic name than FlowSaver because it describes the product’s real value: looking ahead across cost, FX, limits, settlement speed and reliability before the user moves money.
+It described a route-comparison/on-ramp product that is not the current shipped product. Do not blend that audience, mission, terminology, x402 action, or savings language into the current execution-and-verification category. Historical route-intelligence and x402 references may remain in dated planning or integration records, but they are not current Providus messaging.
 
-**Pronunciation:** `pro-VEE-dus`  
-**Public category:** Celo route-intelligence agent  
-**Trademark/domain status:** Not legally or commercially cleared in this document.
+## Category
 
-### Product principle
+> **Providus is a safety-first conversational payment execution layer that turns user-approved requests into verified real-world payments.**
 
-> **Show the outcome before the money moves.**
+Plain-language explanation: users tell Providus what they want to pay, review the exact action, approve it, and receive evidence of what actually happened.
 
-### Brand essence
+## One-line description
 
-> **Prudence in motion.**
+> **Providus turns approved messages into verified real-world payments.**
 
-### Core promise
+## Hero
 
-> **Know what arrives before you pay.**
+### Headline
 
-## Strategic foundation
+> **Ask. Approve. Prove.**
 
-| Element | Definition |
-|---|---|
-| Purpose | Help people preserve more value when moving local money into Celo. |
-| Vision | Every stablecoin user understands the true outcome of a money route before committing to it. |
-| Mission | Compare validated fiat-to-Celo routes by effective received amount and turn opaque pricing into an explainable action. |
-| Priority audience | Mobile-first Celo users in one or two high-fee markets buying stablecoins via local methods. |
-| Category | Route-intelligence agent, not an on-ramp or wallet. |
-| Strategic enemy | The default route chosen because it appears first, not because it delivers the best outcome. |
-| Internal trueline | Let users see the money outcome before they accept the route. |
+### Subhead
 
-## Positioning
+> Tell Providus what you want to pay. It prepares the exact terms, waits for your approval, executes through Celo and local payment rails, verifies each stage, and gives you a receipt for the outcome.
 
-> For mobile-first stablecoin users in high-fee markets who need to buy Celo assets without losing value to opaque fees and FX spreads, Providus is a Celo-native route-intelligence agent that compares available payment paths by effective received amount, reliability, limits and settlement speed. Unlike a wallet’s single on-ramp option or a generic comparison site, Providus shows users what will actually arrive before they pay.
+For the current product, this means Celo USDC bank cash-out and a verified Nigerian airtime flow.
 
-## Message hierarchy
+## Product promise
 
-### Roof message
+> **You tell Providus what should happen. It prepares the payment, waits for your approval, executes through the right rails, verifies the real-world outcome, and gives you proof.**
 
-> **Know what arrives before you pay.**
+The promise is bounded by supported flows and provider availability. Never present an intermediate transaction, provider acknowledgement, or stale quote as delivery proof.
 
-### Product descriptor
+## Narrative tension
 
-> **The Celo route-intelligence agent for smarter on-ramp decisions.**
+> **Conversational payments aren’t the hard part. Proving the real-world outcome is.**
 
-### One-line description
+A conversation can express intent, but it does not prove that money moved correctly, NGN was delivered, or airtime reached a phone. Real payments cross asynchronous systems with different failure, timing, and retry rules. Providus makes those boundaries visible and reconciles the path after intent parsing.
 
-> Providus finds the cheapest reliable way to move local money into Celo, based on what actually arrives—not the headline fee.
+## Three product pillars
 
-### Messaging pillars
+### Ask naturally
 
-| Pillar | Message | Proof |
+Users describe the intended outcome in ordinary language. Providus turns supported requests into a typed, validated `PaymentIntent` and asks for missing or ambiguous fields.
+
+### Approve explicitly
+
+Users review recipient, network, amount, quote, fees, expiry, and total. No money moves until the user approves the exact action and separately signs the exact Celo wallet transfer.
+
+### Verify the outcome
+
+Providus separates on-chain confirmation, NGN settlement, and last-mile fulfilment. It reconciles uncertain states, avoids blind retries, and issues a receipt for evidence-backed results.
+
+## Core principle
+
+> **LLM owns language. Deterministic code owns money.**
+
+The LLM may interpret language, ask questions, and explain recorded state. It does not create an executable transaction, alter approved payment-critical fields, authorize a provider mutation, sign a wallet transfer, select a success state, or invent a refund. Deterministic code validates the `PaymentIntent`, binds amounts and fees, enforces approval, controls provider calls, persists state, reconciles outcomes, and builds the receipt.
+
+## Primary user stories
+
+### Nigerian stablecoin user
+
+“I hold Celo USDC and want to pay for something useful in Nigeria without coordinating a wallet, off-ramp, settlement status, and utility provider myself.”
+
+### Airtime sender
+
+“I want to say ‘Send ₦1,000 MTN airtime to this number,’ review the exact payment, approve it, and know whether the airtime was actually delivered.”
+
+### Cash-out user
+
+“I want to cash out Celo USDC to a verified Nigerian bank account, see the quote and fees before signing, and distinguish a Celo deposit from Nigerian bank delivery.”
+
+### Judge or integrator
+
+“I need to see that the assistant is not the money authority, that provider boundaries are deterministic, and that the receipt proves the stages that actually completed.”
+
+## Tone and voice rules
+
+| Rule | Use | Avoid |
 |---|---|---|
-| See what arrives | The best route is measured by effective received amount, not advertised fee. | Fee, FX spread, network cost, limits and estimated received calculation. |
-| Choose with context | The right route changes by country, amount and payment method. | Localised inputs, provider eligibility and transparent ranking. |
-| Pay only for a useful answer | A small x402 payment unlocks a complete, actionable Route Verdict. | Locked preview, paid full breakdown and provider handoff. |
-| Keep control | Providus explains and recommends; the user executes with their chosen provider. | No custody, no automated fiat purchase, clear deep link/manual instructions. |
-| Improve with real use | Route history and outcome feedback make later recommendations better. | Quote freshness, reliability tracking and user-owned savings history. |
+| Plainly practical | “Approve the exact payment, then we verify what happened.” | “Activate your autonomous financial future.” |
+| Control-first | “Your connected wallet signs the transfer.” | “Providus handles everything.” |
+| Precise about state | “Paycrest confirmed fiat delivery; protocol settlement is tracked separately.” | “The payment is guaranteed.” |
+| Evidence-led | “Airtime is complete only after provider status `200`.” | “The provider accepted the request, so it succeeded.” |
+| Calm about uncertainty | “This outcome is unknown; Providus will reconcile the original reference.” | “Retry now” after an ambiguous mutation. |
+| Conversational, not magical | “Tell Providus what you want to pay.” | “AI knows the best route.” |
 
-## Product architecture
+Use: **ask, approve, exact, quote, fee, verify, reconcile, delivered, proof, receipt, supported, current, pending, unknown.**
 
-| Layer | Name | Job |
-|---|---|---|
-| Master product | Providus | The intelligent route and savings layer |
-| Core paid action | Providus Route Check | x402-paid unlock of a full route recommendation |
-| Core result surface | Route Verdict | The most transparent answer to “what will arrive?” |
-| Brand visual asset | Value Line | You pay → fees + FX → route → you receive |
-| Proof surface | Savings Receipt | Explains the choice, timestamp and estimated saving |
-| Future module | Providus Monitor | Optional recurring route and subscription savings monitoring |
+Avoid: **guaranteed, first, best, only, magic, frictionless, autonomous spending, AI controls the payment, seamless wealth, route intelligence, Route Check, Route Verdict, Savings Receipt, x402 payment** as current product language.
 
-## Voice
+## Current shipped truth
 
-| Principle | Meaning | Sounds like | Avoid |
-|---|---|---|---|
-| Plainly numerical | State the money outcome without hiding behind finance terms | “You receive an estimated 96.42 cUSD.” | “Optimised financial routing unlocked.” |
-| Transparent | Show assumptions and uncertainty | “Estimated from a quote captured 2 minutes ago.” | “Best route guaranteed.” |
-| Calmly practical | Help users take one next action | “Continue with provider.” | “Activate your wealth journey.” |
-| Control-first | State product boundaries plainly | “Providus does not hold or move your funds.” | “We handle everything.” |
-| Precise about savings | Call an estimate an estimate | “You may keep about 3.42 cUSD.” | “You saved 3.42 cUSD.” before the outcome is confirmed |
+- Web dashboard conversational assistant.
+- Validated airtime `PaymentIntent` flow.
+- Celo mainnet USDC.
+- Paycrest settlement adapter.
+- Neon PostgreSQL (managed Postgres) + Drizzle durable transaction state.
+- Paycrest reconciliation, durable monotonic fiat-finality, and distinct fiat-delivery/protocol-settlement states.
+- ClubKonnect airtime fulfilment adapter with deterministic RequestID and reconciliation.
+- Evidence-linked receipt surface.
+- Owner-scoped receipt evidence: receipt and payment-instruction reads are wallet-checked server-side before any DTO or evidence is returned, while the default status endpoint stays a sanitized public status read.
+- Separate Nigerian bank cash-out flow through Paycrest.
+- One completed live human-gated airtime run demonstrating the complete request → receipt chain.
 
-### Vocabulary
+The live run proves one end-to-end execution. It is not a universal guarantee for every payment, provider state, recipient, or future channel.
 
-Use: **arrive, receive, route, compare, quote, estimate, fee, FX, limit, settlement, verify, continue, keep.**
+## Safe claims
 
-Avoid: **guaranteed, best price ever, effortless wealth, alpha, degen, yield machine, magic, frictionless, financial freedom, AI knows best.**
+- Providus turns user-approved messages into verified real-world payments for supported flows.
+- Providus has completed a human-gated Celo mainnet USDC → NGN settlement → Nigerian airtime run.
+- Providus separates language interpretation from deterministic money execution.
+- Explicit human approval precedes order creation and browser-wallet signing.
+- Paycrest authoritatively binds the provider fee and total before the wallet transfer.
+- Celo deposit verification is distinct from Paycrest fiat-delivery reconciliation.
+- ClubKonnect fulfilment completes only on its documented terminal success state.
+- Durable state, deterministic RequestIDs, idempotency, and recovery protect the current airtime orchestration.
+- The receipt shows approved payment terms and execution, settlement, fulfilment, and outcome evidence available for the transaction.
+- Owner-scoped receipt evidence is server wallet-checked; the generic status read remains sanitized and public.
 
-## Essential copy
+## Qualified roadmap claims
 
-| Moment | Copy |
-|---|---|
-| Hero | “Know what arrives before you pay.” |
-| Support | “Providus compares local routes into Celo by what you actually receive after fees, FX, limits and settlement time.” |
-| Main CTA | “Check my route” |
-| Locked preview | “A better route may save you up to 4.8%.” |
-| Paid CTA | “Unlock full route — 0.05 cUSD” |
-| Result header | “Best route for your money” |
-| Quote freshness | “Captured 2 minutes ago · valid for 04:32” |
-| Estimated state | “This amount is estimated. Refresh before continuing.” |
-| Handoff | “Continue with provider” |
-| Receipt | “You kept an estimated 3.42 cUSD by choosing this route.” |
+Use **“designed to,” “architecture supports,” “future adapter,” “roadmap,”** or **“not shipped”** for:
 
-## Celo hackathon narrative
+- data bundles, electricity, cable, or a broader utility catalogue;
+- iMessage/Photon, WhatsApp, Telegram, MiniPay, or other channels;
+- additional settlement rails or fulfilment providers;
+- multi-provider production support;
+- autonomous or recurring spending with permissions/session keys;
+- broader remittances, multi-country support, or agent-to-agent payment surfaces.
 
-> Providus turns the question “What is the cheapest way to buy cUSD here?” into a paid, explainable Celo agent action. It compares real routes, unlocks an actionable recommendation through x402, and makes the resulting Celo activity measurable through the appropriate track mechanisms.
+Photon/iMessage is a future adapter/proof opportunity, not the core payment engine.
 
-| Track | Providus expression |
-|---|---|
-| Most Revenue Generated | Genuine Celo-value actions with assigned attribution tags where technically eligible. |
-| Most x402 Payments | Real pay-per-request Route Checks and, later, paid agent/API quote calls via Celo’s x402 facilitator. |
-| Askbots | An explainable decision agent that states route evidence and constraints. |
+## Claims never to use
 
-## Product boundaries
+- “First AI payment agent on Celo.”
+- “First Nigerian stablecoin bill-pay product.”
+- “Only,” “best,” or “most reliable” without independently verifiable evidence.
+- “Every payment is guaranteed.”
+- “Celo confirmation means NGN delivery.”
+- “Paycrest settled” as shorthand for fiat delivery. Use `validated` for the authoritative fiat-delivery condition and describe `settled` as separately tracked protocol completion.
+- “Paycrest automatically funds ClubKonnect.”
+- Autonomous spending without explicit human approval.
+- Production support for channels, providers, or utility categories not shipped.
+- Wording that gives the LLM custody, signing authority, or success authority.
+- “Verified” ERC-8021 attribution from the static tag alone. Say attribution configured or applied, or refer to the ERC-8021 attribution tag.
+- A refund claim unless a refund was actually verified.
 
-- Providus does not custody user funds.
-- Providus does not execute fiat purchases in the MVP.
-- Providus does not claim every country or provider is covered.
-- Providus does not accept affiliate placement as a ranking signal.
-- Providus does not call a stale quote a final price.
-- Gmail subscription discovery is a future optional module, not the main product story.
+## Demo narrative
 
-## Final recommendation
+1. User requests Nigerian airtime in natural language.
+2. Providus validates the structured `PaymentIntent`.
+3. The user reviews the recipient, network, amount, quote, fees, expiry, and exact total.
+4. Paycrest binds authoritative fees; the user approves order creation.
+5. The browser wallet signs the exact Celo USDC transfer.
+6. Providus verifies the on-chain deposit.
+7. Providus reconciles Paycrest until durable fiat-final truth is recorded — set when `validated` confirms fiat delivery, with `settled` also satisfying it as later protocol completion. A later raw `settling` event never clears it.
+8. Only then does the ClubKonnect adapter submit/reconcile fulfilment using its deterministic RequestID.
+9. ClubKonnect status `200` verifies airtime delivery.
+10. The receipt presents the approved terms and available execution, settlement, fulfilment, and outcome evidence.
 
-Lead with the outcome, not Celo, x402, AI, or provider integrations:
+The current operating model uses a Providus fulfilment float. The demo does not imply automatic Paycrest-to-ClubKonnect funding.
 
-> **See what arrives. Then choose the route.**
+## Channel thesis
+
+Channels are presentation and conversation adapters, not independent payment engines:
+
+```text
+Channel
+→ Conversation Layer
+→ PaymentIntent Engine
+→ Human Approval Boundary
+→ Providus Execution Engine
+→ SettlementRail + FulfilmentProvider adapters
+→ Reconciliation
+→ Verified Outcome
+→ Receipt
+```
+
+Web is the current channel. iMessage/Photon, WhatsApp, Telegram, MiniPay, and other surfaces are future adapters over the same execution and proof layers.
+
+## Provider-agnostic thesis
+
+Current adapters:
+
+- **SettlementRail:** Paycrest
+- **FulfilmentProvider:** ClubKonnect
+
+Providus owns intent validation, approval, orchestration, durable state, fee binding, reconciliation, recovery, idempotency, verified outcome classification, and the receipt. Future rails/providers can implement adapter contracts without becoming independent payment engines.
+
+This is an architectural principle, not a claim of multi-provider production support today. Paycrest and ClubKonnect remain infrastructure that Providus coordinates and verifies; Providus does not replace either provider.
+
+## Canonical source hierarchy
+
+For current category, promises, claims, and differentiation, use:
+
+1. `docs/positioning.md`
+2. `docs/competitive-positioning.md`
+3. `docs/live-airtime-e2e.md` for the single live proof
+4. this document for brand and messaging application
+
+Older route-intelligence/on-ramp/x402 material is superseded and must not be used as current product copy.

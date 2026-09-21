@@ -1,6 +1,7 @@
 import { getOfframpOrder } from "@/lib/paycrest/server/client";
 import {
   getTransactionRepository,
+  isFiatDeliveryFinal,
   isTerminalStatus,
   type TransactionRecord,
   type TransactionStatus,
@@ -265,8 +266,7 @@ export async function reconcileTransaction(
     return {
       ok: true,
       transaction: tx,
-      upstreamStatus: tx.paycrestStatus ?? undefined,
-      isFiatFinal: false,
+      isFiatFinal: isFiatDeliveryFinal(tx),
       changed: false,
     };
   }
@@ -275,7 +275,7 @@ export async function reconcileTransaction(
     return {
       ok: true,
       transaction: tx,
-      isFiatFinal: false,
+      isFiatFinal: isFiatDeliveryFinal(tx),
       changed: false,
       message: "No Paycrest order ID bound to transaction yet",
     };
@@ -287,7 +287,7 @@ export async function reconcileTransaction(
     return {
       ok: false,
       transaction: tx,
-      isFiatFinal: false,
+      isFiatFinal: isFiatDeliveryFinal(tx),
       changed: false,
       message: upstream.message,
     };
@@ -309,8 +309,7 @@ export async function reconcileTransaction(
     return {
       ok: false,
       transaction: tx,
-      upstreamStatus: rawStatus,
-      isFiatFinal: false,
+      isFiatFinal: isFiatDeliveryFinal(tx),
       changed: false,
       message: updateResult.message,
     };
@@ -319,8 +318,7 @@ export async function reconcileTransaction(
   return {
     ok: true,
     transaction: updateResult.record,
-    upstreamStatus: rawStatus,
-    isFiatFinal: mapping.isFiatFinal,
+    isFiatFinal: isFiatDeliveryFinal(updateResult.record),
     changed: !updateResult.isNoop,
   };
 }

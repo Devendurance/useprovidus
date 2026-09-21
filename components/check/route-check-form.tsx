@@ -55,11 +55,11 @@ export function RouteCheckForm() {
 
   return (
     <Card variant="surface" className="w-full">
-      <CardTitle>Cash-out details</CardTitle>
+      <CardTitle>Bank cash-out details</CardTitle>
       <CardDescription>
-        This legacy form carries basic details into the review shell. The live
-        Move Money flow is the source of truth for Celo USDC bank cash-outs,
-        recipient verification and Paycrest quotes.
+        This form carries basic details into the bank cash-out review. The live
+        flow is the source of truth for Celo USDC bank cash-outs, recipient
+        verification and Paycrest quotes.
       </CardDescription>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-5" noValidate>
@@ -115,11 +115,11 @@ export function RouteCheckForm() {
 
         <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center">
             <Button type="submit" variant="primary" disabled={!canContinue}>
-            Continue to review shell
+            Continue to bank cash-out review
           </Button>
           <p className="text-sm text-receipt-grey">
             No transfer starts here. Review and explicit wallet approval happen
-            in Move Money.
+            in Bank cash-out.
           </p>
         </div>
       </form>

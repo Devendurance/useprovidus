@@ -10,7 +10,7 @@ export type ValueLineStep = {
 const DEFAULT_STEPS: ValueLineStep[] = [
   { label: "You pay", detail: "Local amount" },
   { label: "Fees + FX", detail: "Costs applied" },
-  { label: "Selected route", detail: "Provider path" },
+  { label: "Payment path", detail: "Celo → NGN" },
   { label: "You receive", detail: "Effective amount", emphasis: true },
 ];
 
@@ -37,7 +37,7 @@ export function ValueLine({
           "flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2",
           compact && "sm:gap-1.5",
         )}
-        aria-label="Value Line: you pay, fees and FX, selected route, you receive"
+        aria-label="Payment path: amount, fees and FX, payment path, outcome"
       >
         {steps.map((step, index) => (
           <li
