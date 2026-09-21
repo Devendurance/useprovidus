@@ -1,18 +1,38 @@
+<div align="center">
+
 # Providus
 
-> **Ask. Approve. Prove.**
->
-> Providus turns approved messages into verified real-world payments.
+### Ask. Approve. Prove.
 
-Providus is a safety-first conversational payment execution layer for supported Nigerian payment flows. It turns a natural-language request into a validated `PaymentIntent`, waits for explicit human approval, executes through Celo and provider adapters, reconciles asynchronous state, and presents evidence of the outcome.
+**Providus turns approved messages into verified real-world payments.**
 
-**Status:** P6.14 trust story. Public trust section: [/how-it-works#trust](/how-it-works#trust). Future channels, providers, and utility categories are roadmap-only.
+A safety-first conversational payment execution layer on Celo for supported Nigerian payment flows.
 
-[![Built on Celo](https://img.shields.io/badge/Built%20on-Celo%20Mainnet-35D07F?style=flat-square&logo=celo)](https://celoscan.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![ERC-8004](https://img.shields.io/badge/ERC--8004-Agent%20%239851-blue?style=flat-square)](https://celoscan.io/address/0x8190b99392a2aB86d63749449fA4482cf1902096)
-[![ERC-8021](https://img.shields.io/badge/ERC--8021-Attributed-green?style=flat-square)](https://github.com/Devendurance/useprovidus)
+<p>
+  <a href="https://useprovidus.vercel.app"><img src="https://img.shields.io/badge/Live%20App-useprovidus.vercel.app-1F6F50?style=for-the-badge" alt="Live App"></a>
+  <a href="https://useprovidus.vercel.app/how-it-works#trust"><img src="https://img.shields.io/badge/Trust%20Architecture-How%20it%20works-243B53?style=for-the-badge" alt="Trust Architecture"></a>
+  <a href="https://celoscan.io/tx/0xfb952e0f2670c64cc6829d6419d736cc0ff152e8bec7fd30cbbdf837496e0ce9"><img src="https://img.shields.io/badge/Live%20E2E-Proven%20on%20Celo-35D07F?style=for-the-badge" alt="Live E2E Proof"></a>
+</p>
 
+<p>
+  <a href="https://celo.org"><img src="https://img.shields.io/badge/Built%20on-Celo%20Mainnet-FCFF52?style=flat-square&logo=celo&logoColor=111111" alt="Built on Celo"></a>
+  <a href="https://8004scan.io/agents/celo/9851"><img src="https://img.shields.io/badge/ERC--8004-Agent%20%239851-4C6FFF?style=flat-square" alt="ERC-8004 Agent 9851"></a>
+  <a href="https://github.com/Devendurance/useprovidus"><img src="https://img.shields.io/badge/ERC--8021-Attributed-2E8B57?style=flat-square" alt="ERC-8021 Attribution"></a>
+  <a href="https://askbots.ai/p/k172fmf6cpxbq355mzsevk3vcd8epej8"><img src="https://img.shields.io/badge/AskBots-Round%201-6B5CE7?style=flat-square" alt="AskBots Round 1"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="MIT License"></a>
+</p>
+
+<p>
+  <a href="https://useprovidus.vercel.app">Live App</a> ·
+  <a href="https://useprovidus.vercel.app/dashboard">Try Providus</a> ·
+  <a href="https://useprovidus.vercel.app/how-it-works#trust">How it works</a> ·
+  <a href="https://useprovidus.vercel.app/receipt">Receipt</a> ·
+  <a href="./docs/live-airtime-e2e.md">Live proof</a>
+</p>
+
+</div>
+
+---
 ## What Providus does
 
 A user says what should happen. Providus:
@@ -21,8 +41,8 @@ A user says what should happen. Providus:
 2. asks for missing or ambiguous payment-critical fields;
 3. prepares the live quote, exact fees, recipient, network, and expiry;
 4. waits for explicit approval before creating the provider order;
-5. waits for a separate browser-wallet signature before moving USDC;
-6. verifies the Celo transfer and reconciles provider state;
+5. waits for a separate browser-wallet signature before moving the selected Celo asset;
+6. verifies the exact Celo transfer and reconciles provider state;
 7. triggers airtime fulfilment only once durable fiat-final truth is recorded from Paycrest's authoritative fiat-delivery condition;
 8. issues a receipt showing the approved payment terms and available execution, settlement, fulfilment, and outcome evidence.
 
@@ -31,6 +51,16 @@ Current user-facing flows:
 - **Conversational airtime (`/dashboard`)** — Nigerian MTN, Airtel, Glo, and 9mobile airtime.
 - **Direct bank cash-out (`/check`)** — Celo USDC to a verified Nigerian bank account through Paycrest.
 - **Receipt and status (`/receipt`)** — durable lifecycle and evidence for supported transactions.
+
+
+### Supported airtime payment assets
+
+| Asset | Celo contract | Current evidence |
+|---|---|---|
+| **USDC** | `0xcebA9300f2b948710d2653dD7B07f33A8B32118C` | **Live mainnet E2E proven**: Celo payment → NGN delivery → airtime delivery → receipt |
+| **cNGN** | `0xF6829D7393dAe24509eb1E52eE8e572e2E271a4f` | **Implemented and test-verified**; Paycrest Celo corridor read-verified. Live cNGN E2E remains pending. |
+
+USDC remains the default asset. cNGN is an additional airtime payment path through the same deterministic execution, reconciliation, fulfilment, and receipt engine.
 
 ## Why it exists
 
@@ -49,7 +79,7 @@ Web today (future iMessage / WhatsApp / Telegram / MiniPay are roadmap-only)
 → Human Approval Boundary
 → Providus Execution Engine
 → two separate provider edges:
-     SettlementRail / Paycrest (current)                     → Celo USDC → NGN settlement
+     SettlementRail / Paycrest (current)                     → supported Celo asset → NGN settlement
      FulfilmentProvider / ClubKonnect (current for airtime)  → airtime fulfilment
 → Reconciliation + Recovery
 → Verified Outcome
@@ -60,17 +90,17 @@ Who owns what:
 
 | Owner | Owns | Never owns |
 |---|---|---|
-| **User** | Approval of the exact bound terms and the browser-wallet USDC signature | No money moves without both |
+| **User** | Approval of the exact bound terms and the browser-wallet signature | No money moves without both |
 | **LLM** | Language interpretation, clarification, structured candidate data | Payment-critical fields, provider authorization, wallet signing, success states, refunds |
 | **Deterministic Providus code** | `PaymentIntent` validation, quote/fee binding, execution eligibility, durable state, reconciliation, fulfilment gating, recovery, receipts | No success claim it cannot evidence |
-| **Paycrest** | Celo USDC → NGN settlement | Fulfilment or fulfilment gating |
+| **Paycrest** | Supported Celo asset → NGN settlement | Fulfilment or fulfilment gating |
 | **ClubKonnect** | Airtime fulfilment | When it is called, or whether its result ends the lifecycle |
 | **Celo** | On-chain payment evidence | NGN delivery or utility fulfilment |
 | **Neon PostgreSQL + Drizzle** | Durable transaction state | Provider truth that has not been reconciled |
 
 Provider acknowledgement is never final success. Unknown outcomes reconcile through the durable Paycrest order reference or the deterministic ClubKonnect RequestID recorded at claim time; they are never blindly retried.
 
-The public walkthrough — architecture diagram, LLM can/cannot, the money movement gate, the actual lifecycle, evidence chain, and recovery — is the [trust section](/how-it-works#trust).
+The public walkthrough — architecture diagram, LLM can/cannot, the money movement gate, the actual lifecycle, evidence chain, and recovery — is the [Trust Architecture](https://useprovidus.vercel.app/how-it-works#trust).
 
 ## Live proof
 
@@ -78,13 +108,14 @@ One human-gated run demonstrates the complete **request → receipt** chain on C
 
 - **Delivered:** ₦1,000 MTN airtime
 - **Recipient:** `*******6560`
+- **Payment asset:** USDC
 - **Celo deposit:** [transaction `0xfb95…e0ce`](https://celoscan.io/tx/0xfb952e0f2670c64cc6829d6419d736cc0ff152e8bec7fd30cbbdf837496e0ce9) (Celoscan link; display shortened)
 - **Amount:** `0.736312 USDC` (`0.732612` base + `0.0037` Paycrest sender fee)
 - **Paycrest:** fiat delivery `validated`, then protocol `settled`
 - **ClubKonnect:** provider status `200`, RequestID `cktx48b9…`, provider order `6720476887`
 - **Full trace:** [`docs/live-airtime-e2e.md`](./docs/live-airtime-e2e.md)
 
-This is one human-gated run of the current architecture — approval, Celo deposit, fiat delivery, fulfilment — not a universal guarantee for every payment, recipient, provider state, or future channel. The same chain is walked through publicly in the [trust section](/how-it-works#trust).
+This is one human-gated run of the current architecture — approval, Celo deposit, fiat delivery, fulfilment — not a universal guarantee for every payment, recipient, provider state, or future channel. The same chain is walked through publicly in the [Trust Architecture](https://useprovidus.vercel.app/how-it-works#trust).
 
 ## How the flow works
 
@@ -94,7 +125,7 @@ User request
 → exact preview and provider-authoritative fee binding
 → explicit human approval
 → Paycrest order
-→ browser-wallet Celo USDC signature
+→ browser-wallet Celo asset signature
 → on-chain deposit verification
 → Paycrest fiat-delivery reconciliation (settlement edge)
 → ClubKonnect fulfilment and reconciliation (fulfilment edge)
@@ -130,7 +161,7 @@ graph TD
     Execution --> Fulfilment[FulfilmentProvider adapter<br/>ClubKonnect current for airtime]
     Settlement --> Reconcile[Reconciliation + Recovery]
     Fulfilment --> Reconcile
-    Celo[Celo Mainnet + browser wallet] --> Reconcile
+    Celo[Celo Mainnet + browser wallet<br/>USDC / cNGN] --> Reconcile
     Reconcile --> Outcome[Verified Outcome]
     Outcome --> Receipt[Receipt]
 ```
@@ -142,7 +173,7 @@ For airtime, Paycrest NGN proceeds land in the configured Providus operating set
 
 | Internal status | Meaning |
 |---|---|
-| `pending` | Provider order exists; awaiting the Celo USDC deposit. |
+| `pending` | Provider order exists; awaiting the selected Celo asset deposit. |
 | `settling` | Celo deposit is verified; Paycrest fiat delivery is still pending. |
 | `settled` | Internal status records the durable fiat-final milestone — set when the authoritative fiat-delivery status `validated` is observed, and never cleared afterwards, including when raw upstream state later moves through `settling` to `settled`. Upstream `settled` also satisfies the gate because it subsumes prior fiat delivery and records protocol completion. For utility transactions this enables fulfilment; for cash-out it is the effective business terminal state. |
 | `processing` | ClubKonnect fulfilment is claimed or in flight. |
@@ -159,10 +190,10 @@ Public stage labels shown in the product come only from `lib/transactions/status
 ## Safety and reliability
 
 - **Non-custodial:** browser wallet signing only; no private keys or seed phrases reach the server.
-- **Explicit approval:** the user approves the exact order and separately signs the exact bound USDC transfer.
+- **Explicit approval:** the user approves the exact order and separately signs the exact bound asset transfer.
 - **Provider fee authority:** Paycrest order creation binds sender/network fees and the final total.
 - **Durable state:** Neon PostgreSQL (managed Postgres) + Drizzle records the orchestration across refreshes and restarts.
-- **Celo verification:** the server checks the expected sender, recipient, token, and amount.
+- **Celo verification:** the server checks the expected sender, recipient, token contract, and exact amount.
 - **Idempotent fulfilment:** deterministic ClubKonnect RequestIDs and one-shot claims prevent duplicate purchases.
 - **Conservative recovery:** ambiguous mutations are reconciled through the original reference instead of blindly retried.
 - **Server-only providers:** Paycrest and ClubKonnect credentials never enter client bundles or public logs.
@@ -185,6 +216,9 @@ ERC-8021 attribution is presented from the recorded tag and transfer evidence as
 
 - Web conversational assistant with multi-turn clarification.
 - Deterministic, schema-validated airtime `PaymentIntent`.
+- **USDC airtime path with a completed Celo-mainnet E2E proof.**
+- **cNGN airtime path implemented and test-verified; live Paycrest corridor read-verified; live cNGN E2E pending.**
+- USDC remains the default payment asset.
 - Celo mainnet and canonical Circle USDC.
 - Explicit human approval and browser-wallet signing.
 - Paycrest quotes, order creation, authoritative fee binding, and reconciliation.
@@ -210,7 +244,11 @@ Roadmap-only — not shipped, not production-supported, and not current product 
 
 ## AskBots progression
 
-AskBots Round 1 established the conversational intent baseline. Subsequent work added deterministic validation, explicit approval, durable persistence, provider reconciliation, fulfilment idempotency, fee binding, and live Celo airtime evidence. AskBots references are evaluation history; they do not change the product authority boundary.
+[AskBots Round 1](https://askbots.ai/p/k172fmf6cpxbq355mzsevk3vcd8epej8) established the early public baseline.
+
+Since that round, Providus has added deterministic validation, explicit approval, durable persistence, provider reconciliation, fulfilment idempotency, provider-authoritative fee binding, a verified receipt surface, a completed Celo-mainnet airtime E2E, and multi-asset airtime support.
+
+Round 2 reviews the current live product rather than the earlier baseline.
 
 ## Testing
 
@@ -248,9 +286,9 @@ Keep provider credentials server-side and out of git. Never print secrets, full 
 
 ## Canonical documentation
 
-The public trust story is the [trust section](/how-it-works#trust) (P6.14). These documents carry the same ownership, state, recovery, and roadmap semantics and are synchronized as one P6.14 set:
+The public trust story is the [Trust Architecture](https://useprovidus.vercel.app/how-it-works#trust) (P6.14). These documents carry the same ownership, state, recovery, and roadmap semantics and are synchronized as one P6.14 set:
 
-- [/how-it-works#trust](/how-it-works#trust) — public trust section: architecture diagram, LLM can/cannot and the money movement gate, actual lifecycle, exceptional branches, evidence chain, recovery
+- [Trust Architecture](https://useprovidus.vercel.app/how-it-works#trust) — public trust section: architecture diagram, LLM can/cannot and the money movement gate, actual lifecycle, exceptional branches, evidence chain, recovery
 - [`docs/PROVIDUS_ARCHITECTURE.md`](./docs/PROVIDUS_ARCHITECTURE.md) — P6.14 current architecture, ownership, state semantics, and lifecycle
 - [`docs/providus_PRD.md`](./docs/providus_PRD.md) — P6.14 current product requirements
 - [`docs/positioning.md`](./docs/positioning.md) — P6.14 category, promise, trust architecture, claims, and messaging hierarchy
