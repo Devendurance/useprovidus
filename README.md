@@ -153,7 +153,8 @@ Deterministic code validates the `PaymentIntent`, binds fees and totals, enforce
 
 ```mermaid
 graph TD
-    Channel[Web today — future iMessage/WhatsApp/Telegram/MiniPay are roadmap-only] --> Conversation[Conversation Layer]
+    Web[Web dashboard — shipped channel] --> Conversation[Conversation Layer]
+    iMsg[iMessage / Photon — channel proof<br/>simulated transport] --> Conversation
     Conversation --> Intent[PaymentIntent Engine]
     Intent --> Approval[Human Approval Boundary]
     Approval --> Execution[Providus Execution Engine]
@@ -166,7 +167,7 @@ graph TD
     Outcome --> Receipt[Receipt]
 ```
 
-Channels do not own payment engines. The web dashboard is the shipped channel; iMessage/Photon, WhatsApp, Telegram, MiniPay, and other surfaces are roadmap-only adapters over the same execution path — not shipped capability. Paycrest and ClubKonnect are current infrastructure adapters at two separate edges; Providus owns intent, approval, orchestration, state, reconciliation, recovery, and proof.
+Channels do not own payment engines. The web dashboard is the shipped production channel. iMessage/Photon is a **channel proof** (simulated transport): `POST /api/channels/imessage/webhook` normalizes a Photon-style message into the same `PaymentIntent` engine, returns clarification or a web approval handoff (`/dashboard?channel=imessage`), and formats receipt/status replies from verified terminal state — execution, wallet signing, Paycrest, ClubKonnect, and receipt stay on the existing web path. WhatsApp, Telegram, MiniPay, and other surfaces remain roadmap-only adapters over the same execution path — not shipped capability. Paycrest and ClubKonnect are current infrastructure adapters at two separate edges; Providus owns intent, approval, orchestration, state, reconciliation, recovery, and proof.
 For airtime, Paycrest NGN proceeds land in the configured Providus operating settlement account and ClubKonnect spends from its own prepaid float. Providus does not claim automatic Paycrest-to-ClubKonnect funding.
 
 ## Transaction lifecycle
@@ -227,6 +228,7 @@ ERC-8021 attribution is presented from the recorded tag and transfer evidence as
 - Receipt/status surface limited to evidence-backed stages, with owner-scoped evidence reads.
 - Separate Nigerian bank cash-out flow through Paycrest.
 - ERC-8021 attribution tag `celo_8190b99392a2` on eligible transfers.
+- iMessage/Photon channel proof (simulated transport): `POST /api/channels/imessage/webhook` normalizes a Photon-style message into the same `PaymentIntent` engine, returns clarification or a web approval handoff, and formats receipt/status replies from verified terminal state (`npm run test:channel`, `npx tsx scripts/imessage-channel-demo.ts`) — NOT production-supported.
 
 ## Roadmap
 
@@ -235,7 +237,7 @@ Roadmap-only — not shipped, not production-supported, and not current product 
 - [ ] Data bundles
 - [ ] Electricity payments
 - [ ] Cable TV subscriptions
-- [ ] iMessage/Photon proof or adapter
+- [ ] iMessage/Photon production support (a simulated channel proof is shipped above; live delivery is not)
 - [ ] WhatsApp, Telegram, MiniPay, and other channel adapters
 - [ ] Additional settlement rails
 - [ ] Additional fulfilment providers

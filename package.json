@@ -20,9 +20,10 @@
     "test:recovery-security": "npx --yes tsx lib/transactions/recovery-security-self-check.ts",
     "test:clubkonnect": "npx --yes tsx --conditions=react-server lib/clubkonnect/self-check.ts",
     "test:ai": "npx --yes tsx --conditions=react-server lib/ai/self-check.ts",
+    "test:channel": "npx --yes tsx --conditions=react-server lib/channels/imessage-self-check.ts",
     "test:assistant": "npx --yes tsx --conditions=react-server lib/assistant/validation-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/status-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/chat-route-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/preview-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/confirmation-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/preview-authority-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/payment-service-self-check.ts && npx --yes tsx components/assistant/self-check.ts",
     "test:receipt": "npx --yes tsx lib/transactions/receipt-self-check.ts",
-    "test:all": "npm run test:wallet-helpers && npm run test:money-helpers && npm run test:recipient-helpers && npm run test:order-helpers && npm run test:order-route && npm run test:attribution && npm run test:persistence && npm run test:reconciliation && npm run test:recovery-security && npm run test:clubkonnect && npm run test:ai && npm run test:receipt && npm run test:assistant"
+    "test:all": "npm run test:wallet-helpers && npm run test:money-helpers && npm run test:recipient-helpers && npm run test:order-helpers && npm run test:order-route && npm run test:attribution && npm run test:persistence && npm run test:reconciliation && npm run test:recovery-security && npm run test:clubkonnect && npm run test:ai && npm run test:receipt && npm run test:channel && npm run test:assistant"
   },
   "dependencies": {
     "@celo/attribution-tags": "^0.3.0",
