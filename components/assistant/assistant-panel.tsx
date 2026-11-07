@@ -16,14 +16,23 @@ import {
   Loader2,
 } from "lucide-react";
 import { useState } from "react";
+import { useWalletAuth, type WalletAuth } from "@/hooks/use-wallet-auth";
+import { WalletTransferCard } from "@/components/assistant/wallet-transfer-card";
+import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
 
 export interface AssistantPanelProps {
   className?: string;
 }
 
 export function AssistantPanel({ className }: AssistantPanelProps) {
+  const auth = useWalletAuth();
+  return <AssistantContent className={className} auth={auth} />;
+}
+
+function AssistantContent({ className, auth }: AssistantPanelProps & { auth: WalletAuth }) {
   const {
     messages,
+    walletAction,
     activeIntent,
     pending,
     error,
@@ -49,7 +58,7 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
     rehydrating,
     rehydrationError,
     loadTransaction,
-  } = useAssistant();
+  } = useAssistant({ walletTransferOwner: auth.owner });
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [lookupId, setLookupId] = useState("");
   const [lookupDismissedFor, setLookupDismissedFor] = useState<string | null>(null);
@@ -71,6 +80,14 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
       )}
       aria-label="Providus Assistant Panel"
     >
+      <div className="border-b border-ledger bg-receipt-field p-4 font-proof text-sm">
+        {auth.address ? <>
+          <p className="break-all">Connected wallet {auth.address}</p>
+          <p className="mt-1">{auth.owner ? "Wallet ownership authenticated. Every payment still needs wallet approval." : "Sign in to use saved recipients and BOT payments. This EOA ownership signature creates a secure session and does not move funds."}</p>
+          {!auth.owner && <button className="mt-2 min-h-11 rounded-lg border border-ledger bg-clear-paper px-4 disabled:opacity-50" disabled={auth.busy} onClick={() => void auth.signIn()}>{auth.busy ? "Waiting for sign-in signature…" : "Sign in with wallet"}</button>}
+        </> : <ConnectWalletButton />}
+        {auth.error && <p role="alert" className="mt-2 text-red-700">{auth.error}</p>}
+      </div>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ledger bg-receipt-field px-4 py-3.5 sm:px-5">
         <div className="flex items-center gap-2.5">
@@ -139,7 +156,7 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
         </div>
       ) : null}
       {/* Active Intent Draft Card Preview (Docked if active) */}
-      {activeIntent ? (
+      {activeIntent && activeIntent.type !== "wallet_transfer" ? (
         <div className="border-b border-ledger-edge/80 bg-receipt-field/60 p-3 sm:p-4">
           <IntentDraftCard
             intent={activeIntent}
@@ -184,6 +201,7 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
         onSelectSuggestion={send}
         className="bg-clear-paper"
       />
+      <WalletTransferCard key={`${auth.address}:${auth.owner}:${activeIntent?.type === "wallet_transfer" ? `${activeIntent.chainId}:${activeIntent.recipientAddress}:${activeIntent.preparedIntentId}` : "recovery"}`} auth={auth} action={walletAction} draft={activeIntent?.type === "wallet_transfer" ? activeIntent : null} send={send} pending={pending} />
       {/* Explicit transaction lookup (resume an unfunded order after reload) */}
       <div className="mx-4 mb-2 rounded-[10px] border border-ledger-edge bg-receipt-field/70 p-3">
         <form

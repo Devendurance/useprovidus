@@ -22,6 +22,8 @@ const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), selec
 
 export function ConnectWalletButton({ className, size = "sm", fullWidth = false, label = "Connect wallet", showBalances = true }: ConnectWalletButtonProps) {
   const wallet = useProvidusWallet();
+  const onBot = wallet.chainId === 968 && Boolean(wallet.address);
+  const connectedHere = wallet.status === "connected" || onBot;
   const statusId = useId();
   const panelId = useId();
   const titleId = useId();
@@ -125,10 +127,10 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
       onClick={togglePanel} aria-expanded={panelOpen} aria-controls={panelId} aria-haspopup="dialog"
       aria-describedby={statusId} aria-busy={wallet.isConnectPending}>
       {wallet.isConnectPending ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-        : wallet.status === "wrong-network" ? <AlertTriangle className="h-4 w-4 shrink-0 text-loss-red" aria-hidden />
+        : wallet.status === "wrong-network" && !onBot ? <AlertTriangle className="h-4 w-4 shrink-0 text-loss-red" aria-hidden />
           : wallet.status === "connected" ? <CheckCircle2 className="h-4 w-4 shrink-0 text-provident-green" aria-hidden />
             : <Wallet className="h-4 w-4 shrink-0" aria-hidden />}
-      <span className="truncate">{wallet.isConnectPending ? "Connecting…" : wallet.status === "wrong-network" ? "Wrong network" : wallet.status === "connected" ? truncated : label}</span>
+      <span className="truncate">{wallet.isConnectPending ? "Connecting…" : connectedHere ? truncated : wallet.status === "wrong-network" ? "Wrong network" : label}</span>
     </Button>
   );
 
@@ -139,7 +141,7 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
         className="fixed inset-x-3 bottom-3 z-[71] max-h-[min(82svh,680px)] w-auto overflow-y-auto rounded-[10px] border-ledger bg-clear-paper p-3 shadow-prominent sm:inset-x-auto sm:bottom-auto sm:w-[min(360px,calc(100vw-24px))]"
         style={position ? { top: position.top, left: position.left, width: position.width } : undefined}>
         <div className="mb-2 flex items-center justify-between gap-2">
-          <p id={titleId} className="text-sm font-semibold text-ledger-stone">{showChooser ? "Connect wallet" : wallet.status === "wrong-network" ? "Wallet needs Celo" : "Wallet connected"}</p>
+          <p id={titleId} className="text-sm font-semibold text-ledger-stone">{showChooser ? "Connect wallet" : onBot ? "BOT Testnet wallet connected" : wallet.status === "wrong-network" ? "Choose a supported network" : "Wallet connected"}</p>
           <button type="button" className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-ledger-edge text-receipt-grey hover:bg-ledger-edge/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green" onClick={() => closePanel()} aria-label="Close wallet panel">
             <X className="h-4 w-4" aria-hidden />
           </button>
@@ -167,10 +169,10 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
         ) : (
           <>
             <div className="mb-3 flex min-w-0 items-center gap-2 rounded-[10px] bg-receipt-field px-3 py-2 text-sm font-semibold text-ledger-stone">
-              {wallet.status === "wrong-network" ? <AlertTriangle className="h-4 w-4 shrink-0 text-loss-red" aria-hidden /> : <CheckCircle2 className="h-4 w-4 shrink-0 text-provident-green" aria-hidden />}<span className="truncate font-proof">{truncated}</span>
+              {wallet.status === "wrong-network" && !onBot ? <AlertTriangle className="h-4 w-4 shrink-0 text-loss-red" aria-hidden /> : <CheckCircle2 className="h-4 w-4 shrink-0 text-provident-green" aria-hidden />}<span className="truncate font-proof">{truncated}</span>
             </div>
             {wallet.status === "connected" && wallet.address ? <a href={addressExplorerUrl(wallet.address)} target="_blank" rel="noopener noreferrer" className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-quote-blue underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green">View address on Celoscan <ExternalLink className="h-4 w-4" aria-hidden /></a> : null}
-            {wallet.status === "wrong-network" ? <div className="space-y-2 pb-1"><p className="text-xs font-medium text-loss-red" role="status">Switch to Celo mainnet to use Providus payments.</p><Button type="button" variant="primary" size="sm" fullWidth onClick={() => wallet.switchToCelo()} disabled={wallet.isSwitchPending}>{wallet.isSwitchPending ? "Switching…" : "Switch to Celo"}</Button>{wallet.switchError ? <p className="text-xs text-loss-red" role="alert">{wallet.switchError}</p> : null}</div> : null}
+            {wallet.status === "wrong-network" ? <div className="space-y-2 pb-1"><p className="text-xs font-medium text-receipt-grey" role="status">{onBot ? "BOT Testnet payments are available in the assistant. Switch to Celo for airtime and cash-out." : "Use Celo for airtime and cash-out, or BOT Testnet in the assistant."}</p><Button type="button" variant="secondary" size="sm" fullWidth onClick={() => wallet.switchToCelo()} disabled={wallet.isSwitchPending}>{wallet.isSwitchPending ? "Switching…" : "Switch to Celo"}</Button>{wallet.switchError ? <p className="text-xs text-loss-red" role="alert">{wallet.switchError}</p> : null}</div> : null}
             {wallet.status === "connected" && showBalances ? <div className="space-y-2 border-t border-ledger-edge pt-2">{wallet.balancesLoading ? <p className="font-proof text-[12px] text-receipt-grey" role="status">Reading balances…</p> : <dl className="grid min-w-0 grid-cols-2 gap-2 font-proof text-[12px] text-ledger-stone"><div className="min-w-0"><dt className="text-receipt-grey">CELO</dt><dd className="truncate font-medium tabular-nums">{wallet.nativeBalance?.value ?? "—"}</dd></div><div className="min-w-0"><dt className="text-receipt-grey">USDC</dt><dd className="truncate font-medium tabular-nums">{wallet.usdcBalance?.value ?? (wallet.usdcConfigured ? "—" : "n/a")}</dd></div></dl>}{wallet.balancesError ? <p className="text-[11px] text-ledger-stone" role="status">{wallet.balancesError}</p> : null}</div> : null}
             <Button type="button" variant="ghost" size="sm" fullWidth className="mt-3" onClick={() => wallet.disconnectWallet()} disabled={wallet.isDisconnectPending}><Unplug className="h-4 w-4" aria-hidden />{wallet.isDisconnectPending ? "Disconnecting…" : "Disconnect"}</Button>
           </>
@@ -179,5 +181,5 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
     </>
   ) : null;
 
-  return <div className={cn("relative inline-flex min-w-0 items-center", fullWidth && "w-full")}>{trigger}<div id={statusId} className="sr-only" role="status" aria-live="polite">{wallet.status === "connected" ? `Connected on Celo: ${wallet.address}` : wallet.status === "wrong-network" ? "Wrong network. Switch to Celo to use Providus payments." : wallet.isConnectPending ? "Connecting wallet." : "Wallet disconnected."}</div>{typeof document !== "undefined" && panel ? createPortal(panel, document.body) : null}</div>;
+  return <div className={cn("relative inline-flex min-w-0 items-center", fullWidth && "w-full")}>{trigger}<div id={statusId} className="sr-only" role="status" aria-live="polite">{connectedHere ? `Connected on ${onBot ? "BOT Testnet (968)" : "Celo"}: ${wallet.address}` : wallet.status === "wrong-network" ? "Choose Celo for airtime and cash-out, or BOT Testnet in the assistant." : wallet.isConnectPending ? "Connecting wallet." : "Wallet disconnected."}</div>{typeof document !== "undefined" && panel ? createPortal(panel, document.body) : null}</div>;
 }

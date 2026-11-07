@@ -1,0 +1,66 @@
+# Providus — Memory (decisions, invariants, lessons)
+
+## B7 invariants, 2026-11-07
+- User's B7 scope overrides automatic push. No deploy, production writes or migrations through 0006.
+- Wallet connection and SIWE authentication are separate. Only the verified session establishes transfer ownership. Client owner context may narrow access, never establish it.
+- Full wallet addresses must be displayed during recipient confirmation and payment review. This overrides historical address truncation guidance for these owner-only views.
+- Native BOT payments use chain 968 and canonical ProvidusPay `0xbc6298701490ba211733F2Dc28deB7Df9835B7a4`. Mainnet plan/submission remains blocked until B9.
+- Fresh stored-intent execution plan immediately precedes explicit review-card signing. Assistant actions and chat acknowledgements never authorize a transaction.
+- Wallet hash is retained before fallible local persistence/registration. Uncertain broadcast survives refresh and blocks resend. B5 confirmed plus verifiedAt is required for success.
+- Save consent uses narrow affirmative phrases. Broad matching for the word save incorrectly accepted 'do not save', reproduced and fixed by B7 regression.
+- Browser proof uses an empty ephemeral SIWE account and isolated memory payment fixtures. A simulated verified receipt must never be described as live chain proof.
+- Store generated Playwright CLI output outside the checkout to avoid development refresh loops. Prewarm local auth routes before a memory-backed SIWE test so recompilation does not invalidate its nonce.
+- The existing B1-B6 baseline was already dirty/untracked before B7. The local B7 checkpoint includes a base64 recovery patch for B7 edits inside those files, without absorbing the full baseline.
+
+## Non-negotiable invariants
+- LLM owns language; deterministic code owns money. Model never authorizes, mutates provider state, or decides success.
+- Paycrest `validated`/`settled` = fiat delivered. `fulfilled`/`fulfilling`/`pending` alone are NEVER fiat delivery.
+- Only numeric ClubKonnect `200` completes airtime. 100/300 = processing, 201/unknown/timeout = reconciliation-required, 417 = failed (`PROVIDER_FLOAT_EXHAUSTED`). Never invent refunds.
+- Preview freezes NGN + base USDC only. Paycrest order authoritatively binds `senderFee`/`transactionFee`/`totalUsdcToSend`. Never hardcode fee percentages.
+- One Paycrest order per preview; one ClubKonnect purchase per transaction (`fulfilment_attempts` 0→1, one-shot claim). Unknown outcome ⇒ query same RequestID, never re-purchase.
+- Deterministic RequestID: `ck` + sanitized prefix + 12-hex sha256, ≤32 chars. Missing/mismatched response RequestID ⇒ unknown/reconcile, never complete.
+- Preview: 5-min TTL, single-use, wallet-bound, fingerprint-bound, atomically consumed.
+- Non-custodial: no private-key/server signing ever. Browser wallet only, explicit click only.
+- Never expose secrets, full bank details, credential URLs, or full PII. Mask phones (`*******6560`), truncate addresses/hashes.
+
+## Architecture lessons (earned)
+- `resolveAssistantTurn`: status query first, then deterministic confirmation fast-path (closed affirmative vocabulary), then LLM. Simple "yes" must never cost an LLM round-trip.
+- `instructionsFromBoundTransaction` is the single "is this row payable?" authority — reused by POST prepare/replay and GET rehydration. No duplicated fee logic.
+- Rehydration (`GET /api/transactions/[id]?paymentInstructions=true&walletAddress=`): explicit-null contract (`null` on refusal, `PAYMENT_ORDER_EXPIRED` only with full ownership proof). Opted-in reads skip all reconciliation (`fetchCalls===0`).
+- Wallet mismatch semantics: malformed/missing wallet → `WALLET_CONTEXT_INVALID`; valid foreign wallet → `PREVIEW_NOT_USABLE` (privacy, no existence oracle).
+- `useTransactionStatus` polling: halt on terminal (`airtime_delivered`/`failed`/`recovery_required`/`completed`/`failed`/`refunded`). Stabilize hook deps — never depend on fresh inline `options` objects (identity-loop reconcile storm).
+- `PaymentInstructionsCard`: derive `isSettling`/terminal from fetched durable stage, never from local `depositStatus` alone.
+- Receipt: explicit `?tx=` lookup only, revalidate on wallet change, never enumerate another wallet's rows.
+- `sanitizeFailureReason` must redact `UserID=`/`token=`/key-value credential pairs, not just Bearer tokens.
+- `isFiatDelivered`/`isFiatFinal` derive ONLY from Paycrest `validated`/`settled` — never from internal status fallbacks.
+
+## Sprint discipline (from AGENTS.md)
+- Repo is implementation source of truth; build plan is sprint authority. Inspect files before planning/editing.
+- One milestone at a time; never jump ahead because the next step looks obvious.
+- Current sprint: airtime vertical slice before data bundles; P7 data starts only if airtime is stable; electricity/cable/general utilities out of scope unless re-approved.
+- Preserve working bank cash-out flow; protect the stable vertical slice over feature breadth.
+- Database: Drizzle/Neon workflow, inspect generated migrations, NEVER `drizzle push`, no destructive/prod mutation without explicit user approval.
+
+## Safety boundaries (human approval required)
+- Live Paycrest order creation, Celo mainnet tx, ClubKonnect purchase, destructive prod DB ops, final publish/deploy.
+- Agents may autonomously inspect, research, build, mock, test, validate, construct requests, implement reconciliation — up to the pre-mutation gate.
+- Never: print secrets/bank details/credential URLs, fake provider success, blindly retry unknown mutations, treat ClubKonnect ack as final success, treat Paycrest deposit as fiat delivery, invent refunds, weaken validation to pass tests.
+- Persist state before irreversible multi-provider orchestration.
+
+## Verification discipline
+- Always run: `test:assistant`, `test:all`, `tsc --noEmit`, `lint`, `build`, `git diff --check` before closing a milestone.
+- Self-check suites are the test framework (`*-self-check.ts` + `tests/`). New behavior needs a failing-first regression case.
+- Independent `verifier` agent before PASS on consequential work. Max 2 repair loops, then stop and report.
+- Receipt/UI edits are high-risk for JSX corruption via line-patch tools — verify with `tsc` immediately after each edit.
+
+## Live-run rules
+- Three separate human gates (A: order, B: wallet sign, C: fulfilment). Never combine or infer approval.
+- Old failed/unbound orders stay abandoned and expire. Never reuse previews, transactions, or receive addresses.
+- Webhook is 503 without `PAYCREST_API_SECRET` — polling/reconciliation is the fallback path.
+- ClubKonnect float and IP-whitelist must be operator-verified before live runs.
+
+## Session-continuity operating procedure (this setup)
+- `agent-state/` holds `project-state.md` (built/architecture/tasks/files/commands), `memory.md` (this file: invariants/lessons/discipline), `left-off.md` (resume point/dirty tree/first actions/risks).
+- Update all three at milestone gates and before `/new` or compaction — never let them go stale (stale state caused confusion on 2026-09-20 when P6.10–P6.14 committed but files still said "uncommitted P6.10").
+- After `/new` or compaction, first read all three files plus `git status --short` and `git log --oneline -5` before acting.
+- A fresh model is not "confused" — it is contextless. Point it at these files; do not blame it for missing unrecorded state.

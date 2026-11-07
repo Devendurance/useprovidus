@@ -230,6 +230,7 @@ export function resolveRehydrationState(input: RehydrationStateInput): Rehydrati
 
 export interface UseAssistantState {
   messages: ConversationMessage[];
+  walletAction: import("@/lib/assistant/types").WalletTransferAction | null;
   activeIntent: PaymentIntent | null;
   pending: boolean;
   error: string | null;
@@ -251,6 +252,7 @@ export interface UseAssistantState {
 }
 
 export interface UseAssistantOptions {
+  walletTransferOwner?: string | null;
   walletAddress?: string;
   onDepositConfirmed?: (transactionId: string, celoTxHash: string) => void;
 }
@@ -303,8 +305,11 @@ function useSafeConnectedAddress(): string | undefined {
 }
 
 export function useAssistant(options?: UseAssistantOptions): UseAssistantResult {
+  const walletTransferOwnerRef = useRef(options?.walletTransferOwner);
+  useEffect(() => { walletTransferOwnerRef.current = options?.walletTransferOwner; }, [options?.walletTransferOwner]);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [activeIntent, setActiveIntent] = useState<PaymentIntent | null>(null);
+  const [walletAction, setWalletAction] = useState<import("@/lib/assistant/types").WalletTransferAction | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -343,6 +348,22 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
 
   // Wallet address resolution
   const connectedAddress = useSafeConnectedAddress();
+  const previousTransferContext = useRef(`${connectedAddress}:${options?.walletTransferOwner}`);
+  useEffect(() => {
+    const context = `${connectedAddress}:${options?.walletTransferOwner}`;
+    if (previousTransferContext.current === context) return;
+    previousTransferContext.current = context;
+    if (activeIntentRef.current?.type !== "wallet_transfer") return;
+    abortControllerRef.current?.abort();
+    activeIntentRef.current = null;
+    messagesRef.current = [];
+    let alive = true;
+    queueMicrotask(() => {
+      if (!alive) return;
+      setActiveIntent(null); setWalletAction(null); setMessages([]); setPending(false);
+    });
+    return () => { alive = false; };
+  }, [connectedAddress, options?.walletTransferOwner]);
   const targetWalletAddress = options?.walletAddress ?? connectedAddress;
   const targetWalletRef = useRef<string | undefined>(targetWalletAddress);
 
@@ -396,6 +417,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     setAsset("USDC");
     setMessages([]);
     setActiveIntent(null);
+    setWalletAction(null);
     setError(null);
     setPending(false);
     setPreview(null);
@@ -463,6 +485,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
 
     const payload: AssistantChatRequest = {
       message: trimmed,
+      walletTransferOwner: walletTransferOwnerRef.current,
       history: priorHistory,
       activeIntent: currentIntent,
     };
@@ -500,6 +523,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       const { turn, activeIntent: newActiveIntent } = json;
       setMessages((prev) => [...prev, turn.message]);
       setActiveIntent(newActiveIntent);
+      setWalletAction(turn.action ?? null);
       setError(null);
     } catch (err: unknown) {
       // Ignore AbortError when superseded
@@ -1191,6 +1215,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
 
   return {
     messages,
+    walletAction,
     activeIntent,
     pending,
     error,

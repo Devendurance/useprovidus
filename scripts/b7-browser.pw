@@ -1,0 +1,113 @@
+async page => {
+  const signFunction = `b7Sign${Date.now()}`;
+  const fixture = 'http://127.0.0.1:3999';
+  await page.request.post('http://localhost:3000/api/auth/verify', { data: { message: 'invalid', signature: '0x' }, headers: { origin: 'http://localhost:3000' } });
+  const { address } = await (await page.request.get(`${fixture}/account`)).json();
+  const recipient = '0x2222222222222222222222222222222222222222';
+  const hash = `0x${'ab'.repeat(32)}`;
+  await page.exposeFunction(signFunction, async message => (await (await page.request.post(`${fixture}/sign`, { data: { message } })).json()).signature);
+  await page.addInitScript(({ address, hash, signFunction }) => {
+    let chain = '0xa4ec';
+    let currentAddress = address;
+    let authorized = sessionStorage.getItem('b7Connected') === 'yes';
+    const handlers = new Map();
+    window.b7Sends = [];
+    window.b7Reject = false;
+    window.b7RejectSign = false;
+    window.ethereum = {
+      isMetaMask: true,
+      on(event, listener) { if (!handlers.has(event)) handlers.set(event, []); handlers.get(event).push(listener); },
+      removeListener(event, listener) { handlers.set(event, (handlers.get(event) ?? []).filter(fn => fn !== listener)); },
+      async request({ method, params }) {
+        if (method === 'eth_requestAccounts') { authorized = true; sessionStorage.setItem('b7Connected', 'yes'); return [currentAddress]; }
+        if (method === 'eth_accounts') return authorized ? [currentAddress] : [];
+        if (method === 'eth_chainId') return chain;
+        if (method === 'wallet_requestPermissions') return [{ parentCapability: 'eth_accounts' }];
+        if (method === 'wallet_getPermissions') return authorized ? [{ parentCapability: 'eth_accounts' }] : [];
+        if (method === 'wallet_switchEthereumChain') { chain = params[0].chainId; for (const fn of handlers.get('chainChanged') ?? []) fn(chain); return null; }
+        if (method === 'wallet_addEthereumChain') return null;
+        if (method === 'personal_sign') {
+          if (window.b7RejectSign) { const error = new Error('User rejected sign-in'); error.code = 4001; throw error; }
+          return window[signFunction](params[0]);
+        }
+        if (method === 'eth_sendTransaction') {
+          if (window.b7Reject) { const error = new Error('User rejected the request'); error.code = 4001; throw error; }
+          window.b7Sends.push(params[0]); return hash;
+        }
+        throw new Error(`Unsupported fixture wallet method ${method}`);
+      },
+    };
+    window.b7SwitchWallet = value => { currentAddress = value; for (const fn of handlers.get('accountsChanged') ?? []) fn([value]); };
+  }, { address, hash, signFunction });
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname.startsWith('/api/auth/')) return route.continue();
+    if (url.pathname.startsWith('/api/transfers') || url.pathname.startsWith('/api/recipients') || url.pathname === '/api/assistant/chat') {
+      const response = await page.request.fetch(`${fixture}${url.pathname}${url.search}`, { method: request.method(), data: request.postData() ?? undefined, headers: { 'content-type': 'application/json' } });
+      return route.fulfill({ status: response.status(), contentType: 'application/json', body: await response.text() });
+    }
+    return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, error: { message: 'Provider disabled during B7 isolated browser test' } }) });
+  });
+  for (const host of ['https://rpc.bohr.life/**', 'https://forno.celo.org/**']) await page.route(host, async route => {
+    const request = route.request().postDataJSON();
+    const answer = rpc => ({ jsonrpc: '2.0', id: rpc.id, result: rpc.method === 'eth_chainId' ? (route.request().url().includes('bohr') ? '0x3c8' : '0xa4ec') : rpc.method === 'eth_estimateGas' ? '0x186a0' : rpc.method === 'eth_gasPrice' ? '0x3b9aca00' : rpc.method === 'eth_getBalance' ? '0x8ac7230489e80000' : rpc.method === 'eth_call' ? `0x${'0'.repeat(64)}` : '0x1' });
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(Array.isArray(request) ? request.map(answer) : answer(request)) });
+  });
+  await page.goto('http://localhost:3000/dashboard', { timeout: 240000, waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => Object.keys(document.querySelector('#assistant-input') ?? {}).some(key => key.startsWith('__reactProps$')));
+  const composer = page.locator('#assistant-input');
+  await composer.fill('Buy airtime'); await composer.press('Enter');
+  await page.getByText('Celo airtime draft retained across wallet authentication.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: /connect wallet/i }).first().click();
+  await page.getByRole('button', { name: 'Connect with MetaMask', exact: true }).click();
+  await page.getByRole('button', { name: 'Sign in with wallet', exact: true }).waitFor({ timeout: 30000 });
+  if (await page.getByText('Wallet ownership authenticated.', { exact: false }).count()) throw new Error('Connection was incorrectly treated as login');
+  await page.screenshot({ path: '.audit/b7-connected-wallet.png', fullPage: true });
+  await page.evaluate(() => { window.b7RejectSign = true; });
+  await page.getByRole('button', { name: 'Sign in with wallet', exact: true }).click();
+  await page.getByText('User rejected sign-in', { exact: false }).waitFor();
+  if (await page.getByText('Wallet ownership authenticated.', { exact: false }).count()) throw new Error('Rejected sign-in authenticated the wallet');
+  await page.evaluate(() => { window.b7RejectSign = false; });
+  await page.getByRole('button', { name: 'Sign in with wallet', exact: true }).click();
+  await page.getByText('Wallet ownership authenticated.', { exact: false }).waitFor({ timeout: 60000 });
+  await page.getByText('Celo airtime draft retained across wallet authentication.', { exact: true }).waitFor();
+  await composer.fill('Pay Douglas 0.01 BOT on BOT Testnet.'); await composer.press('Enter');
+  await page.getByLabel('Wallet address for Douglas').fill(recipient);
+  await page.getByRole('button', { name: 'Review address', exact: true }).click();
+  await page.getByTestId('recipient-address').waitFor();
+  if ((await page.getByTestId('recipient-address').innerText()) !== recipient) throw new Error('Full recipient address not displayed');
+  await page.screenshot({ path: '.audit/b7-recipient-confirmation.png', fullPage: true });
+  await page.getByRole('button', { name: 'Confirm recipient', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue without saving', exact: true }).click();
+  await page.getByTestId('review-address').waitFor();
+  await page.getByRole('button', { name: 'Switch to BOT Testnet', exact: true }).click();
+  const approve = page.getByRole('button', { name: 'Approve in wallet', exact: true });
+  await approve.waitFor();
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some(button => button.textContent === 'Approve in wallet' && !button.disabled));
+  if ((await page.evaluate(() => window.b7Sends)).length) throw new Error('Chat confirmation moved tokens');
+  await page.screenshot({ path: '.audit/b7-payment-review.png', fullPage: true });
+  await page.evaluate(() => { window.b7Reject = true; });
+  await approve.click();
+  await page.getByText('Wallet request rejected. No payment submitted.', { exact: true }).first().waitFor();
+  await page.evaluate(() => { window.b7Reject = false; });
+  await page.request.post(`${fixture}/fail-registration`);
+  await approve.click();
+  await page.getByText('Fixture registration timeout.', { exact: false }).waitFor();
+  if (await page.getByText('Verified on-chain receipt', { exact: true }).count()) throw new Error('Hash was treated as verified');
+  await page.screenshot({ path: '.audit/b7-transaction-state.png', fullPage: true });
+  await page.reload();
+  await page.getByRole('button', { name: 'Recheck payment, never resend', exact: true }).waitFor({ timeout: 60000 });
+  await page.getByRole('button', { name: 'Recheck payment, never resend', exact: true }).click();
+  await page.request.post(`${fixture}/verify-fixture`);
+  await page.getByRole('button', { name: 'Recheck payment, never resend', exact: true }).click();
+  await page.getByText('Verified on-chain receipt', { exact: true }).waitFor();
+  await page.screenshot({ path: '.audit/b7-verified-receipt-MOCK.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: '.audit/b7-mobile-receipt-MOCK.png', fullPage: true });
+  if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error('Mobile horizontal overflow');
+  await page.evaluate(() => window.b7SwitchWallet('0x3333333333333333333333333333333333333333'));
+  await page.getByRole('button', { name: 'Sign in with wallet', exact: true }).waitFor();
+  if (await page.getByText('Verified on-chain receipt', { exact: true }).count()) throw new Error('Old owner receipt survived wallet switching');
+  return { result: 'PASS with fixtures', realSIWE: true, wallet: 'Injected empty test account, real SIWE signature, simulated eth_sendTransaction', paymentAndReceipt: 'Memory services and simulated chain confirmation. No real broadcast or real verified receipt.', screenshots: '.audit/b7-*.png' };
+}
