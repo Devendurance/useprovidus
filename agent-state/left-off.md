@@ -3,6 +3,7 @@
 ## B7 supersedes the historical notes below, 2026-11-08
 - Doing B7 frontend wallet payments. Stop after B7. No push/deploy/prod DB writes or migrations.
 - HEAD at start `52ff058`. B1-B6 and unrelated files were already dirty/untracked. Preserve them. Scope is in `.audit/b7.todo.md`.
+- B7 source checkpoint is `503160c`. A small continuity commit records this hash. No commits were pushed.
 - Done: authenticated session read, testnet-only execution endpoint, B6 actions, SIWE UI, recipient flow, stored review, explicit wallet send, B5 receipt/status, uncertain/hash recovery and gated ERC-20 approval UI/helper.
 - Done: B6 save-refusal and stored cancellation regressions fixed. B7 consent/execution/HTTP/ERC-20 UI checks and B6 rerun pass. Full `npm run test:all` passes, including Celo and 14 contract tests. Default `npm run build` passes. Final source review gives qualified PASS.
 - Browser scenario passed with actual local SIWE signatures and simulated payment/receipt. It preserved the Celo draft, tested rejected signing, full-address review, registration failure, reload recovery, mobile overflow and wallet switching. Screenshots are in `docs/b7-evidence/`.

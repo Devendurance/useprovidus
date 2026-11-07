@@ -2,7 +2,7 @@
 
 ## B7 current checkpoint, 2026-11-08
 - Current task is B7 BOT wallet frontend in the existing dashboard. B8/B9 are excluded. No push, deploy, migration, or production database mutation.
-- Repository HEAD is `52ff058`. B1-B6 already exist as dirty/untracked work and must remain intact. Historical notes below predate those changes.
+- B7 source checkpoint is `503160c`. Session started at `52ff058`. B1-B6 already exist as dirty/untracked work and must remain intact. Historical notes below predate those changes.
 - Added owner-only session read and execution-plan endpoint. Plan uses stored B3 terms, B4 freshness checks, B5 duplicate-submission guard, canonical 968 contract, and hard mainnet gate.
 - Existing assistant now retains B6 structured actions. Wallet ownership login, recipient cards, exact stored review, explicit wallet send, hash retention, recovery and B5 receipt are wired into AssistantPanel.
 - Existing Celo quote, airtime and cash-out paths remain separate and unchanged.
