@@ -1,6 +1,6 @@
 # Providus Brand Messaging
 
-**Status:** Canonical messaging synchronized to P6.12
+**Status:** Canonical messaging synchronized to B8
 **Scope:** Product and brand language. This document does not change product behavior.
 
 ## Superseded positioning
@@ -11,7 +11,7 @@ It described a route-comparison/on-ramp product that is not the current shipped 
 
 ## Category
 
-> **Providus is a safety-first conversational payment execution layer that turns user-approved requests into verified real-world payments.**
+> **Providus is a safety-first multichain conversational payment execution layer that turns user-approved requests into verified payments and real-world outcomes.**
 
 Plain-language explanation: users tell Providus what they want to pay, review the exact action, approve it, and receive evidence of what actually happened.
 
@@ -27,9 +27,9 @@ Plain-language explanation: users tell Providus what they want to pay, review th
 
 ### Subhead
 
-> Tell Providus what you want to pay. It prepares the exact terms, waits for your approval, executes through Celo and local payment rails, verifies each stage, and gives you a receipt for the outcome.
+> Tell Providus who to pay or what to purchase. It prepares the exact terms, waits for your approval, executes through a supported network, verifies each stage, and gives you a receipt for the outcome.
 
-For the current product, this means Celo USDC bank cash-out and a verified Nigerian airtime flow.
+For the current product, this means live Celo service flows and a verified BOT Testnet recipient-payment flow. BOT Chain mainnet and BOT-funded Nigerian utilities are not live.
 
 ## Product promise
 
@@ -51,7 +51,7 @@ Users describe the intended outcome in ordinary language. Providus turns support
 
 ### Approve explicitly
 
-Users review recipient, network, amount, quote, fees, expiry, and total. No money moves until the user approves the exact action and separately signs the exact Celo wallet transfer.
+Users review recipient, network, amount, quote, fees, expiry, and total. No money moves until the user approves the exact action and separately signs the exact wallet transfer.
 
 ### Verify the outcome
 
@@ -101,6 +101,7 @@ Avoid: **guaranteed, first, best, only, magic, frictionless, autonomous spending
 - Web dashboard conversational assistant.
 - Validated airtime `PaymentIntent` flow.
 - Celo mainnet USDC.
+- BOT Testnet native BOT recipient transfers with saved-recipient lookup, wallet approval and B5 verification.
 - Paycrest settlement adapter.
 - Neon PostgreSQL (managed Postgres) + Drizzle durable transaction state.
 - Paycrest reconciliation, durable monotonic fiat-finality, and distinct fiat-delivery/protocol-settlement states.
@@ -115,11 +116,13 @@ The live run proves one end-to-end execution. It is not a universal guarantee fo
 ## Safe claims
 
 - Providus turns user-approved messages into verified real-world payments for supported flows.
+- Providus supports live Celo service payments and verified BOT Testnet recipient payments.
 - Providus has completed a human-gated Celo mainnet USDC → NGN settlement → Nigerian airtime run.
 - Providus separates language interpretation from deterministic money execution.
 - Explicit human approval precedes order creation and browser-wallet signing.
 - Paycrest authoritatively binds the provider fee and total before the wallet transfer.
 - Celo deposit verification is distinct from Paycrest fiat-delivery reconciliation.
+- A BOT Testnet transaction hash is evidence of a chain transfer, not proof of a real-world service outcome.
 - ClubKonnect fulfilment completes only on its documented terminal success state.
 - Durable state, deterministic RequestIDs, idempotency, and recovery protect the current airtime orchestration.
 - The receipt shows approved payment terms and execution, settlement, fulfilment, and outcome evidence available for the transaction.
@@ -130,6 +133,7 @@ The live run proves one end-to-end execution. It is not a universal guarantee fo
 Use **“designed to,” “architecture supports,” “future adapter,” “roadmap,”** or **“not shipped”** for:
 
 - data bundles, electricity, cable, or a broader utility catalogue;
+- BOT Chain mainnet payments and BOT-funded Nigerian utility payments;
 - iMessage/Photon, WhatsApp, Telegram, MiniPay, or other channels;
 - additional settlement rails or fulfilment providers;
 - multi-provider production support;

@@ -15,6 +15,7 @@ export interface MessageListProps {
 
 const STARTER_SUGGESTIONS = [
   "Buy ₦1,000 MTN airtime",
+  "Pay Douglas 2 BOT on BOT Testnet",
   "Buy ₦500 Airtel airtime",
   "How do I approve an airtime payment?",
   "How does Celo USDC cash-out work?",

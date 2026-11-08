@@ -1,5 +1,13 @@
 # Left Off — resume here
 
+## B8 complete, 2026-11-08
+- B8 public positioning is complete. Stop after B8. No push, deploy, mainnet execution, production database write, or migration.
+- Done: shared Celo/BOT availability registry, homepage repositioning, network cards, dashboard copy, trust walkthrough, assistant prompts, navigation, footer partner acknowledgement, metadata, README, and product messaging.
+- Done: official BOT Chain wordmark and links to the official website, mainnet explorer, and Testnet explorer. BOT mainnet and BOT-funded utilities remain clearly gated for B9 or later verification.
+- Done: browser screenshots in `docs/b8-evidence/`, B8 positioning report, and focused source self-check. Desktop/mobile surfaces have no observed horizontal overflow in the tested dashboard and trust layouts.
+- Verification passed: `npm run test:all`, `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check`. B7 fixture browser scenario still passes with simulated signing and no funded broadcast.
+- Checkpoint: local commit `79b3556 feat: position Providus across Celo and BOT Chain`. The remaining B1-B7 dirty/untracked tree is preserved outside this commit. Next is the final report with production environment blockers and B9 readiness. Do not push or deploy.
+
 ## B7 supersedes the historical notes below, 2026-11-08
 - Doing B7 frontend wallet payments. Stop after B7. No push/deploy/prod DB writes or migrations.
 - HEAD at start `52ff058`. B1-B6 and unrelated files were already dirty/untracked. Preserve them. Scope is in `.audit/b7.todo.md`.

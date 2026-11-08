@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight } from "lucide-react";
+import { BOT_CHAIN_LINKS } from "@/lib/product/positioning";
 
 const FOOTER_LINKS = [
   { href: "/how-it-works", label: "How it works" },
@@ -18,8 +20,8 @@ export function SiteFooter() {
               Providus
             </span>
             <p className="max-w-md text-sm leading-relaxed text-[#1A1A1A]/70">
-              A safety-first conversational payment execution layer that turns
-              user-approved requests into verified real-world payments.
+              A multichain conversational payment execution layer that turns
+              user-approved requests into verified outcomes.
             </p>
             <p className="font-proof text-[#1A1A1A]/65">
               Ask. Approve. Prove.
@@ -51,11 +53,46 @@ export function SiteFooter() {
               <ul className="mt-3 space-y-2 text-sm leading-5 text-[#1A1A1A]/70">
                 <li>Web dashboard is the current channel</li>
                 <li>No custody or silent wallet approval</li>
-                <li>Celo, NGN and airtime stay separate states</li>
+                <li>Celo is live; BOT Testnet is verified</li>
+                <li>BOT Chain mainnet is pending B9</li>
+                <li>BOT-funded utilities need a verified settlement route</li>
                 <li>Quotes are estimates with freshness and assumptions</li>
-                <li>Future channels and categories are roadmap, not shipped</li>
+                <li>Future services are roadmap, not shipped</li>
               </ul>
             </div>
+          </div>
+        </div>
+
+        <div className="mt-10 rounded-[8px] border-[1.5px] border-[#F5F2EA]/20 bg-[#1A1A1A] p-5 text-[#F5F2EA] sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-6">
+          <div className="flex items-center gap-4">
+            <Image
+              src="/brand/bot-chain-official-logo.png"
+              alt="BOT Chain"
+              width={150}
+              height={28}
+              className="h-7 w-auto max-w-[150px]"
+            />
+            <p className="text-xs leading-5 text-[#F5F2EA]/70">
+              Official ecosystem acknowledgment for the verified BOT Testnet payment path.
+            </p>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold sm:mt-0">
+            <a
+              href={BOT_CHAIN_LINKS.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-[#F5F2EA]/40 underline-offset-4 hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5F2EA]"
+            >
+              BOT Chain website
+            </a>
+            <a
+              href={BOT_CHAIN_LINKS.mainnetExplorer}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-[#F5F2EA]/40 underline-offset-4 hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5F2EA]"
+            >
+              Official explorer
+            </a>
           </div>
         </div>
 
@@ -72,7 +109,7 @@ export function SiteFooter() {
             Try Providus <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
           <p className="font-proof text-xs text-[#1A1A1A]/65">
-            Built for Celo · Ask. Approve. Prove.
+            Built across Celo and BOT Chain · Ask. Approve. Prove.
           </p>
         </div>
       </div>

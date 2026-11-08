@@ -1,6 +1,13 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Coins, ExternalLink, Eye, ShieldCheck } from "lucide-react";
 import { CELO_EXPLORER_URL } from "@/lib/wallet/celo";
+import {
+  BOT_CHAIN_LINKS,
+  EXECUTION_DOMAINS,
+  PRODUCT_POSITIONING,
+  UTILITY_ROADMAP,
+} from "@/lib/product/positioning";
 
 const INK = "#1A1A1A";
 const LIVE_PROOF_TX_HASH =
@@ -20,15 +27,15 @@ const PILLARS = [
     message:
       "Review the recipient, network, amount, quote, fees, expiry and total before your connected wallet signs.",
     proof:
-      "No money moves on a model's say-so; you approve the exact action and sign the exact Celo transfer.",
+      "No money moves on a model's say-so. You approve the exact action and sign the exact wallet transfer.",
     icon: Coins,
   },
   {
     title: "Verify the outcome",
     message:
-      "Providus separates Celo confirmation, NGN settlement and last-mile fulfilment, then gives you evidence of what happened.",
+      "Providus separates chain confirmation, settlement and last-mile fulfilment, then gives you evidence of what happened.",
     proof:
-      "A Celo deposit or provider acknowledgement is not delivery proof by itself.",
+      "A transaction hash or provider acknowledgement is not delivery proof by itself.",
     icon: ShieldCheck,
   },
 ] as const;
@@ -42,7 +49,7 @@ const STEPS = [
   {
     n: "02",
     title: "Approve",
-    body: "Review the exact terms, approve the action and sign the Celo transfer yourself.",
+    body: "Review the exact terms, approve the action and sign the wallet transfer yourself.",
   },
   {
     n: "03",
@@ -366,13 +373,13 @@ export default function HomePage() {
         <div className="mx-auto grid min-h-[calc(100svh-64px)] max-w-[1440px] grid-cols-1 items-start gap-5 px-4 py-12 min-[600px]:px-6 min-[600px]:py-16 md:min-h-[650px] md:px-8 lg:min-h-[calc(100svh-81px)] lg:grid-cols-[40%_60%] lg:items-center lg:gap-0 lg:px-8 lg:py-0">
           <div className="relative z-10 max-w-[520px]">
             <p className="mb-4 inline-flex items-center border-b border-[#1A1A1A] pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/75 lg:text-[12px]">
-              Celo-native payment execution
+              Multichain conversational payments
             </p>
             <h1 className="max-w-[520px] font-hero text-[38px] font-bold leading-[1.05] tracking-[-0.03em] text-[#1A1A1A] min-[600px]:text-[48px] lg:text-[clamp(52px,4.5vw,72px)] lg:leading-none">
-              Ask. Approve. Prove.
+              {PRODUCT_POSITIONING.heroHeadline}
             </h1>
             <p className="mt-5 max-w-[360px] text-[14px] leading-[22px] text-[#1A1A1A]/75 min-[600px]:text-[15px] min-[600px]:leading-6 lg:mt-7 lg:max-w-[500px] lg:text-[18px] lg:leading-7">
-              Tell Providus what you want to pay. It prepares the exact terms, waits for your approval, executes through Celo and local payment rails, verifies each stage, and gives you a receipt for the outcome.
+              {PRODUCT_POSITIONING.heroSupport}
             </p>
             <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6 lg:mt-7 lg:gap-7">
               <Link
@@ -389,7 +396,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mt-6 max-w-[360px] text-[11px] leading-[18px] text-[#1A1A1A]/60 lg:mt-7 lg:max-w-[480px] lg:text-[13px] lg:leading-5">
-              Current channel: web dashboard. Current flows: conversational airtime and a separate Nigerian bank cash-out.
+              Current channel: web dashboard. Celo services are live, and BOT Testnet recipient payments are verified. BOT Chain mainnet is pending B9.
             </p>
           </div>
           <div className="relative mt-4 min-h-[360px] min-[600px]:min-h-[430px] md:min-h-[470px] lg:-ml-[clamp(56px,7.5vw,120px)] lg:mt-0 lg:h-full lg:min-h-[calc(100svh-81px)]">
@@ -425,6 +432,84 @@ export default function HomePage() {
               Language can interpret a request and explain a recorded state. Deterministic code validates payment terms, enforces approval, controls provider calls, reconciles outcomes and builds the receipt.
             </p>
           </article>
+        </div>
+      </section>
+
+      <section id="networks" className="border-b border-[#1A1A1A]/20 bg-[#F5F2EA] py-16 sm:py-20">
+        <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 md:px-8">
+          <div className="max-w-3xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/60">
+              Two payment experiences
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#1A1A1A] sm:text-3xl">
+              Pay people on-chain or pay for real-world services.
+            </h2>
+            <p className="mt-4 leading-7 text-[#1A1A1A]/70">
+              Providus keeps the network, asset, recipient and proof requirements visible before your wallet signs.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
+            {EXECUTION_DOMAINS.map((domain) => (
+              <article
+                key={domain.id}
+                className="flex h-full flex-col rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#CBD2C4] p-5 sm:p-6"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/55">
+                      {domain.id === "bot" ? "Pay people on-chain" : "Pay for real-world services"}
+                    </p>
+                    <h3 className="mt-2 text-xl font-semibold tracking-[-0.015em] text-[#1A1A1A]">
+                      {domain.name}
+                    </h3>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-[#1A1A1A]/35 bg-[#F5F2EA] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#1A1A1A]/70">
+                    {domain.label}
+                  </span>
+                </div>
+                <p className="mt-4 text-sm leading-6 text-[#1A1A1A]/75">{domain.summary}</p>
+                <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1A1A1A]/55">Network</dt>
+                    <dd className="mt-1 font-semibold text-[#1A1A1A]">{domain.network}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1A1A1A]/55">Assets</dt>
+                    <dd className="mt-1 font-semibold text-[#1A1A1A]">{domain.assets}</dd>
+                  </div>
+                </dl>
+                <ul className="mt-5 space-y-2 border-t border-[#1A1A1A]/20 pt-4 text-sm text-[#1A1A1A]/75">
+                  {domain.examples.map((example) => (
+                    <li key={example}>"{example}"</li>
+                  ))}
+                </ul>
+                <p className="mt-4 text-xs leading-5 text-[#1A1A1A]/60">{domain.boundary}</p>
+                {domain.id === "bot" ? (
+                  <div className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
+                    <a
+                      href={BOT_CHAIN_LINKS.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-[#1A1A1A]/40 underline-offset-4 hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1A1A1A]"
+                    >
+                      BOT Chain website
+                    </a>
+                    <a
+                      href={BOT_CHAIN_LINKS.mainnetExplorer}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-[#1A1A1A]/40 underline-offset-4 hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1A1A1A]"
+                    >
+                      Mainnet explorer
+                    </a>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+          <p className="mt-5 rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#1A1A1A] px-4 py-3 text-sm leading-6 text-[#F5F2EA]/85">
+            BOT Testnet payment proof uses the testnet explorer. BOT Chain mainnet payment submission and BOT-funded Nigerian utility payments are not live.
+          </p>
         </div>
       </section>
 
@@ -593,13 +678,13 @@ export default function HomePage() {
               Current scope
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
-              One execution layer, bounded by what is shipped.
+              One execution layer across supported networks.
             </h2>
             <ul className="mt-6 space-y-3 text-sm leading-6 text-[#F5F2EA]/75">
-              <li>Web dashboard conversational airtime: Celo USDC → Paycrest NGN settlement → ClubKonnect airtime.</li>
-              <li>Separate Nigerian bank cash-out through Paycrest.</li>
+              <li>Celo live: supported USDC and cNGN airtime, plus separate Nigerian bank cash-out.</li>
+              <li>BOT Testnet verified: wallet-authorized native BOT recipient transfers.</li>
               <li>Human approval and browser-wallet signing stay explicit; Providus does not custody user funds.</li>
-              <li>Celo confirmation, NGN settlement and airtime delivery remain separate states.</li>
+              <li>Chain confirmation, settlement and service fulfilment remain separate states.</li>
               <li>Quotes are estimates with freshness and assumptions.</li>
             </ul>
           </div>
@@ -608,16 +693,51 @@ export default function HomePage() {
               Roadmap, not shipped
             </p>
             <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
-              More surfaces can use the same proof layer later.
+              From sending tokens to paying for everyday life.
             </h3>
             <ul className="mt-5 space-y-2 text-sm leading-6 text-[#1A1A1A]/70">
-              <li>iMessage/Photon, WhatsApp, Telegram and MiniPay.</li>
-              <li>Data bundles, electricity, cable and other utility categories.</li>
-              <li>Additional rails and fulfilment providers.</li>
+              {UTILITY_ROADMAP.map((item) => (
+                <li key={item.name}>
+                  <span className="font-semibold">{item.name}</span> · {item.availability === "live" ? "Live" : "Planned"} · {item.note}
+                </li>
+              ))}
+              <li>BOT Chain mainnet and BOT-funded utility payments remain in development.</li>
             </ul>
             <p className="mt-5 border-t border-[#1A1A1A]/20 pt-4 text-xs leading-5 text-[#1A1A1A]/60">
-              These are future adapters and categories, not current availability.
+              Any new utility route needs its own conversion, provider delivery and verification proof before it becomes a live claim.
             </p>
+          </aside>
+          <aside className="flex flex-col gap-4 rounded-[8px] border-[1.5px] border-[#F5F2EA]/30 bg-[#252525] p-6 text-[#F5F2EA] sm:p-8 lg:col-span-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <Image
+                src="/brand/bot-chain-official-logo.png"
+                alt="BOT Chain"
+                width={170}
+                height={32}
+                className="h-8 w-auto max-w-[170px]"
+              />
+              <p className="max-w-xl text-sm leading-6 text-[#F5F2EA]/70">
+                Providus acknowledges BOT Chain as the network behind the verified testnet recipient-payment path.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-4 text-sm font-semibold">
+              <a
+                href={BOT_CHAIN_LINKS.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-[#F5F2EA]/40 underline-offset-4 hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5F2EA]"
+              >
+                Official website
+              </a>
+              <a
+                href={BOT_CHAIN_LINKS.mainnetExplorer}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-[#F5F2EA]/40 underline-offset-4 hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5F2EA]"
+              >
+                Mainnet explorer
+              </a>
+            </div>
           </aside>
           <div className="flex flex-col items-start gap-4 border-t border-[#F5F2EA]/20 pt-8 sm:flex-row sm:items-center sm:gap-6 lg:col-span-2">
             <Link

@@ -1,5 +1,12 @@
 # Providus — Memory (decisions, invariants, lessons)
 
+## B8 invariants, 2026-11-08
+- Public positioning uses one shared registry. Celo is live for existing supported services. BOT Chain is verified on Testnet for native BOT recipient transfers on chain 968. BOT mainnet remains pending B9.
+- BOT-funded airtime, data, electricity, cable, and other utilities are roadmap items until an independently verified settlement route and provider fulfilment path exist.
+- Official partner links are `https://www.botchain.ai`, `https://scan.botchain.ai`, and `https://scan.bohr.life`. The local logo is sourced from the official BOT Chain site.
+- B8 changes are content, navigation, metadata, and partner acknowledgement only. Payment execution, Celo settlement, Paycrest, ClubKonnect, schema, and production state remain unchanged.
+- Browser evidence covers desktop/mobile public surfaces and preserves the B7 signing-boundary fixture limitation. It does not claim a funded live BOT transaction or a live mainnet receipt.
+
 ## B7 invariants, 2026-11-07
 - User's B7 scope overrides automatic push. No deploy, production writes or migrations through 0006.
 - Wallet connection and SIWE authentication are separate. Only the verified session establishes transfer ownership. Client owner context may narrow access, never establish it.

@@ -25,7 +25,7 @@ export function AssistantComposer({
   onSend,
   pending = false,
   disabled = false,
-  placeholder = "Type a message or airtime request (e.g. 'Buy ₦500 MTN airtime')...",
+  placeholder = "Type a payment request (e.g. 'Pay Douglas 2 BOT on BOT Testnet')...",
   className,
 }: AssistantComposerProps) {
   const [content, setContent] = useState("");

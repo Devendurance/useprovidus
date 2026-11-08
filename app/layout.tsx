@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { WalletProviders } from "@/components/providers/wallet-providers";
 import { wagmiConfig } from "@/lib/wallet/config";
+import { PRODUCT_POSITIONING } from "@/lib/product/positioning";
 import "./globals.css";
 
 const baloo = Baloo_2({
@@ -30,15 +31,18 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://useprovidus.vercel.app"),
   title: {
-    default: "Providus — Ask. Approve. Prove.",
+    default: `Providus — ${PRODUCT_POSITIONING.tagline}`,
     template: "%s · Providus",
   },
   description:
-    "Providus turns approved messages into verified real-world payments through a safety-first conversational payment execution layer.",
+    PRODUCT_POSITIONING.heroSupport,
   keywords: [
     "Providus",
     "Celo",
+    "BOT Chain",
+    "multichain payments",
     "conversational payments",
     "Nigerian payments",
     "airtime",
@@ -46,10 +50,25 @@ export const metadata: Metadata = {
     "stablecoin",
   ],
   openGraph: {
-    title: "Providus — Ask. Approve. Prove.",
+    title: `Providus — ${PRODUCT_POSITIONING.tagline}`,
     description:
-      "Turn approved messages into verified real-world payments with Providus.",
+      PRODUCT_POSITIONING.heroSupport,
+    url: "/",
     type: "website",
+    images: [
+      {
+        url: "/brand/providus mascot full.png",
+        width: 1254,
+        height: 1254,
+        alt: "Providus payment assistant mascot",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `Providus — ${PRODUCT_POSITIONING.tagline}`,
+    description: PRODUCT_POSITIONING.heroSupport,
+    images: ["/brand/providus mascot full.png"],
   },
 };
 

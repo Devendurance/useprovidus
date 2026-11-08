@@ -1,6 +1,6 @@
 # Providus Positioning
 
-**Status:** Canonical P6.14 positioning freeze
+**Status:** Canonical B8 multichain positioning
 **Scope:** Strategy and documentation only. This document does not change product behavior.
 **Public trust surface:** [/how-it-works#trust](/how-it-works#trust) — synchronized with [`README.md`](../README.md), [`docs/providus_PRD.md`](./providus_PRD.md), and [`docs/PROVIDUS_ARCHITECTURE.md`](./PROVIDUS_ARCHITECTURE.md).
 
@@ -12,7 +12,7 @@ In plain language: users say what they want to pay, review the exact action, app
 
 ## Positioning statement
 
-For people who hold Celo USDC and need a Nigerian payment they can trust, Providus turns an approved message into a real-world outcome through explicit human approval, deterministic execution, settlement reconciliation, fulfilment verification, and an evidence-linked receipt. Providus is not the wallet, settlement rail, or utility provider; it is the control and proof layer across them.
+For people who need a payment they can trust across supported networks, Providus turns an approved message into an on-chain or real-world outcome through explicit wallet approval, deterministic execution, reconciliation, and an evidence-linked receipt. Providus is not the wallet, settlement rail, or utility provider. It is the control and proof layer across them.
 
 ## Product promise
 
@@ -33,8 +33,8 @@ Web today (future iMessage / WhatsApp / Telegram / MiniPay are roadmap-only)
 → Human Approval Boundary
 → Providus Execution Engine
 → two separate provider edges:
-     SettlementRail / Paycrest (current)                     → Celo USDC → NGN settlement
-     FulfilmentProvider / ClubKonnect (current for airtime)  → airtime fulfilment
+     Celo execution path                                       → supported asset → NGN settlement or airtime
+     BOT Chain execution path                                  → named-recipient on-chain payment
 → Reconciliation + Recovery
 → Verified Outcome
 → Receipt
@@ -49,7 +49,8 @@ Web today (future iMessage / WhatsApp / Telegram / MiniPay are roadmap-only)
 | **Deterministic Providus code** | PaymentIntent validation, quote/fee binding, execution eligibility, durable state, reconciliation, fulfilment gating, recovery, receipts | No success claim it cannot evidence |
 | **Paycrest** | Celo USDC → NGN settlement | Fulfilment or fulfilment gating |
 | **ClubKonnect** | Airtime fulfilment | When it is called, or whether its result ends the lifecycle |
-| **Celo** | On-chain payment evidence | NGN delivery or utility fulfilment |
+| **Celo** | On-chain payment evidence for live service flows | NGN delivery or utility fulfilment |
+| **BOT Chain** | Testnet recipient-payment evidence | Mainnet payments or BOT-funded utility delivery |
 | **Neon PostgreSQL + Drizzle** | Durable transaction state | Provider truth that has not been reconciled |
 
 **State semantics.** `validated` is authoritative fiat delivery: it sets the durable monotonic fiat-final marker and is the point at which fulfilment becomes eligible. `settling` is later protocol progression and never clears fiat delivery or re-blocks fulfilment. `settled` is protocol completion and also subsumes prior fiat delivery. Public stage labels come only from `lib/transactions/status.ts`; `deposit_confirming` is declared but never emitted and is never shown. Exceptional branches are `failed`, `recovery_required`, and `refunded`; the unresolved provider-status branch is a recovery branch, not a failure and not a success.
@@ -63,6 +64,8 @@ Web today (future iMessage / WhatsApp / Telegram / MiniPay are roadmap-only)
 - Web dashboard conversation can produce a validated airtime `PaymentIntent`.
 - Supported airtime flow: Celo USDC → Paycrest NGN settlement → ClubKonnect airtime.
 - Direct Nigerian bank cash-out through Paycrest remains a separate supported flow.
+- Web dashboard conversation can prepare a named-recipient native BOT transfer on BOT Testnet.
+- BOT Testnet transfer status is checked through the B5 submission and verification path. BOT Chain mainnet payment submission is pending B9.
 - Human approval precedes Paycrest order creation and the browser-wallet transfer.
 - Paycrest binds the authoritative fee and total before the wallet payment.
 - Providus verifies the Celo transfer, reconciles Paycrest settlement, reconciles ClubKonnect fulfilment, and records durable transaction state in Neon PostgreSQL (managed Postgres) through Drizzle. Fiat-finality is persisted monotonically once the authoritative fiat-delivery status is observed.
@@ -77,12 +80,13 @@ Web today (future iMessage / WhatsApp / Telegram / MiniPay are roadmap-only)
 
 ### Primary user
 
-A Nigerian stablecoin user with Celo USDC who wants a local payment without manually coordinating a wallet, off-ramp, settlement status, and utility provider.
+A user with a supported wallet and asset who wants a local payment or named-recipient transfer without manually coordinating the execution, settlement status, and proof steps.
 
 ### Useful current actions
 
 - Request Nigerian airtime conversationally, review the exact recipient/network/amount, approve, and receive verified delivery proof.
 - Cash out Celo USDC to a verified Nigerian bank account through the existing Paycrest flow.
+- Pay a named recipient with native BOT on BOT Testnet, then inspect the verified transaction status.
 - Inspect the evidence and lifecycle of a payment instead of relying on a single success label.
 
 ### Future use cases
@@ -101,9 +105,9 @@ Additional utility categories and conversational channels may use the same execu
 
 ### C. Hero subhead
 
-**Tell Providus what you want to pay. It prepares the exact terms, waits for your approval, executes through Celo and local payment rails, verifies each stage, and gives you a receipt for the outcome.**
+**Tell Providus who to pay or what to purchase. It prepares the exact terms, waits for your approval, executes through a supported network, verifies each stage, and gives you a receipt for the outcome.**
 
-For the current product, this means Celo USDC bank cash-out and a verified Nigerian airtime flow.
+For the current product, this means live Celo service flows and a verified BOT Testnet recipient-payment flow. BOT Chain mainnet and BOT-funded utilities are not live.
 
 ### D. Core narrative
 

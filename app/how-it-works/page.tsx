@@ -23,17 +23,18 @@ import {
   X,
 } from "lucide-react";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { BOT_CHAIN_LINKS, EXECUTION_DOMAINS } from "@/lib/product/positioning";
 
 export const metadata: Metadata = {
   title: "How it works",
   description:
-    "How Providus turns approved messages into verified real-world payments through a human-approved execution flow.",
+    "How Providus turns approved messages into verified Celo and BOT Chain payments through a human-approved execution flow.",
 };
 
 const FLOW = [
   {
     title: "Request",
-    body: "Tell the web dashboard what you want to pay in ordinary language. The current conversational path supports Nigerian airtime.",
+    body: "Tell the web dashboard what you want to pay in ordinary language. Ask for a supported Nigerian service or name a recipient on BOT Testnet.",
     icon: ClipboardList,
   },
   {
@@ -48,17 +49,17 @@ const FLOW = [
   },
   {
     title: "Approve",
-    body: "Approve the exact action, then separately sign the exact Celo USDC transfer in your browser wallet. Providus never signs for you.",
+    body: "Approve the exact action, then separately sign the exact wallet transfer for the selected network and asset. Providus never signs for you.",
     icon: Lock,
   },
   {
     title: "Execute",
-    body: "Deterministic code creates and binds the approved order, then calls the current rails. Paycrest settles NGN; ClubKonnect fulfils current airtime.",
+    body: "Deterministic code creates and binds the approved payment, then calls the selected execution path. Celo utility settlement and BOT recipient transfers remain distinct flows.",
     icon: ExternalLink,
   },
   {
     title: "Reconcile",
-    body: "Read chain and provider states separately; reconcile unknown outcomes without blind duplicate mutation. A Celo deposit is not Nigerian delivery.",
+    body: "Read chain and provider states separately. Reconcile unknown outcomes without blind duplicate mutation. A transaction hash is not service delivery proof.",
     icon: ShieldCheck,
   },
   {
@@ -89,7 +90,7 @@ const TRUST_ARCHITECTURE_PRELUDE = [
   },
   {
     title: "Human Approval Boundary",
-    body: "The user reviews the frozen terms, approves the action and signs the exact Celo USDC transfer.",
+    body: "The user reviews the frozen terms, approves the action and signs the exact transfer for the selected network and asset.",
     meta: null,
     icon: Lock,
   },
@@ -109,7 +110,7 @@ const TRUST_ARCHITECTURE_POSTLUDE = [
   },
   {
     title: "Verified Outcome",
-    body: "A stage is final only when its required evidence supports it; Celo, fiat delivery and fulfilment stay separate.",
+    body: "A stage is final only when its required evidence supports it. Chain confirmation, settlement and fulfilment stay separate.",
     icon: BadgeCheck,
   },
   {
@@ -219,9 +220,9 @@ const VERDICT_FIELDS = [
   "Requested outcome and validated PaymentIntent",
   "Recipient, network and verified account or phone",
   "Amount, quote, fee, expiry and exact total",
-  "Celo mainnet and canonical USDC",
+  "Celo mainnet or BOT Testnet, with the selected asset",
   "Order approval and browser-wallet signing boundary",
-  "Celo deposit status",
+  "On-chain payment status",
   "NGN delivery status",
   "Airtime fulfilment status when supported",
   "Evidence-linked receipt",
@@ -236,9 +237,9 @@ export default function HowItWorksPage() {
           Request → Validate → Review → Approve → Execute → Reconcile → Prove
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-receipt-grey">
-          Providus turns approved messages into verified real-world payments. You
-          can ask naturally, inspect the exact action, approve it yourself, and
-          follow the evidence across each handoff.
+          Providus turns approved messages into verified payments across supported
+          networks. Ask naturally, inspect the exact action, approve it yourself,
+          and follow the evidence across each handoff.
         </p>
       </div>
 
@@ -545,7 +546,7 @@ export default function HowItWorksPage() {
                 <span className="font-proof text-xs font-semibold text-provident-green">03</span>
                 <p className="mt-2 text-sm leading-6 text-ledger-stone">
                   <strong>Sign</strong> after the server binds the authoritative
-                  order; then sign the exact Celo USDC transfer in your browser wallet.
+                  terms; then sign the exact transfer for the selected network and asset in your browser wallet.
                 </p>
               </li>
             </ol>
@@ -896,6 +897,58 @@ export default function HowItWorksPage() {
             </ul>
           </Card>
         </div>
+      </section>
+
+      <section className="mt-14 rounded-[14px] border-ledger bg-sage p-6 sm:p-8" aria-labelledby="execution-domains-title">
+        <p className="font-proof text-receipt-grey">Supported execution domains</p>
+        <h2 id="execution-domains-title" className="mt-2 font-display text-2xl font-semibold tracking-tight">
+          The same approval and proof model across two current paths.
+        </h2>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {EXECUTION_DOMAINS.map((domain) => (
+            <Card key={domain.id} variant="flat">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-proof text-[11px] font-semibold uppercase tracking-[0.1em] text-receipt-grey">
+                    {domain.id === "bot" ? "Pay people on-chain" : "Pay for real-world services"}
+                  </p>
+                  <CardTitle className="mt-2">{domain.name}</CardTitle>
+                </div>
+                <span className="rounded-full border border-ledger-edge bg-receipt-field px-2.5 py-1 font-proof text-[10px] font-semibold uppercase tracking-[0.08em] text-provident-green">
+                  {domain.label}
+                </span>
+              </div>
+              <CardDescription className="mt-3">{domain.summary}</CardDescription>
+              <p className="mt-3 font-proof text-xs leading-5 text-receipt-grey">
+                {domain.network} · {domain.assets}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-receipt-grey">{domain.boundary}</p>
+              {domain.id === "bot" ? (
+                <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
+                  <a
+                    href={BOT_CHAIN_LINKS.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-quote-blue underline decoration-quote-blue/40 underline-offset-4 hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  >
+                    BOT Chain website
+                  </a>
+                  <a
+                    href={BOT_CHAIN_LINKS.mainnetExplorer}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-quote-blue underline decoration-quote-blue/40 underline-offset-4 hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  >
+                    Mainnet explorer
+                  </a>
+                </div>
+              ) : null}
+            </Card>
+          ))}
+        </div>
+        <p className="mt-5 border-t border-ledger-edge pt-4 text-sm leading-6 text-receipt-grey">
+          BOT Testnet recipient payments are verified. BOT Chain mainnet payments and BOT-funded Nigerian utility payments remain pending separate B9 verification.
+        </p>
       </section>
 
       <section className="mt-14 rounded-[14px] border-ledger bg-receipt-field p-6 sm:p-8">

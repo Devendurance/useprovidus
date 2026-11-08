@@ -1,0 +1,6 @@
+checkpoint	decision	evidence
+B8-scope	Keep B8 to positioning, navigation, trust copy, partner acknowledgement, and documentation	No payment execution, schema, migration, mainnet, push, or deploy changes
+availability	Use one registry for Celo live, BOT Testnet verified, and future utility states	lib/product/positioning.ts and b8-positioning-self-check.mjs
+partner	Use official BOT Chain identity and links only	public/brand/bot-chain-official-logo.png, botchain.ai, scan.botchain.ai, scan.bohr.life
+proof	Keep transfer proof separate from utility fulfilment proof	Homepage, dashboard, trust walkthrough, README, docs/b8-product-positioning.md
+verification	Require focused checks plus the full project suite before checkpoint	B8 self-check, test:all, tsc, lint, build, diff check, browser screenshots

@@ -6,7 +6,7 @@
 
 **Providus turns approved messages into verified real-world payments.**
 
-A safety-first conversational payment execution layer on Celo for supported Nigerian payment flows.
+A multichain conversational payment execution layer for wallet-authorized payments across supported Celo and BOT Chain flows.
 
 <p>
   <a href="https://useprovidus.vercel.app"><img src="https://img.shields.io/badge/Live%20App-useprovidus.vercel.app-1F6F50?style=for-the-badge" alt="Live App"></a>
@@ -15,7 +15,8 @@ A safety-first conversational payment execution layer on Celo for supported Nige
 </p>
 
 <p>
-  <a href="https://celo.org"><img src="https://img.shields.io/badge/Built%20on-Celo%20Mainnet-FCFF52?style=flat-square&logo=celo&logoColor=111111" alt="Built on Celo"></a>
+  <a href="https://celo.org"><img src="https://img.shields.io/badge/Celo-Live%20payment%20flows-FCFF52?style=flat-square&logo=celo&logoColor=111111" alt="Celo live payment flows"></a>
+  <a href="https://www.botchain.ai"><img src="https://img.shields.io/badge/BOT%20Chain-Testnet%20verified-13B897?style=flat-square" alt="BOT Chain testnet verified"></a>
   <a href="https://8004scan.io/agents/celo/9851"><img src="https://img.shields.io/badge/ERC--8004-Agent%20%239851-4C6FFF?style=flat-square" alt="ERC-8004 Agent 9851"></a>
   <a href="https://github.com/Devendurance/useprovidus"><img src="https://img.shields.io/badge/ERC--8021-Attributed-2E8B57?style=flat-square" alt="ERC-8021 Attribution"></a>
   <a href="https://askbots.ai/p/k172fmf6cpxbq355mzsevk3vcd8epej8"><img src="https://img.shields.io/badge/AskBots-Round%201-6B5CE7?style=flat-square" alt="AskBots Round 1"></a>
@@ -41,8 +42,8 @@ A user says what should happen. Providus:
 2. asks for missing or ambiguous payment-critical fields;
 3. prepares the live quote, exact fees, recipient, network, and expiry;
 4. waits for explicit approval before creating the provider order;
-5. waits for a separate browser-wallet signature before moving the selected Celo asset;
-6. verifies the exact Celo transfer and reconciles provider state;
+5. waits for a separate browser-wallet signature before moving the selected asset on the selected network;
+6. verifies the exact on-chain transfer and reconciles any provider state;
 7. triggers airtime fulfilment only once durable fiat-final truth is recorded from Paycrest's authoritative fiat-delivery condition;
 8. issues a receipt showing the approved payment terms and available execution, settlement, fulfilment, and outcome evidence.
 
@@ -50,7 +51,17 @@ Current user-facing flows:
 
 - **Conversational airtime (`/dashboard`)** — Nigerian MTN, Airtel, Glo, and 9mobile airtime.
 - **Direct bank cash-out (`/check`)** — Celo USDC to a verified Nigerian bank account through Paycrest.
+- **BOT Chain recipient payments (`/dashboard`)** — named-recipient native BOT transfers on BOT Testnet, with saved-recipient lookup, wallet approval and verified status.
 - **Receipt and status (`/receipt`)** — durable lifecycle and evidence for supported transactions.
+
+### Supported networks and boundaries
+
+| Network | Availability | Current payment use | Assets and limits |
+|---|---|---|---|
+| **Celo** | Live | Nigerian airtime and bank cash-out | USDC and cNGN. Airtime has a live mainnet proof. |
+| **BOT Chain** | Testnet verified | Named-recipient wallet transfers | Native BOT on BOT Testnet, chain ID 968. Mainnet payment submission is pending B9. |
+
+BOT Chain mainnet explorer links to [`scan.botchain.ai`](https://scan.botchain.ai). Testnet transaction proof uses [`scan.bohr.life`](https://scan.bohr.life). BOT-funded airtime, data, electricity and cable payments are not live. They need a supported conversion or settlement route, provider delivery and independent verification before launch.
 
 
 ### Supported airtime payment assets
@@ -163,6 +174,7 @@ graph TD
     Settlement --> Reconcile[Reconciliation + Recovery]
     Fulfilment --> Reconcile
     Celo[Celo Mainnet + browser wallet<br/>USDC / cNGN] --> Reconcile
+    BOT[BOT Testnet + browser wallet<br/>native BOT, chain 968] --> Reconcile
     Reconcile --> Outcome[Verified Outcome]
     Outcome --> Receipt[Receipt]
 ```

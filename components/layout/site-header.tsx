@@ -8,6 +8,7 @@ import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
 import { cn } from "@/lib/cn";
 
 const NAV = [
+  { href: "/#networks", label: "Networks" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/check", label: "Bank cash-out" },
   { href: "/receipt", label: "Receipts" },

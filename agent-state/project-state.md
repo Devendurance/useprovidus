@@ -1,5 +1,13 @@
 # Providus — Project State
 
+## B8 current checkpoint, 2026-11-08
+- B8 repositions the public product as a multichain conversational payment platform while preserving B1-B7 execution code and the Celo service flows.
+- Added shared positioning in `lib/product/positioning.ts` for Celo live, BOT Testnet verified, BOT mainnet pending B9, and utility roadmap statuses.
+- Updated homepage, dashboard, trust walkthrough, assistant prompts, navigation, footer, metadata, README, and product messaging. Added the official BOT Chain wordmark and safe website, mainnet explorer, and testnet explorer links.
+- Added browser evidence in `docs/b8-evidence/` and the positioning report in `docs/b8-product-positioning.md`.
+- Focused positioning self-check, full tests, TypeScript, lint, production build, and diff check pass. No schema change, migration, payment execution feature, mainnet transaction, push, or deploy was performed.
+- B8 source checkpoint is `79b3556`. Existing B1-B7 dirty and untracked files remain outside the B8 checkpoint and must not be reset, cleaned, or overwritten.
+
 ## B7 current checkpoint, 2026-11-08
 - Current task is B7 BOT wallet frontend in the existing dashboard. B8/B9 are excluded. No push, deploy, migration, or production database mutation.
 - B7 source checkpoint is `503160c`. Session started at `52ff058`. B1-B6 already exist as dirty/untracked work and must remain intact. Historical notes below predate those changes.
