@@ -34,6 +34,19 @@ a real wallet (e.g. MetaMask/Rabby on a desktop browser) holding test BOT.
 - Screenshot of the confirmed receipt card (no keys visible).
 - B5 status response showing `confirmed`.
 
+## Completed evidence (testnet, chain 968)
+
+- Payment tx: 0xc78894111101480f801477404f7968127ddcf2a06dc080d9ffb7e9df4c157e25
+- Explorer: https://scan.bohr.life/tx/0xc78894111101480f801477404f7968127ddcf2a06dc080d9ffb7e9df4c157e25
+- From testnet deployer wallet, to canonical testnet ProvidusPay
+  0xbc6298701490ba211733F2Dc28deB7Df9835B7a4
+- payNative selector 0x1a56282b, value exactly 0.01 test BOT (10^16 wei)
+- Receipt: success, block 29829450
+- Exactly one PaymentExecuted from our contract: intentId recorded,
+  token = 0x0 (native), amount = 10^16 wei, recipient 0xD691…0c0d03
+- No second broadcast associated with the intent.
+
 ## Status
 
-NOT YET PERFORMED — awaiting a funded browser wallet session.
+COMPLETED via real browser wallet (user-executed, independently verified
+on-chain 2026-11-09). No mocked wallets, no simulated receipts.
