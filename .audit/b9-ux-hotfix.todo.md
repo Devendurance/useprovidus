@@ -25,7 +25,7 @@
 
 ## Throughput checkpoint
 
-- Blocking first steps: finish read-only flow tracing, then capture the current browser and test baseline.
+- Blocking first steps: complete. Read-only flow tracing is documented and the baseline test/type/lint run passes.
 - Independent workstreams: wallet network controls, wallet authentication, and assistant/payment review can be audited separately; code changes stay with one owner.
 - Shared mutable state: one owner writes the application and tests, so auth/session and review state changes cannot race in the shared checkout.
 - Smallest safe decomposition: one local feature slice keeps chain selection, auth, and execution gating aligned and makes regression review coherent.
@@ -35,6 +35,7 @@
 - Selected shared auth ownership from candidate A and B's registry-backed network menu. Independent cross-judgment is in `.audit/b9-ux-hotfix-design.md`.
 - Baseline `npx tsc --noEmit` and `npm run lint` pass. `npm run test:all` is still running. The existing wallet-connected browser session and dev server remain untouched because they may contain live state.
 - First regression step is a mockable pure switch/auth harness. No wallet/provider action has been sent.
+- Baseline `npm run test:all` passed, including the existing B5/B6 self-checks and 14 contract tests. No source changes were made for this baseline.
 
 ## Done predicate
 

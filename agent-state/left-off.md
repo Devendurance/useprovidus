@@ -7,15 +7,14 @@
 ## Done
 - Read current project state, UI system, skills, and wallet/auth/assistant/review flows.
 - Cross-judged two independent designs. Decision and risks are in `.audit/b9-ux-hotfix-design.md`.
-- Baseline TypeScript and lint pass. `npm run test:all` is still running.
+- Baseline `npm run test:all`, `npx tsc --noEmit`, and `npm run lint` all pass before source edits.
 - Existing connected-wallet browser tab and dev server were left untouched.
 
 ## Next
-1. Finish the baseline suite and record results.
-2. Add failing-first mock switch/auth regression checks.
-3. Implement the registry-backed switcher, shared auth state, safe account cleanup, and clear assistant/review status.
-4. Verify with a fake wallet on an isolated server with `DATABASE_URL` empty, capture desktop/mobile images, then run the full requested checks.
-5. Review exact diff, update state/audit, and commit locally without push.
+1. Add failing-first mock switch/auth regression checks.
+2. Implement the registry-backed switcher, shared auth state, safe account cleanup, and clear assistant/review status.
+3. Verify with a fake wallet on an isolated server with `DATABASE_URL` empty, capture desktop/mobile images, then run the full requested checks.
+4. Review exact diff, update state/audit, and commit locally without push.
 
 ## Worktree and risks
 - Preserve pre-existing untracked `.omp/`, `bridge/`, and `video-demo/` content.
