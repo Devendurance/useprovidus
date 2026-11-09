@@ -66,3 +66,32 @@ tooling. No other contracts exist in the product.
    Sourcify both blocked: generic reject / chain unsupported).
 5. First mainnet movements: tiny native test, then tiny USDT test, each
    B5-verified before any larger amount.
+
+## B9B.1 — Slither triage (2026-11-09)
+
+Command: `uvx --python 3.13 --from slither-analyzer slither .` → 18 contracts,
+102 detectors. Excluding `contracts/mocks`, `test`, `node_modules` (malicious
+test fixtures + OZ dependency noise, by design), exactly **3 findings** remain,
+all in `contracts/ProvidusPay.sol`. Static analysis is NOT an audit.
+
+1. `timestamp` ×2 — `deadline >= block.timestamp` in payNative/payToken.
+   **ACCEPTED, no remediation.** The timestamp is an expiry upper bound, not
+   randomness or ordering logic. Miner timestamp skew (seconds) can only shift
+   boundary acceptance by seconds, always to the same recipient/amount; no
+   fund diversion is possible. Expiry is additionally enforced off-chain at
+   plan time (B4A) and re-checked by the B5 verifier.
+2. `low-level-calls` ×1 — `recipient.call{value: msg.value}()`.
+   **ACCEPTED, no remediation.** `transfer`/`send` (2300-gas stipend) are
+   deprecated and break legitimate receivers; `call` + `require(ok)` +
+   `nonReentrant` + state-before-call is the current recommended pattern.
+   Malicious-receiver re-entry is unit-tested and reverts.
+3. Pragma/compiler — build pins solc **0.8.24** (pragma `^0.8.20` resolves
+   deterministically via hardhat 2.29.1 lockfile). Reviewed the 0.8.24 known-
+   issue list against this code: no inline assembly, no `abi.encode`, no
+   nested calldata arrays, no transient storage, standard ABI usage — none of
+   the 0.8.24-era codegen bugs apply. **No applicable compiler bugs.**
+
+**Remaining material issues: none in contract code.** Residual process items
+(multisig ownership, source-verifier support, first-movement tests) are
+tracked as B9C prerequisites, not code defects. Do not modify the tested
+contract to silence informational warnings.
