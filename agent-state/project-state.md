@@ -1,5 +1,11 @@
 # Providus — Project State
 
+## B9 UX hotfix in progress, 2026-11-09
+- Scope: multichain wallet dropdown/switching, session-state clarity, assistant and review copy. No payment execution rebuild, contract/backend/schema change, push, deploy, production write, or mainnet transaction.
+- B1 registry defines Celo 42220, BOT Mainnet 677, BOT Testnet 968. Wagmi currently registers only 42220 and 968. Celo-only readiness remains required by cash-out and airtime.
+- Design checkpoint: shared auth controller plus registry-derived network display. See `.audit/b9-ux-hotfix-design.md`. The independent review found and recorded the forced-Celo connect risk and wagmi 4902 add behavior.
+- Baseline: TypeScript and lint pass. Full test suite is still running. Existing live-wallet browser session/dev server is untouched.
+
 ## B8 current checkpoint, 2026-11-08
 - B8 repositions the public product as a multichain conversational payment platform while preserving B1-B7 execution code and the Celo service flows.
 - Added shared positioning in `lib/product/positioning.ts` for Celo live, BOT Testnet verified, BOT mainnet pending B9, and utility roadmap statuses.

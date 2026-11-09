@@ -1,5 +1,12 @@
 # Providus — Memory (decisions, invariants, lessons)
 
+## B9 wallet UX invariants, 2026-11-09
+- Keep B1 registry metadata authoritative for 42220, 677, and 968. A recognized/switchable network does not grant payment capability.
+- Do not force Celo during connect. Network changes require an explicit user action and provider-confirmed resulting chain.
+- Keep SIWE owner checks and the existing chain-binding policy. An expected unauthenticated session probe must not dispatch expiry during a pending signature.
+- Account changes clear old-owner drafts and stale results, while submitted or unknown payment recovery remains recoverable. Chain changes invalidate only unsigned plan/gas state.
+- BOT Testnet success still requires B5 independent receipt verification. A submitted hash is verifying until verified.
+
 ## B8 invariants, 2026-11-08
 - Public positioning uses one shared registry. Celo is live for existing supported services. BOT Chain is verified on Testnet for native BOT recipient transfers on chain 968. BOT mainnet remains pending B9.
 - BOT-funded airtime, data, electricity, cable, and other utilities are roadmap items until an independently verified settlement route and provider fulfilment path exist.
