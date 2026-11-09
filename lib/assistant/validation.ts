@@ -10,6 +10,7 @@
 import "server-only";
 
 import { normalizeAndValidatePhone } from "@/lib/clubkonnect/server/client";
+import { getAddress, isAddress } from "viem";
 import type {
   AirtimeIntent,
   AssistantModelOutput,
@@ -20,6 +21,10 @@ import type {
   PaymentNetwork,
   UnsupportedIntent,
   UnsupportedIntentType,
+  WalletTransferAsset,
+  WalletTransferChainId,
+  WalletTransferIntent,
+  WalletTransferPhase,
 } from "@/lib/assistant/types";
 
 export const MIN_AIRTIME_AMOUNT_NGN = 50;
@@ -43,6 +48,7 @@ export const SUPPORTED_PAYMENT_NETWORKS: readonly PaymentNetwork[] = [
 
 const PAYMENT_INTENT_TYPES: readonly PaymentIntentType[] = [
   "airtime",
+  "wallet_transfer",
   "data",
   "electricity",
   "cable",
@@ -346,7 +352,7 @@ export function sanitizeIncomingIntent(
     return { ok: false, message: "activeIntent.type is not a supported intent type." };
   }
 
-  if (type !== "airtime") {
+  if (type !== "airtime" && type !== "wallet_transfer") {
     return {
       ok: true,
       intent: {
@@ -355,6 +361,10 @@ export function sanitizeIncomingIntent(
         readyForConfirmation: false,
       },
     };
+  }
+
+  if (type === "wallet_transfer") {
+    return { ok: true, intent: sanitizeWalletDraft(raw, history) };
   }
 
   const amountNgn = normalizeAirtimeAmountNgn(raw.amountNgn);
@@ -423,6 +433,16 @@ function parseIntentCandidate(
   if (!amount.ok) return amount;
   const phone = readOptionalString("phone", 32);
   if (!phone.ok) return phone;
+  const recipientLabel = readOptionalString("recipientLabel", 64);
+  if (!recipientLabel.ok) return recipientLabel;
+  const recipientAddress = readOptionalString("recipientAddress", 64);
+  if (!recipientAddress.ok) return recipientAddress;
+  const amountW = readOptionalString("amount", 32);
+  if (!amountW.ok) return amountW;
+  const asset = readOptionalString("asset", 16);
+  if (!asset.ok) return asset;
+  const chain = readOptionalString("chain", 32);
+  if (!chain.ok) return chain;
 
   const networkRaw = raw.network;
   let network: PaymentNetwork | null = null;
@@ -444,6 +464,11 @@ function parseIntentCandidate(
       amountNgn: amount.data,
       phone: phone.data,
       network,
+      recipientLabel: recipientLabel.data,
+      recipientAddress: recipientAddress.data,
+      amount: amountW.data,
+      asset: asset.data,
+      chain: chain.data,
     },
   };
 }
@@ -549,6 +574,12 @@ export function isAirtimeIntent(
   return Boolean(intent) && intent!.type === "airtime";
 }
 
+export function isWalletTransferIntent(
+  intent: PaymentIntent | null | undefined,
+): intent is WalletTransferIntent {
+  return Boolean(intent) && intent!.type === "wallet_transfer";
+}
+
 export interface ResolveIntentInput {
   candidate: ModelIntentCandidate | null;
   userMessage: string;
@@ -569,13 +600,17 @@ export function resolveIntent({
 }: ResolveIntentInput): PaymentIntent | null {
   if (!candidate) return null;
 
-  if (candidate.type !== "airtime") {
+  if (candidate.type !== "airtime" && candidate.type !== "wallet_transfer") {
     const unsupported: UnsupportedIntent = {
       type: candidate.type,
       missingFields: [],
       readyForConfirmation: false,
     };
     return unsupported;
+  }
+
+  if (candidate.type === "wallet_transfer") {
+    return resolveWalletTransferIntent({ candidate, userMessage, activeIntent });
   }
 
   const draft = isAirtimeIntent(activeIntent) ? activeIntent : null;
@@ -649,4 +684,331 @@ export function resolveIntent({
   };
 
   return intent;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Wallet-transfer candidates (B6): interpretation only, always re-validated  */
+/* -------------------------------------------------------------------------- */
+
+const WALLET_ASSET_ALIASES: Record<string, WalletTransferAsset> = {
+  usdt: "USDT",
+  tether: "USDT",
+  bot: "BOT",
+};
+
+/** Canonicalizes a stated asset token; null for anything unrecognized. */
+export function normalizeWalletTransferAsset(value: unknown): WalletTransferAsset | null {
+  if (typeof value !== "string") return null;
+  const key = value.trim().toLowerCase();
+  if (!key) return null;
+  return WALLET_ASSET_ALIASES[key] ?? null;
+}
+
+const WALLET_CHAIN_ALIASES: Record<string, WalletTransferChainId> = {
+  bot: 677,
+  "bot chain": 677,
+  "bot mainnet": 677,
+  botchain: 677,
+  mainnet: 677,
+  "677": 677,
+  bot_testnet: 968,
+  "bot testnet": 968,
+  "bot chain testnet": 968,
+  testnet: 968,
+  bohr: 968,
+  "968": 968,
+};
+
+/** Canonicalizes a stated network; null when absent or unrecognized. */
+export function normalizeWalletTransferChain(value: unknown): WalletTransferChainId | null {
+  if (typeof value !== "string") return null;
+  const key = value.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!key) return null;
+  return WALLET_CHAIN_ALIASES[key] ?? null;
+}
+
+const WALLET_ADDRESS_PATTERN = /0x[0-9a-fA-F]{40}\b/g;
+
+/**
+ * Deterministically extracts EVM addresses the USER typed. The model is never
+ * a source of addresses: a candidate address is accepted only when it
+ * matches one of these user-authored values.
+ */
+export function extractAddressCandidates(text: string): string[] {
+  if (typeof text !== "string" || !text) return [];
+  const found: string[] = [];
+  for (const match of text.matchAll(WALLET_ADDRESS_PATTERN)) {
+    const normalized = getAddress(match[0]);
+    if (!found.includes(normalized)) found.push(normalized);
+  }
+  return found;
+}
+
+/** Bare cancel/restart vocabulary for wallet drafts. */
+export function isWalletCancelMessage(message: string): boolean {
+  if (typeof message !== "string") return false;
+  const normalized = message.trim().toLowerCase().replace(/[.!?]+$/g, "").trim();
+  return (
+    normalized === "cancel" ||
+    normalized === "cancel it" ||
+    normalized === "never mind" ||
+    normalized === "nevermind" ||
+    normalized === "stop" ||
+    normalized === "start over" ||
+    normalized === "restart"
+  );
+}
+
+export const WALLET_MISSING_FIELD_ORDER = [
+  "recipient",
+  "amount",
+  "asset",
+  "chain",
+  "address",
+] as const;
+
+export type WalletMissingField = (typeof WALLET_MISSING_FIELD_ORDER)[number];
+
+export function walletMissingFields(draft: {
+  recipientLabel?: string;
+  amount?: string;
+  asset?: WalletTransferAsset;
+  chainId?: WalletTransferChainId;
+  recipientAddress?: string;
+}): WalletMissingField[] {
+  const missing: WalletMissingField[] = [];
+  if (!draft.recipientLabel) missing.push("recipient");
+  if (!draft.amount) missing.push("amount");
+  if (!draft.asset) missing.push("asset");
+  if (!draft.chainId) missing.push("chain");
+  else if (!draft.recipientAddress) missing.push("address");
+  return missing;
+}
+
+/** Phase derived from accumulated terms (never from model claims). */
+export function deriveWalletPhase(draft: {
+  phase?: WalletTransferPhase;
+  recipientAddress?: string;
+  recipientConfirmed?: boolean;
+  addressSource?: "stated" | "saved" | null;
+  readyForConfirmation?: boolean;
+  preparedIntentId?: string;
+}): WalletTransferPhase {
+  if (draft.phase === "cancelled") return "cancelled";
+  if (draft.preparedIntentId && draft.readyForConfirmation) return "ready_for_wallet_authorization";
+  if (draft.readyForConfirmation) return "awaiting_payment_review";
+  if (draft.recipientAddress && !draft.recipientConfirmed) return "awaiting_recipient_confirmation";
+  if (draft.recipientAddress && draft.recipientConfirmed && draft.addressSource === "stated") {
+    return "awaiting_save_decision";
+  }
+  if (!draft.recipientAddress) {
+    return "collecting";
+  }
+  return "awaiting_address";
+}
+
+/**
+ * Recipient confirmation rebuilt from user-authored evidence only:
+ * - the user typed the address themselves, or
+ * - a bare affirmation directly after an assistant message naming it.
+ * A client-supplied `recipientConfirmed: true` without such evidence is
+ * dropped — exactly like airtime's networkConfirmed.
+ */
+export function deriveRecipientConfirmedFromHistory(
+  history: readonly ConversationMessage[],
+  address: string | undefined,
+): boolean {
+  if (!address) return false;
+  const target = address.toLowerCase();
+  for (let index = 0; index < history.length; index += 1) {
+    const entry = history[index];
+    if (!entry || entry.role !== "user" || typeof entry.content !== "string") continue;
+    if (extractAddressCandidates(entry.content).some((a) => a.toLowerCase() === target)) {
+      return true;
+    }
+    if (!isAffirmative(entry.content)) continue;
+    const prior = history[index - 1];
+    if (
+      prior && prior.role === "assistant" && typeof prior.content === "string" &&
+      extractAddressCandidates(prior.content).some((a) => a.toLowerCase() === target)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function sanitizeWalletDraft(raw: Record<string, unknown>, history: readonly ConversationMessage[]): WalletTransferIntent {
+  const label = typeof raw.recipientLabel === "string" && raw.recipientLabel.trim()
+    ? raw.recipientLabel.trim().slice(0, 64)
+    : undefined;
+  const address = typeof raw.recipientAddress === "string" && isAddress(raw.recipientAddress)
+    ? getAddress(raw.recipientAddress)
+    : undefined;
+  const addressSource = raw.addressSource === "stated" || raw.addressSource === "saved"
+    ? raw.addressSource
+    : null;
+  const asset = normalizeWalletTransferAsset(raw.asset);
+  const chainId = raw.chainId === 677 || raw.chainId === 968 ? raw.chainId : null;
+  const amount = typeof raw.amount === "string" && raw.amount.trim()
+    ? raw.amount.trim().slice(0, 32)
+    : undefined;
+  const ownerAddress = typeof raw.ownerAddress === "string" && isAddress(raw.ownerAddress)
+    ? getAddress(raw.ownerAddress)
+    : undefined;
+  const missing = walletMissingFields({
+    recipientLabel: label,
+    amount,
+    asset: asset ?? undefined,
+    chainId: chainId ?? undefined,
+    recipientAddress: address,
+  });
+  const recipientConfirmed = raw.recipientConfirmed === true && address !== undefined &&
+    deriveRecipientConfirmedFromHistory(history, address);
+  const readyForConfirmation = missing.length === 0 && recipientConfirmed;
+  const phase = deriveWalletPhase({
+    phase: raw.phase as WalletTransferPhase | undefined,
+    recipientAddress: address,
+    recipientConfirmed,
+    addressSource,
+    readyForConfirmation,
+    preparedIntentId: typeof raw.preparedIntentId === "string" ? raw.preparedIntentId : undefined,
+  });
+  return {
+    type: "wallet_transfer",
+    ...(ownerAddress ? { ownerAddress } : {}),
+    ...(label ? { recipientLabel: label } : {}),
+    ...(address ? { recipientAddress: address } : {}),
+    addressSource,
+    recipientConfirmed,
+    ...(typeof raw.savedRecipientVersion === "number" ? { savedRecipientVersion: raw.savedRecipientVersion } : {}),
+    ...(amount ? { amount } : {}),
+    ...(asset ? { asset } : {}),
+    ...(chainId ? { chainId } : {}),
+    phase,
+    missingFields: missing,
+    readyForConfirmation,
+    ...(typeof raw.preparedIntentId === "string" ? { preparedIntentId: raw.preparedIntentId } : {}),
+    ...(typeof raw.unsupportedReason === "string" ? { unsupportedReason: raw.unsupportedReason } : {}),
+  };
+}
+
+/**
+ * Merges a validated wallet_transfer candidate into the active draft.
+ * Candidate strings are canonicalized; the candidate address is accepted only
+ * when the user typed that exact address in this turn. A freshly typed
+ * address always wins and resets confirmation/version bindings.
+ */
+export function resolveWalletTransferIntent({
+  candidate,
+  userMessage,
+  activeIntent,
+}: {
+  candidate: ModelIntentCandidate;
+  userMessage: string;
+  activeIntent: PaymentIntent | null;
+}): WalletTransferIntent {
+  const draft = isWalletTransferIntent(activeIntent) ? activeIntent : null;
+  const typedAddresses = extractAddressCandidates(userMessage);
+
+  if (isWalletCancelMessage(userMessage)) {
+    return {
+      type: "wallet_transfer",
+      ...(draft?.ownerAddress ? { ownerAddress: draft.ownerAddress } : {}),
+      phase: "cancelled",
+      addressSource: null,
+      recipientConfirmed: false,
+      missingFields: [],
+      readyForConfirmation: false,
+    };
+  }
+
+  const labelPresent = candidate.recipientLabel !== null && candidate.recipientLabel !== undefined;
+  const amountPresent = candidate.amount !== null && candidate.amount !== undefined;
+  const candidateLabel = labelPresent
+    ? String(candidate.recipientLabel).trim().slice(0, 64) || undefined
+    : undefined;
+  const candidateAmount = amountPresent
+    ? String(candidate.amount).trim().slice(0, 32) || undefined
+    : undefined;
+  const candidateAsset = normalizeWalletTransferAsset(candidate.asset ?? undefined);
+  const candidateChain = normalizeWalletTransferChain(candidate.chain ?? undefined);
+
+  const recipientLabel = candidateLabel ?? draft?.recipientLabel;
+  const amount = candidateAmount ?? draft?.amount;
+  const asset = candidateAsset ?? draft?.asset;
+  const chainId = candidateChain ?? draft?.chainId;
+
+  // A new recipient name resets address bindings: never carry one person's
+  // address onto another person's label.
+  const recipientChanged = Boolean(
+    candidateLabel && draft?.recipientLabel && candidateLabel.toLowerCase() !== draft.recipientLabel.toLowerCase(),
+  );
+
+  // A freshly typed address always wins and resets confirmation bindings.
+  let recipientAddress = recipientChanged ? undefined : draft?.recipientAddress;
+  let addressSource = recipientChanged ? null : (draft?.addressSource ?? null);
+  let recipientConfirmed = recipientChanged ? false : (draft?.recipientConfirmed ?? false);
+  let savedRecipientVersion = recipientChanged ? undefined : draft?.savedRecipientVersion;
+  if (typedAddresses.length > 0) {
+    recipientAddress = typedAddresses[0];
+    addressSource = "stated";
+    recipientConfirmed = true;
+    savedRecipientVersion = undefined;
+  } else if (
+    candidate.recipientAddress &&
+    isAddress(candidate.recipientAddress) &&
+    typedAddresses.includes(getAddress(candidate.recipientAddress))
+  ) {
+    // Model echoed a user-typed address: accept the deterministic value.
+    recipientAddress = getAddress(candidate.recipientAddress);
+    addressSource = "stated";
+    recipientConfirmed = true;
+    savedRecipientVersion = undefined;
+  }
+
+  // Changing amount/asset/chain/recipient invalidates any prepared intent.
+  let preparedIntentId = recipientChanged ? undefined : draft?.preparedIntentId;
+  if (preparedIntentId) {
+    const termsChanged =
+      amount !== draft?.amount ||
+      asset !== draft?.asset ||
+      chainId !== draft?.chainId ||
+      recipientAddress !== draft?.recipientAddress;
+    if (termsChanged) preparedIntentId = undefined;
+  }
+
+  const missing = walletMissingFields({
+    recipientLabel,
+    amount,
+    asset,
+    chainId,
+    recipientAddress,
+  });
+  const confirmed = recipientConfirmed && recipientAddress !== undefined;
+  const readyForConfirmation = missing.length === 0 && confirmed;
+  const phase = deriveWalletPhase({
+    recipientAddress,
+    recipientConfirmed: confirmed,
+    addressSource,
+    readyForConfirmation,
+    preparedIntentId,
+  });
+
+  return {
+    type: "wallet_transfer",
+    ...(draft?.ownerAddress ? { ownerAddress: draft.ownerAddress } : {}),
+    ...(recipientLabel ? { recipientLabel } : {}),
+    ...(recipientAddress ? { recipientAddress } : {}),
+    addressSource,
+    recipientConfirmed: confirmed,
+    ...(savedRecipientVersion !== undefined ? { savedRecipientVersion } : {}),
+    ...(amount ? { amount } : {}),
+    ...(asset ? { asset } : {}),
+    ...(chainId ? { chainId } : {}),
+    phase,
+    missingFields: missing,
+    readyForConfirmation,
+    ...(preparedIntentId ? { preparedIntentId } : {}),
+  };
 }

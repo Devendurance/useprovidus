@@ -22,6 +22,34 @@
       "when": 1789957748479,
       "tag": "0002_groovy_outlaw_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794069817894,
+      "tag": "0003_faithful_speedball",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794070865965,
+      "tag": "0004_smooth_madame_masque",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794071680158,
+      "tag": "0005_amusing_puma",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794080584264,
+      "tag": "0006_brief_green_goblin",
+      "breakpoints": true
     }
   ]
 }

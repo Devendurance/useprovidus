@@ -36,6 +36,17 @@ import {
   sanitizeIncomingIntent,
 } from "@/lib/assistant/validation";
 import {
+  advanceWalletTransfer,
+  type WalletHandoffResult,
+} from "@/lib/assistant/wallet-transfer";
+import {
+  extractAddressCandidates,
+  isWalletTransferIntent,
+} from "@/lib/assistant/validation";
+import { getDb } from "@/lib/db";
+import { createDrizzleIntentStore, createMemoryIntentStore, type IntentStore } from "@/lib/transfers/repository";
+import { createDrizzleRecipientStore, createMemoryRecipientStore, type RecipientStore } from "@/lib/recipients/repository";
+import {
   STATUS_REFERENCE_REQUEST,
   detectStatusQuery,
   formatStatusAnswer,
@@ -47,6 +58,8 @@ export interface ResolveAssistantTurnInput {
   history: readonly ConversationMessage[];
   activeIntent: PaymentIntent | null;
   signal?: AbortSignal;
+  /** Verified SIWE session owner, or null when logged out. Never client-supplied. */
+  ownerAddress?: string | null;
 }
 
 /** Intent extraction is deterministic work: no sampling. */
@@ -92,6 +105,26 @@ export function isAffirmativeConfirmation(message: string): boolean {
 
 let providerOverride: LlmProvider | null = null;
 let chainOverride: ProviderChain | null = null;
+let walletStoresOverride: { intents: IntentStore; recipients: RecipientStore } | null = null;
+
+/**
+ * Test seam: injects deterministic intent/recipient stores for wallet-transfer
+ * handoff self-checks. Production resolves real Drizzle stores from getDb().
+ */
+export function setWalletTransferStoresForTesting(
+  stores: { intents: IntentStore; recipients: RecipientStore } | null,
+): void {
+  walletStoresOverride = stores;
+}
+
+function resolveWalletStores(): { intents: IntentStore; recipients: RecipientStore } {
+  if (walletStoresOverride) return walletStoresOverride;
+  const db = getDb();
+  if (db) {
+    return { intents: createDrizzleIntentStore(db), recipients: createDrizzleRecipientStore(db) };
+  }
+  return { intents: createMemoryIntentStore(), recipients: createMemoryRecipientStore() };
+}
 
 /**
  * Test seam: replaces the production provider for scoped self-checks. The
@@ -220,6 +253,7 @@ export async function resolveAssistantTurn(
   //    no model call, no reinterpretation, the draft passes through untouched.
   if (
     activeIntent !== null &&
+    activeIntent.type !== "wallet_transfer" &&
     activeIntent.readyForConfirmation === true &&
     isAffirmativeConfirmation(message)
   ) {
@@ -287,7 +321,85 @@ export async function resolveAssistantTurn(
   });
 
   if (!resolved) {
+    // Model chatted with no candidate: a wallet draft still advances on
+    // deterministic user evidence (affirmatives, pasted addresses, cancel).
+    if (isWalletTransferIntent(activeIntent)) {
+      const stores = resolveWalletStores();
+      const handoff: WalletHandoffResult = await advanceWalletTransfer({
+        intentStore: stores.intents,
+        recipientStore: stores.recipients,
+        ownerAddress: input.ownerAddress ?? null,
+        draft: activeIntent,
+        userMessage: message,
+      });
+      if (handoff.draft === null) {
+        return {
+          ok: true,
+          turn: { kind: "chat", message: {
+            role: "assistant",
+            content: handoff.reply,
+            timestamp: new Date().toISOString(),
+          }, action: handoff.action },
+          activeIntent: null,
+        };
+      }
+      // Handoff with no model candidate keeps the draft; the handoff reply
+      // wins only when the message carried decision evidence (affirmative,
+      // cancel, pasted address, save choice) — otherwise the model's own
+      // reply stands and the recomputed draft persists.
+      const acted =
+        isAffirmativeConfirmation(message) ||
+        extractAddressCandidates(message).length > 0 ||
+        /\b(save|skip|edit|change|no\b)/i.test(message);
+      if (acted && handoff.action !== null) {
+        const timestamp = new Date().toISOString();
+        const turn: AssistantTurn = {
+          kind: "payment_intent",
+          message: { role: "assistant", content: handoff.reply, timestamp, intent: handoff.draft },
+          intent: handoff.draft,
+          action: handoff.action,
+        };
+        return { ok: true, turn, activeIntent: handoff.draft };
+      }
+      return chatTurn(parsed.data.reply, handoff.draft);
+    }
     return chatTurn(parsed.data.reply, activeIntent);
+  }
+
+  // 4b. Wallet-transfer handoff: deterministic phases over B1–B5 services.
+  if (isWalletTransferIntent(resolved)) {
+    const stores = resolveWalletStores();
+    const handoff: WalletHandoffResult = await advanceWalletTransfer({
+      intentStore: stores.intents,
+      recipientStore: stores.recipients,
+      ownerAddress: input.ownerAddress ?? null,
+      draft: resolved,
+      userMessage: message,
+    });
+    if (handoff.draft === null) {
+      return {
+        ok: true,
+        turn: { kind: "chat", message: {
+          role: "assistant",
+          content: handoff.reply,
+          timestamp: new Date().toISOString(),
+        }, action: handoff.action },
+        activeIntent: null,
+      };
+    }
+    const timestamp = new Date().toISOString();
+    const turn: AssistantTurn = {
+      kind: "payment_intent",
+      message: {
+        role: "assistant",
+        content: handoff.reply,
+        timestamp,
+        intent: handoff.draft,
+      },
+      intent: handoff.draft,
+      action: handoff.action,
+    };
+    return { ok: true, turn, activeIntent: handoff.draft };
   }
 
   const turn: AssistantTurn = {

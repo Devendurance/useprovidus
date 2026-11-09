@@ -16,6 +16,11 @@ import type {
 } from "@/lib/assistant/types";
 import { resolveAssistantTurn } from "@/lib/assistant/resolve";
 import { sanitizeIncomingIntent } from "@/lib/assistant/validation";
+import {
+  authConfigFromEnv,
+  authenticateRequest,
+  getRequestPersistence,
+} from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -175,6 +180,27 @@ function parseHistory(raw: unknown): HistoryParseResult {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Wallet session owner (B6) — verified server-side, never client-supplied    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Returns the authenticated SIWE wallet owner, or null when logged out or
+ * auth is unconfigured. Wallet-transfer handoff treats null as logged-out:
+ * drafts accumulate but nothing owner-scoped is read or prepared.
+ */
+async function resolveSessionOwner(request: Request): Promise<string | null> {
+  try {
+    const config = authConfigFromEnv();
+    const persistence = getRequestPersistence();
+    if (!config || !persistence) return null;
+    const claims = await authenticateRequest(request, config, persistence);
+    return claims?.ownerAddress ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Handler                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -255,6 +281,11 @@ export async function POST(request: Request) {
 
   const response = await resolveAssistantTurn({
     ...chatRequest,
+    ownerAddress: await (async () => {
+      const owner = await resolveSessionOwner(request);
+      if ("walletTransferOwner" in payload && (typeof payload.walletTransferOwner !== "string" || payload.walletTransferOwner.toLowerCase() !== owner?.toLowerCase())) return null;
+      return owner;
+    })(),
     signal: request.signal,
   });
 

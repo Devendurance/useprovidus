@@ -480,7 +480,7 @@ export default function HomePage() {
                 </dl>
                 <ul className="mt-5 space-y-2 border-t border-[#1A1A1A]/20 pt-4 text-sm text-[#1A1A1A]/75">
                   {domain.examples.map((example) => (
-                    <li key={example}>"{example}"</li>
+                    <li key={example}>&ldquo;{example}&rdquo;</li>
                   ))}
                 </ul>
                 <p className="mt-4 text-xs leading-5 text-[#1A1A1A]/60">{domain.boundary}</p>

@@ -1,11 +1,15 @@
 import {
+  bigint,
+  boolean,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /**
  * Supported internal transaction statuses across Providus transaction lifecycles:
@@ -142,3 +146,254 @@ export type AirtimePreviewRecord = Omit<
   "asset"
 > & { asset?: string };
 export type NewAirtimePreviewRecord = typeof airtimePreviews.$inferInsert;
+
+/**
+ * B2 — Wallet-owned trusted recipients (multichain conversational payments).
+ *
+ * Additive table: no change to agent_transactions, airtime_previews, or any
+ * Paycrest/ClubKonnect state. Ownership ALWAYS derives from the verified
+ * wallet session, never from request data.
+ *
+ * - `ownerAddress` is the checksummed authenticated wallet.
+ * - The same display label may exist on MULTIPLE chains (e.g. "Douglas" on
+ *   Celo and on BOT Chain) with different addresses; resolution is always
+ *   scoped to one chain ID, so cross-chain mix-ups cannot happen.
+ * - Duplicate ACTIVE labels within one owner + chain are rejected. Soft-deleted
+ *   rows (`is_active = false`) are excluded by the partial unique index, so a
+ *   label can be reused after deletion.
+ * - `version` increments on every rename/address change; writers must pass
+ *   the version they read (optimistic concurrency) so stale edits fail.
+ * - Labels are NOT verified real-world identity — display only.
+ * - Never store recipient data in LLM chat history as source of truth; the
+ *   database row is authoritative. B3 payment intents must snapshot
+ *   (recipient id + version + address) rather than live-reading this table.
+ */
+export const savedRecipients = pgTable(
+  "saved_recipients",
+  {
+    id: text("id").primaryKey(),
+    ownerAddress: text("owner_address").notNull(),
+    label: text("label").notNull(),
+    normalizedLabel: text("normalized_label").notNull(),
+    recipientType: text("recipient_type").notNull().default("wallet"),
+    chainId: integer("chain_id").notNull(),
+    address: text("address").notNull(),
+    version: integer("version").notNull().default(1),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [
+    uniqueIndex("saved_rcp_owner_label_chain_idx")
+      .on(table.ownerAddress, table.normalizedLabel, table.chainId)
+      .where(sql`${table.isActive} = true`),
+    index("saved_rcp_owner_idx").on(table.ownerAddress),
+    index("saved_rcp_owner_chain_idx").on(table.ownerAddress, table.chainId),
+  ],
+);
+
+export type SavedRecipient = typeof savedRecipients.$inferSelect;
+export type NewSavedRecipient = typeof savedRecipients.$inferInsert;
+
+/**
+ * B2 — Non-sensitive audit trail for recipient address lifecycle.
+ *
+ * Stores only addresses, versions, and timestamps — no auth tokens, no
+ * session data, no associations beyond owner + recipient id. One row per
+ * create / address change / delete.
+ */
+export const recipientAddressAudits = pgTable(
+  "recipient_address_audits",
+  {
+    id: text("id").primaryKey(),
+    recipientId: text("recipient_id").notNull(),
+    ownerAddress: text("owner_address").notNull(),
+    chainId: integer("chain_id").notNull(),
+    oldAddress: text("old_address"),
+    newAddress: text("new_address"),
+    oldVersion: integer("old_version").notNull(),
+    newVersion: integer("new_version").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("rcp_audit_recipient_idx").on(table.recipientId),
+    index("rcp_audit_owner_idx").on(table.ownerAddress),
+  ],
+);
+
+export type RecipientAddressAudit = typeof recipientAddressAudits.$inferSelect;
+export type NewRecipientAddressAudit = typeof recipientAddressAudits.$inferInsert;
+
+/**
+ * B2.1 — Durable wallet-auth state for multi-instance deployments.
+ *
+ * Process-local Maps are NOT safe on Vercel (many concurrent instances), so
+ * login nonces, logout revocations, and rate-limit counters live here in the
+ * existing Neon PostgreSQL instead. All consumption paths are single-statement
+ * atomic operations (DELETE ... RETURNING, INSERT ... ON CONFLICT) so exactly
+ * one instance wins a race. Rows are short-lived by design; `expires_at` /
+ * `window_start` bound every row and pruning deletes anything stale, so these
+ * tables cannot grow without bound.
+ *
+ * Privacy: nonces bind to wallet addresses only for the minutes a challenge
+ * is alive; revocations hold opaque session ids; counters hold hashed keys.
+ * No secrets, signatures, or cookies are stored here — ever.
+ */
+export const authNonces = pgTable(
+  "auth_nonces",
+  {
+    nonce: text("nonce").primaryKey(),
+    address: text("address").notNull(),
+    chainId: integer("chain_id").notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true, mode: "string" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+  },
+  (table) => [index("auth_nonce_exp_idx").on(table.expiresAt)],
+);
+
+export type AuthNonceRow = typeof authNonces.$inferSelect;
+export type NewAuthNonceRow = typeof authNonces.$inferInsert;
+
+export const authRevokedSessions = pgTable(
+  "auth_revoked_sessions",
+  {
+    sessionId: text("session_id").primaryKey(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+  },
+  (table) => [index("auth_revoked_exp_idx").on(table.expiresAt)],
+);
+
+export type AuthRevokedSessionRow = typeof authRevokedSessions.$inferSelect;
+export type NewAuthRevokedSessionRow = typeof authRevokedSessions.$inferInsert;
+
+export const authRateCounters = pgTable(
+  "auth_rate_counters",
+  {
+    key: text("key").notNull(),
+    windowStart: bigint("window_start", { mode: "number" }).notNull(),
+    count: integer("count").notNull(),
+  },
+  (table) => [
+    uniqueIndex("auth_rate_key_window_idx").on(table.key, table.windowStart),
+    index("auth_rate_key_idx").on(table.key),
+  ],
+);
+
+/**
+ * B3 — Server-authoritative wallet_transfer PaymentIntent rows.
+ *
+ * Additive table for the deterministic transfer-intent domain. Distinct from
+ * agent_transactions (cash_out/airtime execution) and untouched by
+ * Paycrest/ClubKonnect flows. B3 only ever writes status 'pending' and reads
+ * or cancels to 'cancelled'; 'approved'/'submitted'/'settled'/'failed' are
+ * reserved for future B4/B5 execution wiring.
+ *
+ * Critical terms (owner, recipient, chain, asset, amount, expiry) are bound
+ * by terms_fingerprint. Version/address snapshots pin saved-recipient state
+ * at preparation time; B4 must re-check freshness before any execution.
+ */
+export const walletTransferIntents = pgTable(
+  "wallet_transfer_intents",
+  {
+    id: text("id").primaryKey(),
+    ownerAddress: text("owner_address").notNull(),
+    recipientSource: text("recipient_source").notNull(),
+    savedRecipientId: text("saved_recipient_id"),
+    savedRecipientVersion: integer("saved_recipient_version"),
+    recipientAddress: text("recipient_address").notNull(),
+    recipientLabel: text("recipient_label").notNull(),
+    chainId: integer("chain_id").notNull(),
+    environment: text("environment").notNull(),
+    assetSymbol: text("asset_symbol").notNull(),
+    tokenAddress: text("token_address"),
+    assetDecimals: integer("asset_decimals").notNull(),
+    amountDisplay: text("amount_display").notNull(),
+    amountBaseUnits: text("amount_base_units").notNull(),
+    status: text("status").notNull().default("pending"),
+    approvalVersion: integer("approval_version").notNull().default(1),
+    termsFingerprint: text("terms_fingerprint").notNull(),
+    idempotencyKey: text("idempotency_key"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("wti_owner_idx").on(table.ownerAddress),
+    index("wti_owner_status_idx").on(table.ownerAddress, table.status),
+    uniqueIndex("wti_owner_idem_idx")
+      .on(table.ownerAddress, table.idempotencyKey)
+      .where(sql`${table.idempotencyKey} IS NOT NULL`),
+  ],
+);
+
+export type WalletTransferIntent = typeof walletTransferIntents.$inferSelect;
+export type NewWalletTransferIntent = typeof walletTransferIntents.$inferInsert;
+
+/**
+ * B5 — Durable transfer submission ledger.
+ *
+ * One row per wallet_transfer intent at most (unique intent_id): an intent can
+ * never acquire competing submissions. One transaction hash can never be
+ * claimed for unrelated intents (partial unique tx_hash). Status authority:
+ * the INTENT row carries user intent (pending/cancelled) while THIS row
+ * carries chain fact (submitted/confirmed/failed/unknown). Cancellation of
+ * an intent never deletes or rewrites its submission row — a later on-chain
+ * confirmation must still be recorded and reported truthfully.
+ *
+ * A browser-supplied tx hash is a candidate proof only; `confirmed` requires
+ * deterministic on-chain verification (see lib/transfers/verify.ts).
+ * No private keys or wallet secrets are stored here — ever.
+ */
+export const transferSubmissions = pgTable(
+  "transfer_submissions",
+  {
+    id: text("id").primaryKey(),
+    intentId: text("intent_id").notNull(),
+    ownerAddress: text("owner_address").notNull(),
+    chainId: integer("chain_id").notNull(),
+    environment: text("environment").notNull(),
+    contractAddress: text("contract_address").notNull(),
+    termsFingerprint: text("terms_fingerprint").notNull(),
+    tokenAddress: text("token_address"),
+    recipientAddress: text("recipient_address").notNull(),
+    amountBaseUnits: text("amount_base_units").notNull(),
+    txHash: text("tx_hash"),
+    status: text("status").notNull().default("submitted"),
+    receiptStatus: text("receipt_status"),
+    blockNumber: bigint("block_number", { mode: "number" }),
+    blockHash: text("block_hash"),
+    confirmations: integer("confirmations"),
+    failureReason: text("failure_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [
+    uniqueIndex("tsub_intent_idx").on(table.intentId),
+    uniqueIndex("tsub_tx_idx")
+      .on(table.txHash)
+      .where(sql`${table.txHash} IS NOT NULL`),
+    index("tsub_owner_idx").on(table.ownerAddress),
+    index("tsub_status_idx").on(table.status),
+    index("tsub_intent_owner_idx").on(table.intentId, table.ownerAddress),
+  ],
+);
+
+export type TransferSubmission = typeof transferSubmissions.$inferSelect;
+export type NewTransferSubmission = typeof transferSubmissions.$inferInsert;

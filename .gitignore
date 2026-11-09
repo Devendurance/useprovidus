@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local-only: hardhat build outputs + pre-migration data checkpoints (never commit)
+/artifacts
+/cache
+/backups

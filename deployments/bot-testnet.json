@@ -1,0 +1,51 @@
+{
+  "network": "botTestnet",
+  "chainId": 968,
+  "contract": "0xbc6298701490ba211733F2Dc28deB7Df9835B7a4",
+  "deployTxHash": "0xa4c2c09a0a81985b61bdc1ec698759af94f0ac4e322e30e4c8ec4d6851b2d54e",
+  "blockNumber": 29626124,
+  "owner": "0x374A94C75BD463635Cc6C96141B0EF31aCd02EF3",
+  "initialAllowlist": [],
+  "deployedBytecodeHash": "0x9ce1cfbe663d69dbb3a40717bbdd75d8940396e5733c5b554d2f0a6d6aeafed1",
+  "compiler": "solc 0.8.24",
+  "verified": "2026-11-07T19:17:55.450Z",
+  "explorer": {
+    "contract": "https://scan.bohr.life/address/0xbc6298701490ba211733F2Dc28deB7Df9835B7a4",
+    "tx": "https://scan.bohr.life/tx/0xa4c2c09a0a81985b61bdc1ec698759af94f0ac4e322e30e4c8ec4d6851b2d54e"
+  },
+  "supersededDeployments": [
+    {
+      "note": "duplicate from repeated deploy-script run; superseded by canonical deployment above",
+      "contract": "0xd26940b21c7fa4a0ad93bd82685c67217ed56600",
+      "deployTxHash": "0x01882dbf9924ea6d481846f1862973405ccca5f9244457e6f044fb5a58e0e05b",
+      "blockNumber": 29626097,
+      "owner": "0x374A94C75BD463635Cc6C96141B0EF31aCd02EF3",
+      "explorer": {
+        "contract": "https://scan.bohr.life/address/0xd26940b21c7fa4a0ad93bd82685c67217ed56600",
+        "tx": "https://scan.bohr.life/tx/0x01882dbf9924ea6d481846f1862973405ccca5f9244457e6f044fb5a58e0e05b"
+      }
+    }
+  ],
+  "testPayment": {
+    "note": "one 0.01 test BOT payNative via B3 intent + B4A execution plan",
+    "txHash": "0x40a7b176d20cccff6f0c5c124c8cd6da34284df08f2f3f095dfe7f0abf629e41",
+    "blockNumber": 29626261,
+    "status": "success",
+    "chainId": 968,
+    "payer": "0x374A94C75BD463635Cc6C96141B0EF31aCd02EF3",
+    "amountBaseUnits": "10000000000000000",
+    "intentId": "0xa395b393ed07a18fb20f22edccd2da652175da67cd220fb9cfb3cb1f8e7de8c1",
+    "paymentExecutedEvent": "verified (intentId, payer, recipient, token=0x0, amount)",
+    "replayFlag": true,
+    "explorer": "https://scan.bohr.life/tx/0x40a7b176d20cccff6f0c5c124c8cd6da34284df08f2f3f095dfe7f0abf629e41"
+  },
+  "sourceVerification": {
+    "status": "unverified-after-two-standard-json-attempts",
+    "attempts": 2,
+    "method": "Blockscout verifysourcecode API, solidity-standard-json-input, solc 0.8.24, optimizer off, evm paris",
+    "reproducibleArtifacts": [
+      "contracts/ProvidusPay.sol",
+      "artifacts/build-info/b75078525f0f9e3f9f772d22ab4e629f.json"
+    ]
+  }
+}
