@@ -28,6 +28,7 @@ import {
   requireOwnerForMutation,
 } from "@/lib/recipients/routes";
 import { getDb } from "@/lib/db";
+import { MAINNET_CONTRACT_ADDRESS, getMainnetTestConfig } from "@/lib/transfers/test-mode";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -51,10 +52,14 @@ function submissionErrorResponse(err: unknown) {
 
 function verifierConfig() {
   const c968 = process.env.PROVIDUS_PAY_CONTRACT_968;
+  // Mainnet stays disabled unless the local-only B9C.0 test mode is active
+  // (never in production builds). The contract is the audited constant,
+  // never a request-supplied or unreviewed env value.
+  const test = getMainnetTestConfig();
   return {
     contracts: {
       968: c968 && isAddress(c968) ? c968 : null,
-      677: null,
+      677: test !== null ? MAINNET_CONTRACT_ADDRESS : null,
     } as Record<number, string | null>,
     requiredConfirmations: { 968: 5, 677: 12 },
   };
