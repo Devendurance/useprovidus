@@ -147,6 +147,89 @@ async function run() {
       assert.equal(plan.recipient, RECIPIENT);
     }
 
+    // --- USDT happy path: exact 1 official USDT ---
+    {
+      const intents = createMemoryIntentStore();
+      const recipients = createMemoryRecipientStore();
+      await saveRecipient(recipients, { ownerAddress: PAYER, label: "Douglas", chainId: 677, address: RECIPIENT });
+      const { intent } = await prepareTransferIntent(intents, recipients, {
+        ownerAddress: PAYER, recipient: { type: "saved", label: "douglas" }, chainId: 677, asset: "USDT", amount: "1",
+      });
+      assert.equal(intent.amountBaseUnits, "1000000");
+      const { plan } = await prepareWebExecution(intents, recipients, submissions(), PAYER, intent.id, undefined);
+      assert.equal(plan.chainId, 677);
+      assert.equal(plan.to.toLowerCase(), MAINNET_CONTRACT_ADDRESS.toLowerCase());
+      assert.equal(plan.value, "0");
+      assert.equal(plan.token?.toLowerCase(), "0xababc7ddc03e501d190c676bf3d92ef0e6e87a3c");
+      assert.equal(plan.amountBaseUnits, "1000000");
+    }
+    // --- USDT rejections: wrong amount / test mode off ---
+    {
+      const intents = createMemoryIntentStore();
+      const recipients = createMemoryRecipientStore();
+      await saveRecipient(recipients, { ownerAddress: PAYER, label: "Douglas", chainId: 677, address: RECIPIENT });
+      const { intent } = await prepareTransferIntent(intents, recipients, {
+        ownerAddress: PAYER, recipient: { type: "saved", label: "douglas" }, chainId: 677, asset: "USDT", amount: "2",
+      });
+      await expectCode(
+        () => prepareWebExecution(intents, recipients, submissions(), PAYER, intent.id, undefined),
+        "INTENT_NOT_EXECUTABLE",
+      );
+    }
+    {
+      setEnv({ PROVIDUS_MAINNET_TEST_MODE: undefined });
+      const intents = createMemoryIntentStore();
+      const recipients = createMemoryRecipientStore();
+      await saveRecipient(recipients, { ownerAddress: PAYER, label: "Douglas", chainId: 677, address: RECIPIENT });
+      const { intent } = await prepareTransferIntent(intents, recipients, {
+        ownerAddress: PAYER, recipient: { type: "saved", label: "douglas" }, chainId: 677, asset: "USDT", amount: "1",
+      });
+      await expectCode(
+        () => prepareWebExecution(intents, recipients, submissions(), PAYER, intent.id, undefined),
+        "UNSUPPORTED_CHAIN",
+      );
+      setEnv({ PROVIDUS_MAINNET_TEST_MODE: "1", PROVIDUS_MAINNET_TEST_PAYER: PAYER, PROVIDUS_MAINNET_TEST_RECIPIENT: RECIPIENT });
+    }
+    // --- exact-amount approval flow (mocked wallet): never unlimited ---
+    {
+      const { prepareTokenAllowance } = await import("@/lib/wallet/transfer-execution");
+      const fakePlan = {
+        chainId: 677,
+        token: "0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C" as `0x${string}`,
+        payer: PAYER as `0x${string}`,
+        to: MAINNET_CONTRACT_ADDRESS,
+        amountBaseUnits: "1000000",
+      };
+      const states: string[] = [];
+      let approvedAmount: bigint | null = null;
+      let approveCalls = 0;
+      await prepareTokenAllowance({
+        plan: fakePlan as Parameters<typeof prepareTokenAllowance>[0]["plan"],
+        readAllowance: async () => BigInt(0),
+        approveExact: (async (_c: number, _t: `0x${string}`, _s: `0x${string}`, amount: bigint) => {
+          approveCalls += 1;
+          approvedAmount = amount;
+          return "0x" + "aa".repeat(32) as `0x${string}`;
+        }) as NonNullable<Parameters<typeof prepareTokenAllowance>[0]["approveExact"]>,
+        wait: async () => ({ status: "success" }),
+        revalidate: async () => {},
+        onState: (s) => { states.push(s); },
+      });
+      assert.equal(approveCalls, 1);
+      assert.equal(approvedAmount, BigInt(1000000));
+      assert.deepEqual(states, ["checking_allowance", "approval_required", "awaiting_token_approval", "approval_confirming", "payment_ready"]);
+      // Sufficient allowance: no approval transaction at all.
+      let approveCalls2 = 0;
+      await prepareTokenAllowance({
+        plan: fakePlan as Parameters<typeof prepareTokenAllowance>[0]["plan"],
+        readAllowance: async () => BigInt(1000000),
+        approveExact: (async () => { approveCalls2 += 1; return ("0x" + "bb".repeat(32)) as `0x${string}`; }) as NonNullable<Parameters<typeof prepareTokenAllowance>[0]["approveExact"]>,
+        wait: async () => ({ status: "success" }),
+        revalidate: async () => {},
+        onState: () => {},
+      });
+      assert.equal(approveCalls2, 0);
+    }
     // --- 968 path unchanged (no flag needed) ---
     {
       setEnv({ PROVIDUS_MAINNET_TEST_MODE: undefined });

@@ -1,10 +1,12 @@
+import { getAddress } from "viem";
 import { prepareExecutionPlan, ExecutionError } from "@/lib/transfers/execution";
 import type { IntentStore } from "@/lib/transfers/repository";
 import type { RecipientStore } from "@/lib/recipients/repository";
 import type { SubmissionStore } from "@/lib/transfers/submissions";
 import {
   MAINNET_CONTRACT_ADDRESS,
-  MAINNET_TEST_TERMS,
+  MAINNET_TEST_TERMS_NATIVE,
+  MAINNET_TEST_TERMS_USDT,
   getMainnetTestConfig,
 } from "@/lib/transfers/test-mode";
 
@@ -30,15 +32,21 @@ export async function prepareWebExecution(
       if (intent.ownerAddress.toLowerCase() !== test.payer.toLowerCase()) {
         throw new ExecutionError("NOT_FOUND", "Payment intent not found.");
       }
+      if (intent.ownerAddress.toLowerCase() !== test.payer.toLowerCase()) {
+        throw new ExecutionError("NOT_FOUND", "Payment intent not found.");
+      }
       if (intent.recipientAddress.toLowerCase() !== test.recipient.toLowerCase()) {
         throw new ExecutionError("INTENT_NOT_EXECUTABLE", "Recipient is not the designated mainnet test recipient.");
       }
+      const isNativeTest = intent.tokenAddress === null;
+      const terms = isNativeTest ? MAINNET_TEST_TERMS_NATIVE : MAINNET_TEST_TERMS_USDT;
+      const termsToken = terms.tokenAddress === null ? null : getAddress(terms.tokenAddress).toLowerCase();
       if (
-        intent.assetSymbol !== MAINNET_TEST_TERMS.assetSymbol ||
-        intent.tokenAddress !== MAINNET_TEST_TERMS.tokenAddress ||
-        intent.amountBaseUnits !== MAINNET_TEST_TERMS.amountBaseUnits
+        intent.assetSymbol !== terms.assetSymbol ||
+        intent.amountBaseUnits !== terms.amountBaseUnits ||
+        (intent.tokenAddress === null ? null : getAddress(intent.tokenAddress).toLowerCase()) !== termsToken
       ) {
-        throw new ExecutionError("INTENT_NOT_EXECUTABLE", "Only the exact 0.01 native BOT test payment is allowed on mainnet.");
+        throw new ExecutionError("INTENT_NOT_EXECUTABLE", "Only the approved 0.01 native BOT or 1 USDT mainnet test payments are allowed.");
       }
       // The test contract is the audited constant — never env-derived.
       if (await submissions.findByIntent(id)) throw new ExecutionError("INTENT_NOT_EXECUTABLE", "A submission already exists. Recheck its status without resending.");

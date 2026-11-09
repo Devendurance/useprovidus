@@ -23,12 +23,23 @@ export const MAINNET_CONTRACT_ADDRESS: Address = getAddress(
   "0xd373b0377F17D38707C610f39820297CF4cfCF60",
 );
 
-/** The only mainnet test payment this mode permits. */
-export const MAINNET_TEST_TERMS = {
+/** The only mainnet test payments this mode permits (B9C.2 adds USDT). */
+export const MAINNET_TEST_TERMS_NATIVE = {
   chainId: 677,
   assetSymbol: "BOT",
   amountBaseUnits: "10000000000000000",
   tokenAddress: null,
+} as const;
+
+export const MAINNET_USDT_ADDRESS: Address = getAddress(
+  "0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C",
+);
+
+export const MAINNET_TEST_TERMS_USDT = {
+  chainId: 677,
+  assetSymbol: "USDT",
+  amountBaseUnits: "1000000",
+  tokenAddress: "0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C",
 } as const;
 
 export type MainnetTestConfig = {

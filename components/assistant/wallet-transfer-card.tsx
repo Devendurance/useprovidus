@@ -279,7 +279,13 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
       </dl>
       {!submission && !recoveryHash && intent.chainId !== 968 && intent.chainId !== 677 && <p role="status">Unsupported network. Switch to a supported BOT Chain network.</p>}
       {!submission && !recoveryHash && intent.chainId === 677 && !currentPlan && <p role="status">BOT Chain Mainnet: Payments coming soon. ERC-20 approval is separate from payment. Mainnet execution is disabled in this build.</p>}
-      {intent.tokenAddress && <TokenApprovalCard enabled={false} />}
+      {intent.tokenAddress && <TokenApprovalCard
+      enabled={Boolean(currentPlan && currentPlan.chainId === 677 && currentPlan.token)}
+      plan={currentPlan && currentPlan.chainId === 677 ? currentPlan : undefined}
+      client={client ?? undefined}
+      wallet={wallet ?? undefined}
+      revalidate={async () => { await refresh(); }}
+    />}
       {!submission && !recoveryHash && !uncertainBroadcast && (intent.chainId === 968 || intent.chainId === 677) && intent.status === "pending" && status.freshness.fresh && <>
         <p>Review these exact stored terms. Only approval in your wallet authorizes payment.</p>
         {chainId !== intent.chainId ? <button className={primary} disabled={disabled || providusWallet.isNetworkSwitchPending} onClick={() => void run(() => providusWallet.requestNetworkSwitch(intent.chainId === 677 ? "botMainnet" : "botTestnet"))}>Switch to {intent.chainId === 677 ? "BOT Chain Mainnet" : "BOT Chain Testnet"}</button> : currentPlan && currentGas ? <button className={primary} disabled={disabled} onClick={() => void run(authorize)}>Approve in wallet</button> : currentReviewError ? <button className={primary} disabled={disabled} onClick={() => { setReviewError(null); setReviewAttempt(value => value + 1); }}>Retry review and gas estimate</button> : <p className="text-xs text-receipt-grey" role="status">Reviewing payment details and estimating gas…</p>}
