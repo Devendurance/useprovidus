@@ -12,6 +12,8 @@
 - Injected connectors may add an unrecognized configured B1 chain after 4902. Retry `switchChainAsync` once only when wagmi reports its exact accepted-add-but-not-selected marker. A user rejection never triggers another prompt.
 - Celo cash-out and airtime still require chain 42220. The payment card now offers an explicit Celo switch before a Celo transaction can be submitted.
 - `test:all` must include `test:web-execution` so the 677 hard gate stays covered even though unsigned internal plan-builder tests can exercise mainnet metadata.
+- Network balance eligibility follows the wagmi provider connection, not the app's Celo-only normalized connection status. Otherwise supported BOT chains can appear connected while their native balance query stays disabled.
+- The dashboard renders multiple wallet triggers. Opening one panel must close the other instance, and mobile panel positioning must not inherit desktop anchor coordinates.
 
 ## B8 invariants, 2026-11-08
 - Public positioning uses one shared registry. Celo is live for existing supported services. BOT Chain is verified on Testnet for native BOT recipient transfers on chain 968. BOT mainnet remains pending B9.

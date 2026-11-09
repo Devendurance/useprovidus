@@ -1,6 +1,6 @@
 # Providus — Project State
 
-## B9 UX hotfix in progress, 2026-11-09
+## B9 UX hotfix completed, 2026-11-09
 - Scope: multichain wallet dropdown/switching, session-state clarity, assistant and review copy. No payment execution rebuild, contract/backend/schema change, push, deploy, production write, or mainnet transaction.
 - B1 registry defines Celo 42220, BOT Mainnet 677, BOT Testnet 968. Wagmi registers all three while existing Celo-only readiness remains required by cash-out and airtime.
 - Design checkpoint: shared auth controller plus registry-derived network display. See `.audit/b9-ux-hotfix-design.md`. The independent review found and recorded the forced-Celo connect risk and wagmi 4902 add behavior.
@@ -8,8 +8,10 @@
 - Shared wallet auth state normalizes addresses, prevents a session probe from invalidating an active sign-in, ignores stale responses after account changes, and keeps chain changes from forcing logout under current `requireOwner` policy. Account changes hide and clear old-owner assistant drafts.
 - Chain/account watcher revisions invalidate BOT Testnet plans and gas immediately. B5 hash and unknown recovery stay mounted and recoverable. Celo airtime controls now require Celo Mainnet before submission.
 - Assistant starter examples cover BOT Testnet transfers and Celo MTN airtime. Mainnet remains switchable and payment-disabled. `test:all` now includes the existing 677 execution hard-gate regression.
-- `npm run test:all`, `npx tsc --noEmit`, `npm run lint`, focused network/auth/review checks, the web execution gate check, and `git diff --check` pass. Existing live-wallet browser session/dev server remains untouched.
-- Remaining: isolated Next build and mocked-wallet desktop/mobile screenshots, inspect browser logs/overlay, then update audit and commit locally. No push.
+- `npm run test:all`, `npx tsc --noEmit`, `npm run lint`, `npm run build` with `DATABASE_URL` empty, and `git diff --check` pass. The suite includes the web execution hard-gate check and 14 local contract unit tests.
+- Mocked-provider UI checks cover supported and unsupported chains, switch paths, wallet rejection, missing switch support, disconnect, RPC failure, and no transaction broadcast. The existing live-wallet browser tab and dev server remain untouched.
+- Visual captures: `.audit/b9-ux-hotfix/providus-wallet-menu-desktop-mainnet.jpg` at 1365x900 and `.audit/b9-ux-hotfix/providus-wallet-menu-mobile-testnet.jpg` at 390x844. The production build has no Next image dimension warning or overlay error.
+- Local source checkpoints: `7fa05ac` and `519bc88`. No push, deploy, migration, production database write, or mainnet transaction.
 
 ## B8 current checkpoint, 2026-11-08
 - B8 repositions the public product as a multichain conversational payment platform while preserving B1-B7 execution code and the Celo service flows.
