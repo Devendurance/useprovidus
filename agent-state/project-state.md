@@ -5,6 +5,7 @@
 - B1 registry defines Celo 42220, BOT Mainnet 677, BOT Testnet 968. Wagmi currently registers only 42220 and 968. Celo-only readiness remains required by cash-out and airtime.
 - Design checkpoint: shared auth controller plus registry-derived network display. See `.audit/b9-ux-hotfix-design.md`. The independent review found and recorded the forced-Celo connect risk and wagmi 4902 add behavior.
 - Baseline: `npm run test:all`, `npx tsc --noEmit`, and `npm run lint` pass before source edits. Existing live-wallet browser session/dev server is untouched.
+- Added passing failing-first checks and pure B1 network, auth-state, and review-context helpers. The application UI/controller has not yet been wired to them.
 
 ## B8 current checkpoint, 2026-11-08
 - B8 repositions the public product as a multichain conversational payment platform while preserving B1-B7 execution code and the Celo service flows.

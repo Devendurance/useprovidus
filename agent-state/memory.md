@@ -7,6 +7,7 @@
 - Account changes clear old-owner drafts and stale results, while submitted or unknown payment recovery remains recoverable. Chain changes invalidate only unsigned plan/gas state.
 - BOT Testnet success still requires B5 independent receipt verification. A submitted hash is verifying until verified.
 - Pre-change checkpoint: full self-check suite, TypeScript, and lint all passed on the B8 tree.
+- The B9 mock-wallet self-check uses provider method responses and asserts no `eth_sendTransaction` occurs during switching.
 
 ## B8 invariants, 2026-11-08
 - Public positioning uses one shared registry. Celo is live for existing supported services. BOT Chain is verified on Testnet for native BOT recipient transfers on chain 968. BOT mainnet remains pending B9.

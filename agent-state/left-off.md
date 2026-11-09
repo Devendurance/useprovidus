@@ -8,11 +8,12 @@
 - Read current project state, UI system, skills, and wallet/auth/assistant/review flows.
 - Cross-judged two independent designs. Decision and risks are in `.audit/b9-ux-hotfix-design.md`.
 - Baseline `npm run test:all`, `npx tsc --noEmit`, and `npm run lint` all pass before source edits.
+- Added `test:wallet-network`, wired into `test:all`. It covers B1 metadata, mocked add/switch/rejection/disconnect/RPC outcomes, auth states, and stale reviews. It passes; no real wallet or transaction was used.
 - Existing connected-wallet browser tab and dev server were left untouched.
 
 ## Next
-1. Add failing-first mock switch/auth regression checks.
-2. Implement the registry-backed switcher, shared auth state, safe account cleanup, and clear assistant/review status.
+1. Wire the tested network and auth models into the wallet hook, provider, menu, and assistant.
+2. Implement safe owner cleanup and chain-bound review invalidation, then clarify assistant/payment states.
 3. Verify with a fake wallet on an isolated server with `DATABASE_URL` empty, capture desktop/mobile images, then run the full requested checks.
 4. Review exact diff, update state/audit, and commit locally without push.
 

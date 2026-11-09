@@ -10,6 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "npx tsx lib/db/migrate.ts",
     "test:wallet-helpers": "npx --yes tsx lib/wallet/self-check.ts",
+    "test:wallet-network": "npx --yes tsx lib/wallet/network-self-check.ts",
     "test:money-helpers": "npx --yes tsx lib/money/self-check.ts",
     "test:recipient-helpers": "npx --yes tsx lib/paycrest/recipient-self-check.ts",
     "test:order-helpers": "npx --yes tsx lib/paycrest/order-self-check.ts",
@@ -34,7 +35,7 @@
     "test:recipients": "npx --yes tsx lib/recipients/self-check.ts",
     "test:chains": "npx --yes tsx lib/chains/self-check.ts",
     "test:contract": "npx hardhat test",
-    "test:all": "npm run test:wallet-helpers && npm run test:money-helpers && npm run test:recipient-helpers && npm run test:order-helpers && npm run test:order-route && npm run test:attribution && npm run test:persistence && npm run test:reconciliation && npm run test:recovery-security && npm run test:clubkonnect && npm run test:ai && npm run test:receipt && npm run test:chains && npm run test:auth && npm run test:auth-store && npm run test:recipients && npm run test:transfers && npm run test:execution && npm run test:submission && npm run test:verification && npm run test:contract && npm run test:channel && npm run test:assistant && npm run test:wallet-assistant"
+    "test:all": "npm run test:wallet-helpers && npm run test:wallet-network && npm run test:money-helpers && npm run test:recipient-helpers && npm run test:order-helpers && npm run test:order-route && npm run test:attribution && npm run test:persistence && npm run test:reconciliation && npm run test:recovery-security && npm run test:clubkonnect && npm run test:ai && npm run test:receipt && npm run test:chains && npm run test:auth && npm run test:auth-store && npm run test:recipients && npm run test:transfers && npm run test:execution && npm run test:submission && npm run test:verification && npm run test:contract && npm run test:channel && npm run test:assistant && npm run test:wallet-assistant"
   },
   "dependencies": {
     "@celo/attribution-tags": "^0.3.0",
