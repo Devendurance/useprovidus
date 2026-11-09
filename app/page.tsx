@@ -715,6 +715,7 @@ export default function HomePage() {
                 width={170}
                 height={32}
                 className="h-8 w-auto max-w-[170px]"
+                style={{ width: "auto", height: "auto" }}
               />
               <p className="max-w-xl text-sm leading-6 text-[#F5F2EA]/70">
                 Providus acknowledges BOT Chain as the network behind the verified testnet recipient-payment path.

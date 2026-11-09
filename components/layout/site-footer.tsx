@@ -71,6 +71,7 @@ export function SiteFooter() {
               width={150}
               height={28}
               className="h-7 w-auto max-w-[150px]"
+              style={{ width: "auto", height: "auto" }}
             />
             <p className="text-xs leading-5 text-[#F5F2EA]/70">
               Official ecosystem acknowledgment for the verified BOT Testnet payment path.

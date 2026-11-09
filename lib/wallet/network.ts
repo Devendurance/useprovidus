@@ -116,6 +116,14 @@ export function getWalletBalanceTarget(
   };
 }
 
+export function shouldReadNetworkBalance(
+  address: string | null | undefined,
+  chainId: number | null | undefined,
+  connected: boolean,
+): boolean {
+  return connected && getWalletBalanceTarget(address, chainId) !== null;
+}
+
 export class WalletNetworkConfirmationError extends Error {
   readonly kind = "unconfirmed";
   readonly targetChainId: number;

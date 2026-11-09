@@ -21,6 +21,7 @@ type ConnectWalletButtonProps = {
 };
 
 const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const WALLET_PANEL_OPEN_EVENT = "providus-wallet-panel-open";
 
 export function ConnectWalletButton({ className, size = "sm", fullWidth = false, label = "Connect wallet", showBalances = true }: ConnectWalletButtonProps) {
   const wallet = useProvidusWallet();
@@ -64,7 +65,10 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
   function togglePanel() {
     wallet.clearConnectError();
     if (panelOpen) closePanel();
-    else setPanelOpen(true);
+    else {
+      window.dispatchEvent(new CustomEvent(WALLET_PANEL_OPEN_EVENT, { detail: panelId }));
+      setPanelOpen(true);
+    }
   }
 
   function selectWallet(id: SupportedWalletId, installed: boolean) {
@@ -76,6 +80,17 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
     if (panelOpen && !previousConnectedRef.current && connectedHere) closePanel();
     previousConnectedRef.current = connectedHere;
   }, [connectedHere, panelOpen]);
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    const closeAnotherWalletPanel = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === panelId) return;
+      setPanelOpen(false);
+      setPosition(null);
+    };
+    window.addEventListener(WALLET_PANEL_OPEN_EVENT, closeAnotherWalletPanel);
+    return () => window.removeEventListener(WALLET_PANEL_OPEN_EVENT, closeAnotherWalletPanel);
+  }, [panelOpen, panelId]);
 
   const refreshSession = auth.refreshSession;
   useEffect(() => {
@@ -152,8 +167,8 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
     <>
       <div className="fixed inset-0 z-[70] bg-ledger-stone/20 sm:hidden" aria-hidden onPointerDown={() => closePanel()} />
       <div ref={panelRef} id={panelId} role="dialog" aria-modal="true" aria-labelledby={titleId}
-        className="fixed inset-x-3 bottom-3 z-[71] max-h-[min(82svh,760px)] w-auto overflow-y-auto rounded-[10px] border-ledger bg-clear-paper p-3 shadow-prominent sm:inset-x-auto sm:bottom-auto sm:w-[min(360px,calc(100vw-24px))]"
-        style={position ? { top: position.top, left: position.left, width: position.width } : undefined}>
+        className="fixed inset-x-3 bottom-3 z-[71] max-h-[min(94svh,820px)] w-auto overflow-y-auto rounded-[10px] border-ledger bg-clear-paper p-3 shadow-prominent sm:inset-x-auto sm:bottom-auto sm:w-[min(360px,calc(100vw-24px))]"
+        style={typeof window !== "undefined" && window.innerWidth >= 640 && position ? { top: position.top, left: position.left, width: position.width } : undefined}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <p id={titleId} className="min-w-0 truncate text-sm font-semibold text-ledger-stone">
             {showChooser ? "Connect wallet" : activeNetwork.kind === "supported" ? `${activeNetwork.displayName} wallet` : activeNetwork.kind === "unsupported" ? "Unsupported network" : "Wallet connected"}
@@ -204,7 +219,6 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
                 {auth.busy ? walletAuthStatusCopy["awaiting-signature"] : auth.statusCopy}
               </p>
               {auth.checking && !auth.busy ? <p className="mt-1 text-[11px] text-receipt-grey">Checking wallet verification…</p> : null}
-              {(auth.status === "unauthenticated" || auth.status === "reauthentication-required") && !auth.busy ? <Button type="button" variant="secondary" size="sm" fullWidth className="mt-2" onClick={() => void auth.signIn()}>Sign in to continue</Button> : null}
               {auth.error ? <p role="alert" className="mt-2 text-xs text-loss-red">{auth.error}</p> : null}
               {auth.status === "authenticated" ? <p className="mt-1 text-[11px] text-receipt-grey">Payments still need review-card wallet approval.</p> : null}
             </div>

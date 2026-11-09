@@ -4,6 +4,7 @@ import {
   getWalletNetworkByKey,
   getWalletNetworkSetup,
   getWalletBalanceTarget,
+  shouldReadNetworkBalance,
   switchWalletNetwork,
   describeWalletNetworkError,
 } from "@/lib/wallet/network";
@@ -71,12 +72,16 @@ async function main() {
     assert.equal(network.nativeSymbol, symbol);
     assert.equal(network.explorerAddressUrl, explorer);
     assert.deepEqual(getWalletBalanceTarget("0x1111111111111111111111111111111111111111", chainId), { address: "0x1111111111111111111111111111111111111111", chainId });
+    assert.equal(shouldReadNetworkBalance("0x1111111111111111111111111111111111111111", chainId, true), true, `${name} exposes its own native balance`);
   }
   assert.equal(getWalletNetwork(1).kind, "unsupported");
   assert.equal(getWalletNetwork(undefined).kind, "disconnected");
   assert.equal(getWalletNetworkByKey("botMainnet").chainId, 677);
   assert.equal(getWalletNetworkByKey("botTestnet").chainId, 968);
   assert.equal(getWalletBalanceTarget("0x1111111111111111111111111111111111111111", 1), null);
+  assert.equal(shouldReadNetworkBalance("0x1111111111111111111111111111111111111111", 1, true), false);
+  assert.equal(shouldReadNetworkBalance(null, 968, true), false);
+  assert.equal(shouldReadNetworkBalance("0x1111111111111111111111111111111111111111", 968, false), false);
   const botNetwork = getWalletNetwork(677, "0x1111111111111111111111111111111111111111");
   assert.ok(botNetwork.kind === "supported");
   if (botNetwork.kind === "supported") assert.notEqual(botNetwork.nativeSymbol, "CELO");

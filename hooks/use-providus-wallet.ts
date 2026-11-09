@@ -10,7 +10,7 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { CELO_CHAIN_ID, isCeloMainnetChainId } from "@/lib/wallet/celo";
-import { describeWalletNetworkError, getWalletBalanceTarget, getWalletNetwork, getWalletNetworkByKey, switchWalletNetwork } from "@/lib/wallet/network";
+import { describeWalletNetworkError, getWalletBalanceTarget, getWalletNetwork, getWalletNetworkByKey, shouldReadNetworkBalance, switchWalletNetwork } from "@/lib/wallet/network";
 import {
   beginWalletNetworkSwitch,
   clearWalletNetworkSwitchMessage,
@@ -123,8 +123,7 @@ export function useProvidusWallet() {
   const onCelo = isCeloMainnetChainId(chainId ?? null);
   const network = getWalletNetwork(chainId ?? null, address);
   const networkBalanceTarget = getWalletBalanceTarget(address, chainId);
-  const canReadNetworkBalance = Boolean(networkBalanceTarget) &&
-    (status === "connected" || status === "reconnecting");
+  const canReadNetworkBalance = shouldReadNetworkBalance(address, chainId, isConnected || isReconnecting);
   const canReadBalances = canReadNetworkBalance && onCelo;
 
   const nativeBalanceQuery = useBalance({
