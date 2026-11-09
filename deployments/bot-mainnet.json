@@ -1,0 +1,30 @@
+{
+  "network": "botMainnet",
+  "chainId": 677,
+  "contract": "0xd373b0377F17D38707C610f39820297CF4cfCF60",
+  "deployTxHash": "0x362b044150156585d2f62484a61cb866e483cce7e268ccff5233e0762c519959",
+  "blockNumber": 29681666,
+  "owner": "0x15451254A70e5bD6FEcA12447c42DCc9B26f3947",
+  "initialAllowlist": [
+    "0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C"
+  ],
+  "deployedBytecodeHash": "0x9ce1cfbe663d69dbb3a40717bbdd75d8940396e5733c5b554d2f0a6d6aeafed1",
+  "compiler": "solc 0.8.24",
+  "verified": "2026-11-09T17:34:50.177Z",
+  "explorer": {
+    "contract": "https://scan.botchain.ai/address/0xd373b0377F17D38707C610f39820297CF4cfCF60",
+    "tx": "https://scan.botchain.ai/tx/0x362b044150156585d2f62484a61cb866e483cce7e268ccff5233e0762c519959"
+  },
+  "actualFeeWei": "24726800000000000",
+  "actualFeeBOT": "0.0247268",
+  "sourceVerification": {
+    "status": "blocked-automatic-submission",
+    "detail": "scan.botchain.ai POST /api returns 403 (Cloudflare/bot protection); GET API works. Manual web-UI verification required.",
+    "reproducibleArtifacts": [
+      "contracts/ProvidusPay.sol",
+      "deployments/solc-input-0.8.24.json"
+    ],
+    "compiler": "solc 0.8.24, optimizer off, evm paris",
+    "constructorArguements": "000000000000000000000000aBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C"
+  }
+}
