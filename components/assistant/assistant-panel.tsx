@@ -15,7 +15,7 @@ import {
   ReceiptText,
   Loader2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWalletAuth, type WalletAuth } from "@/hooks/use-wallet-auth";
 import { WalletTransferCard } from "@/components/assistant/wallet-transfer-card";
 import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
@@ -26,6 +26,10 @@ export interface AssistantPanelProps {
 
 export function AssistantPanel({ className }: AssistantPanelProps) {
   const auth = useWalletAuth();
+  const refreshSession = auth.refreshSession;
+  useEffect(() => {
+    if (auth.address) void refreshSession();
+  }, [auth.address, refreshSession]);
   return <AssistantContent className={className} auth={auth} />;
 }
 
@@ -58,7 +62,7 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
     rehydrating,
     rehydrationError,
     loadTransaction,
-  } = useAssistant({ walletTransferOwner: auth.owner });
+  } = useAssistant({ walletTransferOwner: auth.owner, walletAddress: auth.address });
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [lookupId, setLookupId] = useState("");
   const [lookupDismissedFor, setLookupDismissedFor] = useState<string | null>(null);
@@ -83,8 +87,9 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
       <div className="border-b border-ledger bg-receipt-field p-4 font-proof text-sm">
         {auth.address ? <>
           <p className="break-all">Connected wallet {auth.address}</p>
-          <p className="mt-1">{auth.owner ? "Wallet ownership authenticated. Every payment still needs wallet approval." : "Sign in to use saved recipients and BOT payments. This EOA ownership signature creates a secure session and does not move funds."}</p>
-          {!auth.owner && <button className="mt-2 min-h-11 rounded-lg border border-ledger bg-clear-paper px-4 disabled:opacity-50" disabled={auth.busy} onClick={() => void auth.signIn()}>{auth.busy ? "Waiting for sign-in signature…" : "Sign in with wallet"}</button>}
+          <p className="mt-1" role="status" aria-live="polite">{auth.statusCopy}</p>
+          {auth.status === "authenticated" ? <p className="mt-1 text-xs text-receipt-grey">Payments still need explicit wallet approval in the review card.</p> : null}
+          {(auth.status === "unauthenticated" || auth.status === "reauthentication-required") && !auth.busy ? <button className="mt-2 min-h-11 rounded-lg border border-ledger bg-clear-paper px-4 disabled:opacity-50" onClick={() => void auth.signIn()}>{auth.status === "reauthentication-required" ? "Sign in again" : "Sign in"}</button> : null}
         </> : <ConnectWalletButton />}
         {auth.error && <p role="alert" className="mt-2 text-red-700">{auth.error}</p>}
       </div>

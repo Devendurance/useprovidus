@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   useAccount,
   useBalance,
@@ -10,6 +10,15 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { CELO_CHAIN_ID, isCeloMainnetChainId } from "@/lib/wallet/celo";
+import { describeWalletNetworkError, getWalletBalanceTarget, getWalletNetwork, getWalletNetworkByKey, switchWalletNetwork } from "@/lib/wallet/network";
+import {
+  beginWalletNetworkSwitch,
+  clearWalletNetworkSwitchMessage,
+  finishWalletNetworkSwitch,
+  getWalletNetworkSwitchServerSnapshot,
+  getWalletNetworkSwitchSnapshot,
+  subscribeWalletNetworkSwitch,
+} from "@/lib/wallet/network-switch-state";
 import { detectInstalledWallets } from "@/lib/wallet/connectors";
 import { erc20BalanceOfAbi } from "@/lib/wallet/erc20";
 import { formatTokenAmount } from "@/lib/wallet/format";
@@ -59,9 +68,6 @@ function mapUserError(err: unknown, fallback: string): string {
   if (lower.includes("resource unavailable") || lower.includes("already pending")) {
     return "A connection request is already pending in the wallet.";
   }
-  if (lower.includes("unsupported") && lower.includes("chain")) {
-    return "This wallet cannot switch to Celo mainnet automatically.";
-  }
   return message || fallback;
 }
 
@@ -94,11 +100,17 @@ export function useProvidusWallet() {
   const { disconnect, isPending: isDisconnectPending } = useDisconnect();
 
   const {
-    switchChain,
-    isPending: isSwitchPending,
+    switchChainAsync,
+    isPending: isWagmiSwitchPending,
     error: switchErrorRaw,
     reset: resetSwitch,
   } = useSwitchChain();
+
+  const switchSnapshot = useSyncExternalStore(
+    subscribeWalletNetworkSwitch,
+    getWalletNetworkSwitchSnapshot,
+    getWalletNetworkSwitchServerSnapshot,
+  );
 
   const status = normalizeWalletStatus({
     isConnected,
@@ -109,14 +121,17 @@ export function useProvidusWallet() {
   });
 
   const onCelo = isCeloMainnetChainId(chainId ?? null);
-  const canReadBalances =
-    Boolean(address) && onCelo && (status === "connected" || status === "reconnecting");
+  const network = getWalletNetwork(chainId ?? null, address);
+  const networkBalanceTarget = getWalletBalanceTarget(address, chainId);
+  const canReadNetworkBalance = Boolean(networkBalanceTarget) &&
+    (status === "connected" || status === "reconnecting");
+  const canReadBalances = canReadNetworkBalance && onCelo;
 
   const nativeBalanceQuery = useBalance({
-    address,
-    chainId: CELO_CHAIN_ID,
+    address: networkBalanceTarget?.address,
+    chainId: networkBalanceTarget?.chainId ?? CELO_CHAIN_ID,
     query: {
-      enabled: canReadBalances,
+      enabled: canReadNetworkBalance,
       staleTime: 30_000,
       refetchInterval: false,
       retry: 1,
@@ -160,6 +175,21 @@ export function useProvidusWallet() {
   } else if (canReadBalances && usdcBalanceQuery.isError) {
     balancesError = "Could not read USDC balance.";
   }
+
+  const networkNativeBalance = network.kind === "supported" && canReadNetworkBalance && nativeBalanceQuery.data?.value !== undefined
+    ? { value: formatTokenAmount(nativeBalanceQuery.data.value, network.chain.nativeCurrency.decimals, { maxFractional: 4 }), symbol: network.nativeSymbol }
+    : null;
+  const networkBalancesLoading = canReadNetworkBalance && (nativeBalanceQuery.isLoading || nativeBalanceQuery.isFetching);
+  const networkBalancesError = canReadNetworkBalance && nativeBalanceQuery.isError && network.kind === "supported"
+    ? `Could not read ${network.nativeSymbol} balance. The wallet is still connected.`
+    : null;
+  const switchState = switchSnapshot.state;
+  const isNetworkSwitchPending = switchSnapshot.pending || isWagmiSwitchPending;
+  const switchError = switchState.status === "failed"
+    ? switchState.message
+    : switchErrorRaw
+      ? describeWalletNetworkError(switchErrorRaw).message
+      : null;
 
   const connectErrorCombined =
     localError ??
@@ -207,9 +237,7 @@ export function useProvidusWallet() {
       balancesError,
       usdcConfigured: true,
       connectError: connectErrorCombined,
-      switchError: switchErrorRaw
-        ? mapUserError(switchErrorRaw, "Could not switch network.")
-        : null,
+      switchError,
     }),
     [
       status,
@@ -222,7 +250,7 @@ export function useProvidusWallet() {
       balancesLoading,
       balancesError,
       connectErrorCombined,
-      switchErrorRaw,
+      switchError,
     ],
   );
 
@@ -279,6 +307,7 @@ export function useProvidusWallet() {
       setLocalError(null);
       resetConnect();
       resetSwitch();
+      clearWalletNetworkSwitchMessage();
 
       if (isConnectPending || isConnecting) {
         setLocalError("A connection request is already pending.");
@@ -306,9 +335,9 @@ export function useProvidusWallet() {
         return;
       }
 
-      // Connect only the chosen connector — no fallback to other wallets on failure.
+      // Preserve the wallet's current network. Switching is always a separate action.
       connect(
-        { connector, chainId: CELO_CHAIN_ID },
+        { connector },
         {
           onError: () => {
             // intentionally no auto-retry with another connector
@@ -331,15 +360,43 @@ export function useProvidusWallet() {
     setLocalError(null);
     resetConnect();
     resetSwitch();
+    clearWalletNetworkSwitchMessage();
     disconnect();
   }
 
-  function switchToCelo() {
+  const requestNetworkSwitch = useCallback(async (key: "celo" | "botMainnet" | "botTestnet") => {
+    const target = getWalletNetworkByKey(key);
+    if (chainId === target.chainId) {
+      clearWalletNetworkSwitchMessage();
+      return;
+    }
+    const request = beginWalletNetworkSwitch(key);
+    if (request === null) return;
     resetSwitch();
-    if (isSwitchPending) return;
-    // Targets the currently connected connector's provider only.
-    switchChain({ chainId: CELO_CHAIN_ID });
-  }
+    try {
+      if (!connector || !isConnected) throw Object.assign(new Error("Wallet disconnected"), { code: 4900 });
+      await switchWalletNetwork(key, {
+        switchChainAsync: ({ chainId: requestedChainId }) => switchChainAsync({ chainId: requestedChainId }),
+        getChainId: () => connector.getChainId(),
+      });
+      finishWalletNetworkSwitch(request, { status: "confirmed", target: key });
+    } catch (error) {
+      if (connector && isConnected) {
+        try {
+          if (await connector.getChainId() === target.chainId) {
+            finishWalletNetworkSwitch(request, { status: "confirmed", target: key });
+            return;
+          }
+        } catch {
+          // Report the original switch failure if the provider cannot confirm its state.
+        }
+      }
+      const result = describeWalletNetworkError(error);
+      finishWalletNetworkSwitch(request, { status: "failed", target: key, ...result });
+    }
+  }, [chainId, connector, isConnected, resetSwitch, switchChainAsync]);
+
+  const switchToCelo = useCallback(() => requestNetworkSwitch("celo"), [requestNetworkSwitch]);
 
   function clearConnectError() {
     setLocalError(null);
@@ -354,7 +411,15 @@ export function useProvidusWallet() {
     connectors: connectors.map((c) => ({ id: c.id, name: c.name, type: c.type })),
     isConnectPending: isConnectPending || isConnecting,
     isDisconnectPending,
-    isSwitchPending,
+    isSwitchPending: isNetworkSwitchPending,
+    isNetworkSwitchPending,
+    network,
+    networkNativeBalance,
+    networkBalancesLoading,
+    networkBalancesError,
+    networkSwitch: switchState,
+    requestNetworkSwitch,
+    clearNetworkSwitchMessage: clearWalletNetworkSwitchMessage,
     accountStatus,
     connectWallet,
     connectWithConnectorId,

@@ -2,10 +2,14 @@
 
 ## B9 UX hotfix in progress, 2026-11-09
 - Scope: multichain wallet dropdown/switching, session-state clarity, assistant and review copy. No payment execution rebuild, contract/backend/schema change, push, deploy, production write, or mainnet transaction.
-- B1 registry defines Celo 42220, BOT Mainnet 677, BOT Testnet 968. Wagmi currently registers only 42220 and 968. Celo-only readiness remains required by cash-out and airtime.
+- B1 registry defines Celo 42220, BOT Mainnet 677, BOT Testnet 968. Wagmi registers all three while existing Celo-only readiness remains required by cash-out and airtime.
 - Design checkpoint: shared auth controller plus registry-derived network display. See `.audit/b9-ux-hotfix-design.md`. The independent review found and recorded the forced-Celo connect risk and wagmi 4902 add behavior.
-- Baseline: `npm run test:all`, `npx tsc --noEmit`, and `npm run lint` pass before source edits. Existing live-wallet browser session/dev server is untouched.
-- Added passing failing-first checks and pure B1 network, auth-state, and review-context helpers. The application UI/controller has not yet been wired to them.
+- The wallet menu shows the confirmed network, chain ID, active native balance, network explorer, authentication state, supported switches, and disconnect. Connect preserves the wallet's network. wagmi handles 4902 add-chain from B1 data, with one retry only for its accepted-add-but-not-selected marker.
+- Shared wallet auth state normalizes addresses, prevents a session probe from invalidating an active sign-in, ignores stale responses after account changes, and keeps chain changes from forcing logout under current `requireOwner` policy. Account changes hide and clear old-owner assistant drafts.
+- Chain/account watcher revisions invalidate BOT Testnet plans and gas immediately. B5 hash and unknown recovery stay mounted and recoverable. Celo airtime controls now require Celo Mainnet before submission.
+- Assistant starter examples cover BOT Testnet transfers and Celo MTN airtime. Mainnet remains switchable and payment-disabled. `test:all` now includes the existing 677 execution hard-gate regression.
+- `npm run test:all`, `npx tsc --noEmit`, `npm run lint`, focused network/auth/review checks, the web execution gate check, and `git diff --check` pass. Existing live-wallet browser session/dev server remains untouched.
+- Remaining: isolated Next build and mocked-wallet desktop/mobile screenshots, inspect browser logs/overlay, then update audit and commit locally. No push.
 
 ## B8 current checkpoint, 2026-11-08
 - B8 repositions the public product as a multichain conversational payment platform while preserving B1-B7 execution code and the Celo service flows.

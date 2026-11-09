@@ -23,6 +23,13 @@ export function isSameWalletAddress(a: string | null | undefined, b: string | nu
   return normalizedA !== null && normalizedA === normalizedB;
 }
 
+export function shouldRequireReauthenticationAfterAccountChange(
+  previousSessionAddress: string | null | undefined,
+  nextAddress: string | null | undefined,
+): boolean {
+  return Boolean(previousSessionAddress && nextAddress);
+}
+
 export function getWalletAuthStatus(input: {
   connected: boolean;
   address: string | null | undefined;

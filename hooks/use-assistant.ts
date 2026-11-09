@@ -13,6 +13,7 @@ import type {
   UserConversationMessage,
 } from "@/lib/assistant/types";
 import { normalizePaymentAssetSymbol, type PaymentAssetSymbol } from "@/lib/celo/assets";
+import { isSameWalletAddress, normalizeWalletAddress } from "@/lib/auth/wallet-ui-state";
 import type {
   PaymentInstructions,
   DepositProgressionStatus,
@@ -230,6 +231,7 @@ export function resolveRehydrationState(input: RehydrationStateInput): Rehydrati
 
 export interface UseAssistantState {
   messages: ConversationMessage[];
+  conversationAddress: string | null;
   walletAction: import("@/lib/assistant/types").WalletTransferAction | null;
   activeIntent: PaymentIntent | null;
   pending: boolean;
@@ -241,6 +243,7 @@ export interface UseAssistantState {
   asset: PaymentAssetSymbol;
   confirmedPayment: ConfirmedPaymentState | null;
   paymentInstructions: PaymentInstructions | null;
+  paymentOwner: string | null;
   preparingPayment: boolean;
   preparationError: string | null;
   depositStatus: DepositProgressionStatus;
@@ -320,6 +323,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
   const [asset, setAsset] = useState<PaymentAssetSymbol>("USDC");
   const [confirmedPayment, setConfirmedPayment] =
     useState<ConfirmedPaymentState | null>(null);
+  const [paymentOwner, setPaymentOwner] = useState<string | null>(null);
 
   // Payment Instructions & Deposit State (P5)
   const [paymentInstructions, setPaymentInstructions] =
@@ -345,25 +349,44 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
   const messagesRef = useRef<ConversationMessage[]>(messages);
   const assetRef = useRef<PaymentAssetSymbol>(asset);
   const prevIntentTupleRef = useRef<string | null>(null);
+  const walletContextRevisionRef = useRef(0);
 
   // Wallet address resolution
   const connectedAddress = useSafeConnectedAddress();
-  const previousTransferContext = useRef(`${connectedAddress}:${options?.walletTransferOwner}`);
+  const [conversationAddress, setConversationAddress] = useState(() => normalizeWalletAddress(connectedAddress));
+  const previousConnectedAddress = useRef(normalizeWalletAddress(connectedAddress));
+  const previousTransferOwner = useRef(normalizeWalletAddress(options?.walletTransferOwner));
   useEffect(() => {
-    const context = `${connectedAddress}:${options?.walletTransferOwner}`;
-    if (previousTransferContext.current === context) return;
-    previousTransferContext.current = context;
-    if (activeIntentRef.current?.type !== "wallet_transfer") return;
+    const currentAddress = normalizeWalletAddress(connectedAddress);
+    const currentOwner = normalizeWalletAddress(options?.walletTransferOwner);
+    const accountChanged = previousConnectedAddress.current !== currentAddress;
+    const ownerChanged = previousTransferOwner.current !== currentOwner;
+    previousConnectedAddress.current = currentAddress;
+    previousTransferOwner.current = currentOwner;
+    if (!accountChanged && !ownerChanged) return;
+    walletContextRevisionRef.current += 1;
+    if (!accountChanged && activeIntentRef.current?.type !== "wallet_transfer") return;
+    setConversationAddress(currentAddress);
     abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    previewAbortControllerRef.current?.abort();
+    previewAbortControllerRef.current = null;
     activeIntentRef.current = null;
+    previewRef.current = null;
+    previewIdRef.current = null;
     messagesRef.current = [];
-    let alive = true;
-    queueMicrotask(() => {
-      if (!alive) return;
-      setActiveIntent(null); setWalletAction(null); setMessages([]); setPending(false);
-    });
-    return () => { alive = false; };
-  }, [connectedAddress, options?.walletTransferOwner]);
+    setActiveIntent(null);
+    setWalletAction(null);
+    setMessages([]);
+    setPending(false);
+    setError(null);
+    setPreview(null);
+    setPreviewId(null);
+    setPreviewLoading(false);
+    setPreviewError(null);
+    setPreparingPayment(false);
+    setRehydrating(false);
+  }, [connectedAddress, options?.walletTransferOwner, activeIntent]);
   const targetWalletAddress = options?.walletAddress ?? connectedAddress;
   const targetWalletRef = useRef<string | undefined>(targetWalletAddress);
 
@@ -404,6 +427,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
   }, []);
 
   const reset = useCallback(() => {
+    walletContextRevisionRef.current += 1;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -426,6 +450,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     setPreviewError(null);
     setConfirmedPayment(null);
     setPaymentInstructions(null);
+    setPaymentOwner(null);
     setPreparingPayment(false);
     setPreparationError(null);
     setDepositStatus("pending");
@@ -467,6 +492,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    const walletContextRevision = walletContextRevisionRef.current;
 
     const userMessage: UserConversationMessage = {
       role: "user",
@@ -509,6 +535,8 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
         // Fall through to HTTP error status handling below
       }
 
+      if (walletContextRevision !== walletContextRevisionRef.current) return;
+
       if (!response.ok || !json?.ok) {
         const errorMessage =
           json && !json.ok && json.error?.message
@@ -526,6 +554,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       setWalletAction(turn.action ?? null);
       setError(null);
     } catch (err: unknown) {
+      if (walletContextRevision !== walletContextRevisionRef.current) return;
       // Ignore AbortError when superseded
       if (err instanceof DOMException && err.name === "AbortError") {
         return;
@@ -557,6 +586,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     }
     const controller = new AbortController();
     previewAbortControllerRef.current = controller;
+    const walletContextRevision = walletContextRevisionRef.current;
 
     setPreviewLoading(true);
     setPreviewError(null);
@@ -599,6 +629,8 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
         // Fall through to error handler
       }
 
+      if (walletContextRevision !== walletContextRevisionRef.current) return;
+
       if (!response.ok || !json?.ok || !json.preview) {
         const errorCode = json?.error?.code;
         const errorMessage =
@@ -629,6 +661,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
 
       const currentAsset = assetRef.current;
       const expectedFingerprint = await computeIntentFingerprintClient(currentActive);
+      if (walletContextRevision !== walletContextRevisionRef.current) return;
       if (
         json.preview.intentFingerprint !== expectedFingerprint ||
         !doesPreviewMatchIntent(json.preview, currentActive, currentAsset)
@@ -649,6 +682,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       setPaymentInstructions(null);
       setPreviewError(null);
     } catch (err: unknown) {
+      if (walletContextRevision !== walletContextRevisionRef.current) return;
       if (err instanceof DOMException && err.name === "AbortError") {
         return;
       }
@@ -736,6 +770,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
    */
   const confirmPayment = useCallback(
     async (walletOverride?: string): Promise<void> => {
+      const walletContextRevision = walletContextRevisionRef.current;
       const currentIntent = activeIntentRef.current;
       const currentPreview = previewRef.current;
       const currentPreviewId = previewIdRef.current;
@@ -815,6 +850,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
           // Fall through
         }
 
+        if (walletContextRevision !== walletContextRevisionRef.current ||
+          (targetWalletRef.current && !isSameWalletAddress(targetWallet, targetWalletRef.current))) return;
+
         if (
           !response.ok ||
           !json?.ok ||
@@ -885,17 +923,19 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
         });
 
         setPaymentInstructions(instructions);
+        setPaymentOwner(normalizeWalletAddress(targetWallet));
         setConfirmedPayment(snapshot);
         setDepositStatus("awaiting_deposit");
         setPreparationError(null);
       } catch (err: unknown) {
+        if (walletContextRevision !== walletContextRevisionRef.current) return;
         const message =
           err instanceof Error
             ? err.message
             : "Failed to communicate with payment preparation service.";
         setPreparationError(message);
       } finally {
-        setPreparingPayment(false);
+        if (walletContextRevision === walletContextRevisionRef.current) setPreparingPayment(false);
       }
     },
     [],
@@ -1128,6 +1168,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       transactionId: string,
       walletOverride?: string,
     ): Promise<{ ok: boolean; error?: string }> => {
+      const walletContextRevision = walletContextRevisionRef.current;
       const trimmedId = transactionId.trim();
       if (trimmedId === "") {
         const errorMsg = "A transaction ID is required to look up payment instructions.";
@@ -1162,6 +1203,10 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
         } catch {
           json = null;
         }
+        if (walletContextRevision !== walletContextRevisionRef.current ||
+          (targetWalletRef.current && !isSameWalletAddress(targetWallet, targetWalletRef.current))) {
+          return { ok: false, error: "Wallet changed. Check the connected account and try again." };
+        }
         if (!response.ok || !json || json.ok !== true) {
           const errorMsg =
             response.status === 404
@@ -1189,6 +1234,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
           return { ok: false, error: resolved.rehydrationError ?? "No payable instructions are available for this transaction." };
         }
         setPaymentInstructions(resolved.paymentInstructions);
+        setPaymentOwner(normalizeWalletAddress(targetWallet));
         setRehydratedTransactionId(resolved.rehydratedTransactionId);
         setDepositStatus("awaiting_deposit");
         setDepositHash(null);
@@ -1197,6 +1243,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
         setRehydrationError(null);
         return { ok: true };
       } catch (err: unknown) {
+        if (walletContextRevision !== walletContextRevisionRef.current) {
+          return { ok: false, error: "Wallet changed. Check the connected account and try again." };
+        }
         const message = err instanceof Error ? err.message : "Transaction lookup failed. Verify the transaction ID and try again.";
         setPaymentInstructions(null);
         setRehydratedTransactionId(null);
@@ -1206,34 +1255,39 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
         setRehydrationError(message);
         return { ok: false, error: message };
       } finally {
-        setRehydrating(false);
+        if (walletContextRevision === walletContextRevisionRef.current) setRehydrating(false);
       }
     },
     [],
   );
 
 
+  const currentConversationMatches = normalizeWalletAddress(connectedAddress) === conversationAddress;
+  const currentPaymentOwnerMatches = paymentOwner === null || isSameWalletAddress(paymentOwner, connectedAddress);
+
   return {
-    messages,
-    walletAction,
-    activeIntent,
-    pending,
-    error,
-    preview,
-    previewId,
-    previewLoading,
-    previewError,
+    messages: currentConversationMatches ? messages : [],
+    conversationAddress,
+    walletAction: currentConversationMatches ? walletAction : null,
+    activeIntent: currentConversationMatches ? activeIntent : null,
+    pending: currentConversationMatches && pending,
+    error: currentConversationMatches ? error : null,
+    preview: currentConversationMatches ? preview : null,
+    previewId: currentConversationMatches ? previewId : null,
+    previewLoading: currentConversationMatches && previewLoading,
+    previewError: currentConversationMatches ? previewError : null,
     asset,
-    confirmedPayment,
-    paymentInstructions,
-    preparingPayment,
-    preparationError,
-    depositStatus,
-    depositHash,
-    depositError,
-    rehydratedTransactionId,
-    rehydrating,
-    rehydrationError,
+    confirmedPayment: currentPaymentOwnerMatches ? confirmedPayment : null,
+    paymentInstructions: currentPaymentOwnerMatches ? paymentInstructions : null,
+    paymentOwner,
+    preparingPayment: currentPaymentOwnerMatches && preparingPayment,
+    preparationError: currentPaymentOwnerMatches ? preparationError : null,
+    depositStatus: currentPaymentOwnerMatches ? depositStatus : "pending",
+    depositHash: currentPaymentOwnerMatches ? depositHash : null,
+    depositError: currentPaymentOwnerMatches ? depositError : null,
+    rehydratedTransactionId: currentPaymentOwnerMatches ? rehydratedTransactionId : null,
+    rehydrating: currentPaymentOwnerMatches && rehydrating,
+    rehydrationError: currentPaymentOwnerMatches ? rehydrationError : null,
     send,
     reset,
     selectAsset,

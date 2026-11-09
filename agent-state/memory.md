@@ -8,6 +8,10 @@
 - BOT Testnet success still requires B5 independent receipt verification. A submitted hash is verifying until verified.
 - Pre-change checkpoint: full self-check suite, TypeScript, and lint all passed on the B8 tree.
 - The B9 mock-wallet self-check uses provider method responses and asserts no `eth_sendTransaction` occurs during switching.
+- Wagmi chain/account watchers bump a review-context revision on real provider changes. Wallet transfer plans and gas must match address, authenticated owner, chain, intent fingerprint, and revision before review or execution.
+- Injected connectors may add an unrecognized configured B1 chain after 4902. Retry `switchChainAsync` once only when wagmi reports its exact accepted-add-but-not-selected marker. A user rejection never triggers another prompt.
+- Celo cash-out and airtime still require chain 42220. The payment card now offers an explicit Celo switch before a Celo transaction can be submitted.
+- `test:all` must include `test:web-execution` so the 677 hard gate stays covered even though unsigned internal plan-builder tests can exercise mainnet metadata.
 
 ## B8 invariants, 2026-11-08
 - Public positioning uses one shared registry. Celo is live for existing supported services. BOT Chain is verified on Testnet for native BOT recipient transfers on chain 968. BOT mainnet remains pending B9.

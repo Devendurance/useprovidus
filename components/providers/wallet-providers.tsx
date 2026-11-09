@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, type State } from "wagmi";
+import { watchAccount, watchChainId } from "wagmi/actions";
 import { WalletSessionGuard } from "@/components/providers/wallet-session-guard";
+import { WalletAuthProvider } from "@/hooks/use-wallet-auth";
 import { wagmiConfig } from "@/lib/wallet/config";
+import { bumpWalletReviewContextRevision } from "@/lib/transfers/review-context-revision";
 
 type WalletProvidersProps = {
   children: ReactNode;
@@ -35,9 +38,32 @@ export function WalletProviders({
   return (
     <WagmiProvider config={wagmiConfig} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
+        <WalletReviewContextWatcher />
         <WalletSessionGuard />
-        {children}
+        <WalletAuthProvider>{children}</WalletAuthProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );
+}
+
+function WalletReviewContextWatcher() {
+  useEffect(() => {
+    const unwatchAccount = watchAccount(wagmiConfig, {
+      onChange(account, previousAccount) {
+        if (account.address?.toLowerCase() !== previousAccount.address?.toLowerCase()) {
+          bumpWalletReviewContextRevision();
+        }
+      },
+    });
+    const unwatchChain = watchChainId(wagmiConfig, {
+      onChange(chainId, previousChainId) {
+        if (chainId !== previousChainId) bumpWalletReviewContextRevision();
+      },
+    });
+    return () => {
+      unwatchAccount();
+      unwatchChain();
+    };
+  }, []);
+  return null;
 }

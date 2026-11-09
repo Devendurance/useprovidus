@@ -1,18 +1,19 @@
 /**
- * Wagmi config for Providus — Celo mainnet only.
+ * Wagmi config for Providus wallet connectivity.
  * Explicit MetaMask / Rabby / OKX connectors. No generic injected. No WalletConnect.
  */
 
 import { http, createConfig, createStorage, cookieStorage } from "wagmi";
 import { CELO_MAINNET } from "@/lib/wallet/celo";
-import { BOT_TESTNET } from "@/lib/chains/registry";
+import { BOT_MAINNET, BOT_TESTNET } from "@/lib/chains/registry";
 import { createSupportedWalletConnectors } from "@/lib/wallet/connectors";
 
 export const wagmiConfig = createConfig({
-  chains: [CELO_MAINNET, BOT_TESTNET],
+  chains: [CELO_MAINNET, BOT_MAINNET, BOT_TESTNET],
   connectors: createSupportedWalletConnectors(),
   transports: {
     [CELO_MAINNET.id]: http(),
+    [BOT_MAINNET.id]: http(BOT_MAINNET.rpcUrls.default.http[0], { timeout: 12_000, retryCount: 1 }),
     [BOT_TESTNET.id]: http(undefined, { timeout: 12_000, retryCount: 1 }),
   },
   /**

@@ -6,6 +6,7 @@ export type WalletReviewContext = {
   chainId: number;
   intentId: string;
   termsFingerprint: string;
+  contextRevision?: number;
 };
 
 export function isSameWalletReviewContext(
@@ -17,5 +18,6 @@ export function isSameWalletReviewContext(
     isSameWalletAddress(a.address, b.address) &&
     a.chainId === b.chainId &&
     a.intentId === b.intentId &&
-    a.termsFingerprint === b.termsFingerprint);
+    a.termsFingerprint === b.termsFingerprint &&
+    (a.contextRevision ?? 0) === (b.contextRevision ?? 0));
 }

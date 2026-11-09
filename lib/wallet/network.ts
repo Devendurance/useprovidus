@@ -134,13 +134,27 @@ export type WalletNetworkSwitchAdapter = {
   getChainId(): Promise<number>;
 };
 
+function networkWasAddedButNotSelected(error: unknown): boolean {
+  const { text } = errorParts(error);
+  return text.includes("user rejected switch after adding network");
+}
+
 /** Calls the existing connector's switch action once, then checks provider truth. */
 export async function switchWalletNetwork(
   key: SupportedChainKey,
   adapter: WalletNetworkSwitchAdapter,
 ): Promise<WalletNetworkDefinition> {
   const target = NETWORKS[key];
-  await adapter.switchChainAsync({ chainId: target.chainId });
+  try {
+    await adapter.switchChainAsync({ chainId: target.chainId });
+  } catch (error) {
+    // wagmi's injected connector handles 4902 by adding the configured B1
+    // chain. Some wallets leave the old chain active after accepting that
+    // prompt, so ask the existing connector to switch once more. Other
+    // rejections and failures end here without repeating a wallet prompt.
+    if (!networkWasAddedButNotSelected(error)) throw error;
+    await adapter.switchChainAsync({ chainId: target.chainId });
+  }
   const activeChainId = await adapter.getChainId();
   if (activeChainId !== target.chainId) {
     throw new WalletNetworkConfirmationError(target.chainId, activeChainId);

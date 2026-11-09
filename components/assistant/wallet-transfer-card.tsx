@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { formatEther, getAddress, isAddress, type Hex } from "viem";
 import type { WalletTransferAction, WalletTransferIntent as Draft } from "@/lib/assistant/types";
 import type { WalletTransferIntent } from "@/lib/transfers/repository";
@@ -10,6 +10,9 @@ import type { ExecutionPlan } from "@/lib/transfers/execution";
 import { BOT_TESTNET } from "@/lib/chains/registry";
 import { walletApi as requestWalletApi, type WalletAuth } from "@/hooks/use-wallet-auth";
 import { TokenApprovalCard } from "@/components/assistant/token-approval-card";
+import { isSameWalletReviewContext, type WalletReviewContext } from "@/lib/transfers/review-context";
+import { getWalletReviewContextRevision, publishWalletReviewContext, subscribeWalletReviewContextRevision } from "@/lib/transfers/review-context-revision";
+import { useProvidusWallet } from "@/hooks/use-providus-wallet";
 
 type Status = { intent: WalletTransferIntent; submission: TransferSubmission | null; freshness: { fresh: boolean }; expired: boolean };
 type PlanResponse = { plan: ExecutionPlan; intent: WalletTransferIntent };
@@ -22,13 +25,15 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
 }) {
   const { address, chainId } = useAccount();
   const { data: wallet } = useWalletClient();
+  const providusWallet = useProvidusWallet();
   const client = usePublicClient({ chainId: 968 });
-  const { switchChainAsync } = useSwitchChain();
   const actionId = action && "preparedIntentId" in action ? action.preparedIntentId : null;
   const [id, setId] = useState<string | null>(actionId);
   const [status, setStatus] = useState<Status | null>(null);
   const [plan, setPlan] = useState<ExecutionPlan | null>(null);
+  const [planContext, setPlanContext] = useState<WalletReviewContext | null>(null);
   const [gas, setGas] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<{ key: string; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,9 +49,33 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
   const currentWallet = useRef({ address, chainId, owner: auth.owner });
   useEffect(() => { currentWallet.current = { address, chainId, owner: auth.owner }; }, [address, chainId, auth.owner]);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const contextRevision = useSyncExternalStore(
+    subscribeWalletReviewContextRevision,
+    getWalletReviewContextRevision,
+    () => 0,
+  );
+  const walletContextKey = address && chainId !== undefined && auth.owner
+    ? `${auth.owner.toLowerCase()}:${address.toLowerCase()}:${chainId}`
+    : null;
+  useEffect(() => { publishWalletReviewContext(walletContextKey); }, [walletContextKey]);
   const storageKey = `providus:bot-payment:${auth.owner?.toLowerCase()}`;
   const path = id ? `/api/transfers/${encodeURIComponent(id)}` : "";
   const walletApi = useCallback(<T,>(requestPath: string, body?: unknown, method?: string) => requestWalletApi<T>(requestPath, body, method, auth.owner), [auth.owner]);
+  const reviewIntentId = status?.intent.id;
+  const reviewTermsFingerprint = status?.intent.termsFingerprint;
+  const reviewContext = useMemo<WalletReviewContext | null>(() => reviewIntentId && reviewTermsFingerprint && address && auth.owner ? {
+    owner: auth.owner,
+    address,
+    chainId: chainId ?? 0,
+    intentId: reviewIntentId,
+    termsFingerprint: reviewTermsFingerprint,
+    contextRevision,
+  } : null, [reviewIntentId, reviewTermsFingerprint, address, chainId, auth.owner, contextRevision]);
+  const reviewContextKey = reviewContext ? `${reviewContext.owner.toLowerCase()}:${reviewContext.address.toLowerCase()}:${reviewContext.chainId}:${reviewContext.intentId}:${reviewContext.termsFingerprint}:${reviewContext.contextRevision}` : null;
+  const planIsCurrent = isSameWalletReviewContext(planContext, reviewContext);
+  const currentPlan = planIsCurrent ? plan : null;
+  const currentGas = planIsCurrent ? gas : null;
+  const currentReviewError = reviewError?.key === reviewContextKey ? reviewError.message : null;
 
   const refresh = useCallback(async () => {
     if (!path || !auth.owner) return;
@@ -90,24 +119,28 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
     return () => { alive = false; clearInterval(timer); };
   }, [id, auth.owner, path, refresh, walletApi]);
 
-  const canEstimate = Boolean(status && !status.submission && status.freshness.fresh && status.intent.chainId === 968 && status.intent.status === "pending");
+  const canEstimate = Boolean(status && reviewContext && address?.toLowerCase() === auth.owner?.toLowerCase() && chainId === 968 && !status.submission && status.freshness.fresh && status.intent.chainId === 968 && status.intent.status === "pending");
   useEffect(() => {
-    if (!canEstimate) return;
+    if (!canEstimate || !reviewContext) return;
     let alive = true;
+    const isCurrent = () => alive && getWalletReviewContextRevision() === reviewContext.contextRevision;
     void (async () => {
       try {
         const response = await walletApi<PlanResponse>(`${path}/execution`, {});
-        if (!alive) return;
+        if (!isCurrent()) return;
+        if (response.intent.termsFingerprint !== reviewContext.termsFingerprint || response.plan.termsFingerprint !== reviewContext.termsFingerprint || response.plan.chainId !== 968) throw new Error("Payment terms or network changed. Review again.");
         setPlan(response.plan);
-        if (client) {
-          const units = await client.estimateGas({ account: response.plan.payer, to: response.plan.to, data: response.plan.data, value: BigInt(response.plan.value) });
-          const price = await client.getGasPrice();
-          if (alive) setGas(formatEther(units * price));
-        }
-      } catch (err) { if (alive) setError(message(err)); }
+        setPlanContext(reviewContext);
+        if (!client) throw new Error("BOT Testnet RPC is unavailable. Retry the review shortly.");
+        const units = await client.estimateGas({ account: response.plan.payer, to: response.plan.to, data: response.plan.data, value: BigInt(response.plan.value) });
+        const price = await client.getGasPrice();
+        if (isCurrent()) setGas(formatEther(units * price));
+      } catch (err) {
+        if (isCurrent()) setReviewError({ key: reviewContextKey ?? "", message: message(err) });
+      }
     })();
     return () => { alive = false; };
-  }, [canEstimate, client, path, reviewAttempt, walletApi]);
+  }, [canEstimate, client, path, reviewAttempt, walletApi, reviewContext, reviewContextKey]);
 
   async function run(task: () => Promise<void>) {
     if (lock.current) return;
@@ -117,17 +150,17 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
   }
 
   async function execute() {
-    if (!id || !status || !plan || !wallet || !client || recoveryHash || uncertainBroadcast || status.submission) throw new Error("Recheck payment before signing.");
+    if (!id || !status || !currentPlan || !currentGas || !wallet || !client || recoveryHash || uncertainBroadcast || status.submission || !isSameWalletReviewContext(planContext, reviewContext) || getWalletReviewContextRevision() !== reviewContext?.contextRevision) throw new Error("Recheck payment before signing.");
     const remembered = JSON.parse(localStorage.getItem(storageKey) ?? "null");
     if (remembered?.id === id && (remembered.hash || remembered.signingStarted)) throw new Error("An earlier wallet request may have broadcast. Recover it without resending.");
     setStage("Preparing");
     const reviewed = status.intent;
     const fresh = await walletApi<PlanResponse>(`${path}/execution`, {});
-    if (fresh.intent.termsFingerprint !== reviewed.termsFingerprint || fresh.plan.termsFingerprint !== plan.termsFingerprint) throw new Error("Payment terms changed. Review again.");
+    if (fresh.intent.termsFingerprint !== reviewed.termsFingerprint || fresh.plan.termsFingerprint !== currentPlan.termsFingerprint) throw new Error("Payment terms changed. Review again.");
     if (fresh.plan.chainId !== 968 || fresh.plan.to.toLowerCase() !== "0xbc6298701490ba211733f2dc28deb7df9835b7a4") throw new Error("Payment network or contract is unavailable.");
     const checkWallet = async () => {
       const live = currentWallet.current;
-      if (!mounted.current || !live.owner || live.owner.toLowerCase() !== fresh.plan.payer.toLowerCase() || live.address?.toLowerCase() !== fresh.plan.payer.toLowerCase() || live.chainId !== 968 || (await wallet.getChainId()) !== 968 || (await wallet.getAddresses())[0]?.toLowerCase() !== fresh.plan.payer.toLowerCase()) throw new Error("Wallet or network changed. Reconnect and review again.");
+      if (!mounted.current || getWalletReviewContextRevision() !== reviewContext?.contextRevision || !live.owner || live.owner.toLowerCase() !== fresh.plan.payer.toLowerCase() || live.address?.toLowerCase() !== fresh.plan.payer.toLowerCase() || live.chainId !== 968 || (await wallet.getChainId()) !== 968 || (await wallet.getAddresses())[0]?.toLowerCase() !== fresh.plan.payer.toLowerCase()) throw new Error("Wallet or network changed. Reconnect and review again.");
     };
     await checkWallet();
     const tx = { account: fresh.plan.payer, to: fresh.plan.to, data: fresh.plan.data, value: BigInt(fresh.plan.value) };
@@ -187,7 +220,8 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
   const disabled = busy || pending;
   const needsAddress = action?.type === "ask_recipient_address";
   const recipientAction = action?.type === "confirm_recipient" || action?.type === "offer_save_recipient";
-  const phase = verified ? "Verified" : submission?.status === "failed" ? "Failed" : submission?.status === "unknown" ? "Status unknown / needs recheck" : submission ? "Confirming" : stage;
+  const verifying = Boolean(submission?.txHash || recoveryHash);
+  const phase = verified ? "Verified" : submission?.status === "failed" ? "Failed" : submission?.status === "unknown" ? "Status unknown / needs recheck" : verifying ? "Verifying transaction" : stage;
 
   return <section aria-label="Wallet payment" className="mx-3 my-3 space-y-3 rounded-xl border border-ledger-edge bg-receipt-field p-4 font-proof text-sm sm:mx-4">
     <h3 className="font-semibold text-ledger-stone">{verified ? "Verified on-chain receipt" : "Wallet payment"}</h3>
@@ -201,7 +235,8 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
     {action?.type === "ask_missing_details" && <p>Provide {action.missingFields.join(", ")} in the chat to continue.</p>}
     {action?.type === "cancelled" && <p>Payment cancelled. Nothing was authorized by chat.</p>}
     {recipientAction && !intent && <>
-      <p>{action.recipientLabel} · {action.chainId === 968 ? "BOT Testnet" : "BOT Mainnet"} ({action.chainId})</p>
+      <p className="text-xs font-semibold text-provident-green" role="status">Step 1 of 4: Confirm the recipient.</p>
+      <p>{action.recipientLabel} · {action.chainId === 968 ? "BOT Chain Testnet" : "BOT Chain Mainnet"} ({action.chainId})</p>
       <p className="break-all rounded-lg border border-ledger-edge bg-clear-paper p-3" data-testid="recipient-address">{action.recipientAddress}</p>
       <p>A saved address is a convenience, not a verified identity. Check the full address.</p>
       {!addressConfirmed ? <button className={primary} disabled={disabled} onClick={() => action.type === "confirm_recipient" ? void run(() => send("yes")) : setAddressConfirmed(true)}>Confirm recipient</button> : action.type === "offer_save_recipient" && <div className="flex flex-wrap gap-2"><button className={button} disabled={disabled} onClick={() => void run(save)}>Save for future payments</button><button className={primary} disabled={disabled} onClick={() => void run(() => send("no"))}>Continue without saving</button></div>}
@@ -212,25 +247,25 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
       <button className={button} disabled={disabled} type="submit">{editing ? "Update and review again" : "Review address"}</button>
     </form>}
     {intent && <>
+      <p className="text-xs font-semibold text-provident-green" role="status">{verified ? "Independently verified on-chain." : submission?.status === "unknown" ? "Status unknown. Recheck the transaction without resending." : submission?.status === "failed" ? "Verification failed. Review the reason below." : verifying ? "Step 4 of 4: Verifying transaction." : stage === "Awaiting wallet approval" ? "Step 3 of 4: Confirm the transaction in your wallet." : "Step 2 of 4: Review the recipient and payment details."}</p>
       <h4 className="text-xl font-semibold">{intent.amountDisplay} {intent.assetSymbol}</h4>
       <dl className="grid grid-cols-1 gap-1 [&>dd]:mb-2 [&>dd]:break-all [&>dt]:text-receipt-grey">
         <dt>Sending wallet</dt><dd>{intent.ownerAddress}</dd>
         <dt>Recipient</dt><dd>{intent.recipientLabel}</dd>
         <dt>Full recipient address</dt><dd data-testid="review-address">{intent.recipientAddress}</dd>
-        <dt>Network</dt><dd>{intent.chainId === 968 ? "BOT Testnet" : "BOT Mainnet"} · Chain ID {intent.chainId}</dd>
+        <dt>Network</dt><dd>{intent.chainId === 968 ? "BOT Chain Testnet" : "BOT Chain Mainnet"} · Chain ID {intent.chainId}</dd>
         <dt>Asset contract</dt><dd>{intent.tokenAddress ?? "Native BOT"}</dd>
-        <dt>Estimated network gas</dt><dd>{gas ? `${gas} BOT, estimate may change` : "Unavailable until RPC estimation succeeds"}</dd>
-        <dt>Payment contract</dt><dd>{submission?.contractAddress ?? plan?.to ?? "Execution disabled or unavailable"}</dd>
+        <dt>Estimated network gas</dt><dd>{currentGas ? `${currentGas} BOT, estimate may change` : "Unavailable until RPC estimation succeeds"}</dd>
+        <dt>Payment contract</dt><dd>{submission?.contractAddress ?? currentPlan?.to ?? "Execution disabled or unavailable"}</dd>
         <dt>Intent expiry</dt><dd>{intent.expiresAt}</dd>
         <dt>Payment status</dt><dd>{phase || intent.status}</dd>
         <dt>Payment reference</dt><dd>{intent.id}</dd>
       </dl>
-      {!submission && !recoveryHash && intent.chainId !== 968 && <p role="status">BOT Mainnet execution is disabled until B9. ERC-20 approval is separate from payment. No mainnet contract is deployed.</p>}
+      {!submission && !recoveryHash && intent.chainId !== 968 && <p role="status">BOT Chain Mainnet: Payments coming soon. ERC-20 approval is separate from payment. No mainnet ProvidusPay contract is deployed.</p>}
       {intent.tokenAddress && <TokenApprovalCard enabled={false} />}
       {!submission && !recoveryHash && !uncertainBroadcast && intent.chainId === 968 && intent.status === "pending" && status.freshness.fresh && <>
-        <p>Review these exact stored terms. Only your wallet transaction authorizes payment.</p>
-        {chainId !== 968 ? <button className={primary} disabled={disabled} onClick={() => void run(async () => { await switchChainAsync({ chainId: 968 }); })}>Switch to BOT Testnet</button> : <button className={primary} disabled={disabled || !plan || !gas} onClick={() => void run(authorize)}>Approve in wallet</button>}
-        {!gas && <button className={button} disabled={disabled} onClick={() => { setError(null); setReviewAttempt(value => value + 1); }}>Retry review and gas estimate</button>}
+        <p>Review these exact stored terms. Only approval in your wallet authorizes payment.</p>
+        {chainId !== 968 ? <button className={primary} disabled={disabled || providusWallet.isNetworkSwitchPending} onClick={() => void run(() => providusWallet.requestNetworkSwitch("botTestnet"))}>Switch to BOT Chain Testnet</button> : currentPlan && currentGas ? <button className={primary} disabled={disabled} onClick={() => void run(authorize)}>Approve in wallet</button> : currentReviewError ? <button className={primary} disabled={disabled} onClick={() => { setReviewError(null); setReviewAttempt(value => value + 1); }}>Retry review and gas estimate</button> : <p className="text-xs text-receipt-grey" role="status">Reviewing payment details and estimating gas…</p>}
       </>}
       {!status.freshness.fresh && !submission && <p role="alert">Payment expired or saved recipient changed. Cancel and prepare a fresh payment.</p>}
     </>}

@@ -14,11 +14,8 @@ export interface MessageListProps {
 }
 
 const STARTER_SUGGESTIONS = [
+  "Pay Douglas 0.01 BOT on BOT Testnet",
   "Buy ₦1,000 MTN airtime",
-  "Pay Douglas 2 BOT on BOT Testnet",
-  "Buy ₦500 Airtel airtime",
-  "How do I approve an airtime payment?",
-  "How does Celo USDC cash-out work?",
 ];
 
 export function MessageList({
@@ -50,19 +47,16 @@ export function MessageList({
             <Sparkles className="h-6 w-6" aria-hidden="true" />
           </div>
           <h3 className="mt-3 font-display text-lg font-semibold text-ledger-stone">
-            Ask for supported airtime
+            Start with a payment or purchase
           </h3>
           <p className="mt-1 max-w-md text-sm text-receipt-grey leading-relaxed">
-            Describe the airtime you need. Providus prepares the payment details
-            for your review, then you approve in your wallet before anything is
-            paid.
+            Tell Providus who to pay or what you&apos;d like to purchase. For BOT transfers, check the recipient, review the payment, approve in your wallet, then wait for independent verification.
           </p>
+          <p className="mt-2 max-w-md text-xs leading-relaxed text-receipt-grey">MTN airtime uses Celo. BOT transfers are verified on BOT Testnet. BOT Chain Mainnet payments are coming soon, and BOT-funded airtime is not live.</p>
 
           {onSelectSuggestion ? (
             <div className="mt-5 flex w-full max-w-lg flex-col gap-2">
-              <span className="font-proof text-xs text-receipt-grey text-left">
-                Suggested prompts:
-              </span>
+              <span className="font-proof text-xs text-receipt-grey text-left">Try one of these:</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
                 {STARTER_SUGGESTIONS.map((suggestion) => (
                   <button

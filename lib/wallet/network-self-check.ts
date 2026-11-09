@@ -12,9 +12,12 @@ import {
   isSameWalletAddress,
   isCurrentWalletAuthRequest,
   shouldDispatchWalletSessionExpired,
+  shouldRequireReauthenticationAfterAccountChange,
   walletAuthStatusCopy,
 } from "@/lib/auth/wallet-ui-state";
 import { isSameWalletReviewContext, type WalletReviewContext } from "@/lib/transfers/review-context";
+import { beginWalletNetworkSwitch, finishWalletNetworkSwitch, getWalletNetworkSwitchSnapshot } from "@/lib/wallet/network-switch-state";
+import { bumpWalletReviewContextRevision, getWalletReviewContextRevision } from "@/lib/transfers/review-context-revision";
 
 type MockError = Error & { code?: number; cause?: unknown };
 
@@ -25,6 +28,7 @@ class MockedInjectedWallet {
   switchFailure: MockError | null = null;
   addFailure: MockError | null = null;
   afterSwitchChainId: number | null = null;
+  switchAfterAdd = false;
 
   constructor(chainId: number) { this.chainId = chainId; }
 
@@ -38,6 +42,7 @@ class MockedInjectedWallet {
       this.requests.push({ method: "wallet_addEthereumChain", params: [{ ...addParameters, chainId: chainIdHex }] });
       if (this.addFailure) throw this.addFailure;
       this.recognized.add(chainId);
+      if (this.switchAfterAdd) throw new Error("User rejected switch after adding network.");
     }
     if (this.switchFailure) throw this.switchFailure;
     this.chainId = this.afterSwitchChainId ?? chainId;
@@ -77,16 +82,17 @@ async function main() {
   if (botNetwork.kind === "supported") assert.notEqual(botNetwork.nativeSymbol, "CELO");
 
   const wallet = new MockedInjectedWallet(42220);
+  wallet.switchAfterAdd = true;
   await switchWalletNetwork("botTestnet", wallet);
+  wallet.switchAfterAdd = false;
   assert.equal(wallet.chainId, 968);
   await switchWalletNetwork("botMainnet", wallet);
   assert.equal(wallet.chainId, 677);
   await switchWalletNetwork("celo", wallet);
   assert.equal(wallet.chainId, 42220);
   assert.deepEqual(wallet.requests.map((request) => request.method), [
-    "wallet_switchEthereumChain", "wallet_addEthereumChain",
-    "wallet_switchEthereumChain", "wallet_addEthereumChain",
-    "wallet_switchEthereumChain",
+    "wallet_switchEthereumChain", "wallet_addEthereumChain", "wallet_switchEthereumChain",
+    "wallet_switchEthereumChain", "wallet_addEthereumChain", "wallet_switchEthereumChain",
   ]);
   assert.equal(wallet.requests.some((request) => request.method === "eth_sendTransaction"), false);
   const added = wallet.requests.find((request) => request.method === "wallet_addEthereumChain")?.params as [{ chainId: string; chainName: string; rpcUrls: string[]; blockExplorerUrls: string[]; nativeCurrency: { symbol: string } }];
@@ -101,6 +107,18 @@ async function main() {
   await assert.rejects(switchWalletNetwork("botTestnet", rejected));
   assert.equal(describeWalletNetworkError(rejected.switchFailure).kind, "rejected");
   assert.equal(rejected.requests.filter((request) => request.method === "wallet_switchEthereumChain").length, 1, "a rejection never triggers an automatic second prompt");
+
+  const rejectedAfterAdd = new MockedInjectedWallet(42220);
+  rejectedAfterAdd.switchAfterAdd = true;
+  rejectedAfterAdd.switchFailure = codedError("User rejected the request", 4001);
+  await assert.rejects(switchWalletNetwork("botTestnet", rejectedAfterAdd));
+  assert.equal(rejectedAfterAdd.requests.filter((request) => request.method === "wallet_switchEthereumChain").length, 2, "only the accepted add-chain response permits one switch retry");
+
+  const rejectedAdd = new MockedInjectedWallet(42220);
+  rejectedAdd.addFailure = codedError("User rejected the request", 4001);
+  await assert.rejects(switchWalletNetwork("botTestnet", rejectedAdd));
+  assert.equal(rejectedAdd.requests.filter((request) => request.method === "wallet_switchEthereumChain").length, 1, "rejecting add-chain never triggers another prompt");
+  assert.equal(describeWalletNetworkError(rejectedAdd.addFailure).kind, "rejected");
 
   const unsupportedSwitch = codedError("wallet_switchEthereumChain is not supported", 4200);
   assert.equal(describeWalletNetworkError(unsupportedSwitch).kind, "manual");
@@ -132,6 +150,8 @@ async function main() {
   });
   assert.equal(shouldDispatchWalletSessionExpired(401, "session-probe"), false);
   assert.equal(shouldDispatchWalletSessionExpired(401, "protected"), true);
+  assert.equal(shouldRequireReauthenticationAfterAccountChange("0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"), true);
+  assert.equal(shouldRequireReauthenticationAfterAccountChange(null, "0x2222222222222222222222222222222222222222"), false);
   assert.equal(isCurrentWalletAuthRequest({ address: "0x1111111111111111111111111111111111111111", accountRevision: 2, requestRevision: 4 }, { address: "0x1111111111111111111111111111111111111111", accountRevision: 2, requestRevision: 4 }), true);
   assert.equal(isCurrentWalletAuthRequest({ address: "0x1111111111111111111111111111111111111111", accountRevision: 2, requestRevision: 4 }, { address: "0x2222222222222222222222222222222222222222", accountRevision: 3, requestRevision: 4 }), false);
 
@@ -139,6 +159,18 @@ async function main() {
   assert.equal(isSameWalletReviewContext(review, { ...review }), true);
   assert.equal(isSameWalletReviewContext(review, { ...review, chainId: 677 }), false, "a stale review cannot survive a network change");
   assert.equal(isSameWalletReviewContext(review, { ...review, owner: "0x2222222222222222222222222222222222222222" }), false, "a review cannot survive an owner change");
+  assert.equal(isSameWalletReviewContext({ ...review, contextRevision: 1 }, { ...review, contextRevision: 2 }), false, "a review cannot survive a wallet context event");
+  const previousRevision = getWalletReviewContextRevision();
+  bumpWalletReviewContextRevision();
+  assert.equal(getWalletReviewContextRevision(), previousRevision + 1);
+
+  const pendingSwitch = beginWalletNetworkSwitch("botMainnet");
+  assert.notEqual(pendingSwitch, null);
+  assert.equal(getWalletNetworkSwitchSnapshot().pending, true);
+  assert.equal(beginWalletNetworkSwitch("botTestnet"), null, "only one wallet switch prompt may run at a time");
+  finishWalletNetworkSwitch(pendingSwitch!, { status: "failed", target: "botMainnet", kind: "unavailable", message: "RPC unavailable" });
+  assert.equal(getWalletNetworkSwitchSnapshot().pending, false);
+  assert.equal(getWalletNetworkSwitchSnapshot().state.status, "failed");
 
   console.log("B9 wallet network, auth-state, and stale-review self-checks passed.");
 }

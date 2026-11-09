@@ -4,7 +4,7 @@ B7 connects BOT Testnet payments to the existing dashboard and assistant. Celo a
 
 ## Wallet and payment boundaries
 
-- `hooks/use-wallet-auth.ts` distinguishes connection from SIWE authentication. The wallet signs the existing challenge, the server verifies it and sets the existing HttpOnly session cookie. The owner is checked against the connected account. Authentication supports EOAs.
+- `hooks/use-wallet-auth.tsx` distinguishes connection from SIWE authentication. The wallet signs the existing challenge, the server verifies it and sets the existing HttpOnly session cookie. The owner is checked against the connected account. Authentication supports EOAs.
 - `GET /api/auth/session` returns only the authenticated owner. Recipient and transfer requests include an expected-wallet header that can restrict access, but cannot establish ownership. A different cookie owner returns 401.
 - AssistantPanel retains B6 structured actions. Recipient confirmation displays the full address and network. New addresses require explicit confirmation and a separate save decision. Saving calls the authenticated B2 recipient API. Saved-recipient edits retain the B2 version checks.
 - Chat confirmation can prepare an intent. Only the explicit review-card action starts wallet signing. The review reads the stored B3 intent, not assistant prose or action-card amounts.
@@ -69,7 +69,7 @@ Independent source reviews completed. A separate Grok audit was unavailable beca
 | Area | Files |
 | --- | --- |
 | Existing assistant and wallet UI | `components/assistant/assistant-panel.tsx`, `components/ui/connect-wallet-button.tsx`, `hooks/use-assistant.ts`, `lib/wallet/config.ts` |
-| New payment and authentication UI | `components/assistant/wallet-transfer-card.tsx`, `components/assistant/token-approval-card.tsx`, `hooks/use-wallet-auth.ts`, `lib/wallet/transfer-execution.ts` |
+| New payment and authentication UI | `components/assistant/wallet-transfer-card.tsx`, `components/assistant/token-approval-card.tsx`, `hooks/use-wallet-auth.tsx`, `lib/wallet/transfer-execution.ts` |
 | New HTTP and execution boundary | `app/api/auth/session/route.ts`, `app/api/transfers/[id]/execution/route.ts`, `lib/transfers/web-execution.ts` |
 | Small edits inside the existing backend | `app/api/assistant/chat/route.ts`, `app/api/transfers/[id]/submission/route.ts`, `lib/recipients/routes.ts`, `lib/assistant/types.ts`, `lib/assistant/wallet-transfer.ts` |
 | B7 security and UI checks | `lib/transfers/web-execution-self-check.ts`, `lib/transfers/web-route-self-check.ts`, `lib/assistant/b7-consent-self-check.ts`, `lib/wallet/b7-token-ui-self-check.tsx` |

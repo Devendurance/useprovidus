@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useContext } from "react";
 import type { Address } from "viem";
-import { WagmiContext, useSendTransaction } from "wagmi";
+import { WagmiContext, useAccount, useSendTransaction } from "wagmi";
 import {
   Coins,
   Copy,
@@ -26,6 +26,8 @@ import {
 import { formatDecimalForDisplay, usdcToBaseUnits } from "@/lib/money/decimal";
 import { cn } from "@/lib/cn";
 import { useTransactionStatus } from "@/hooks/use-transaction-status";
+import { useProvidusWallet } from "@/hooks/use-providus-wallet";
+import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
 import type { TransactionStage } from "@/lib/transactions/status";
 export interface PaymentInstructions {
   transactionId: string;
@@ -100,6 +102,10 @@ export function PaymentInstructionsCard({
   // Check if Wagmi context is available for direct wallet submission
   const wagmiContext = useContext(WagmiContext);
   const hasWagmi = Boolean(wagmiContext);
+  const { address, chainId } = useAccount();
+  const providusWallet = useProvidusWallet();
+  const connectedHere = Boolean(address && (providusWallet.accountStatus === "connected" || providusWallet.accountStatus === "reconnecting"));
+  const needsCeloNetwork = connectedHere && chainId !== CELO_CHAIN_ID;
 
   // Wagmi sendTransaction hook (only safe if wagmiContext is present, but Wagmi hooks must be called unconditionally)
   // When wagmiContext is not mounted (e.g. unit testing/node), we gracefully catch or guard.
@@ -169,7 +175,9 @@ export function PaymentInstructionsCard({
       depositStatus === "submitting" ||
       depositStatus === "verifying" ||
       depositStatus === "settling" ||
-      isSubmitting;
+      isSubmitting ||
+      !connectedHere ||
+      chainId !== CELO_CHAIN_ID;
   // IMPORTANT: Explicit user click ONLY. Never auto-trigger wallet transactions.
   const handlePayClick = async () => {
     // 1. If depositHash already exists: NEVER send another transaction!
@@ -714,8 +722,13 @@ export function PaymentInstructionsCard({
           ) : null}
         </div>
 
-        <div>
-          {depositStatus === "confirmed" ? (
+        <div className="flex flex-col items-end gap-2">
+          {!depositHash && !connectedHere ? <div className="flex flex-col items-end gap-1"><p className="text-xs text-receipt-grey" role="status">Connect a wallet to pay this Celo airtime order.</p><ConnectWalletButton label="Connect wallet" /></div> : null}
+          {!depositHash && needsCeloNetwork ? <p className="max-w-xs text-right text-xs text-receipt-grey" role="status">Airtime payments use Celo Mainnet, chain ID 42220.</p> : null}
+          {!depositHash && providusWallet.networkSwitch.status === "requesting" && providusWallet.networkSwitch.target === "celo" ? <p className="text-xs text-receipt-grey" role="status">Confirm the Celo Mainnet switch in your wallet.</p> : null}
+          {!depositHash && providusWallet.networkSwitch.status === "slow" && providusWallet.networkSwitch.target === "celo" ? <p className="text-xs text-receipt-grey" role="status">Still waiting for Celo Mainnet confirmation. Your active network has not changed.</p> : null}
+          {!depositHash && providusWallet.networkSwitch.status === "failed" && providusWallet.networkSwitch.target === "celo" ? <p className="max-w-xs text-right text-xs text-loss-red" role="alert">{providusWallet.networkSwitch.message}</p> : null}
+          {!depositHash && !connectedHere ? null : depositStatus === "confirmed" ? (
             <span className="inline-flex items-center gap-2 rounded-[8px] border border-provident-green/50 bg-provident-green/10 px-4 py-2 font-display text-xs font-semibold text-deep-provision">
               <CheckCircle2 className="h-4 w-4 text-provident-green" />
               <span>Settlement in progress</span>
@@ -723,8 +736,9 @@ export function PaymentInstructionsCard({
           ) : (
             <button
               type="button"
-              onClick={handlePayClick}
-              disabled={isActionDisabled}
+              onClick={() => needsCeloNetwork ? void providusWallet.requestNetworkSwitch("celo") : void handlePayClick()}
+              disabled={needsCeloNetwork ? providusWallet.isNetworkSwitchPending || !connectedHere || Boolean(assetError) || isExpired || isSubmitting || depositStatus === "verifying" || depositStatus === "settling" : isActionDisabled}
+              aria-label={needsCeloNetwork ? "Switch to Celo Mainnet to pay for airtime" : undefined}
               className={cn(
                 "inline-flex min-h-[38px] items-center gap-2 rounded-[8px] border border-ledger bg-provident-green px-4 py-2 font-display text-xs font-semibold text-white transition-all shadow-sticker active:translate-x-0.5 active:translate-y-0.5",
                 "hover:bg-deep-provision",
@@ -790,10 +804,7 @@ export function PaymentInstructionsCard({
                   <span>Settling order...</span>
                 </>
               ) : (
-                <>
-                  <Wallet className="h-3.5 w-3.5" />
-                  <span>Pay from connected wallet</span>
-                </>
+                needsCeloNetwork ? <><Wallet className="h-3.5 w-3.5" /><span>{providusWallet.isNetworkSwitchPending ? "Switching to Celo…" : "Switch to Celo Mainnet"}</span></> : !connectedHere ? <><Wallet className="h-3.5 w-3.5" /><span>Connect wallet to continue</span></> : <><Wallet className="h-3.5 w-3.5" /><span>Pay from connected wallet</span></>
               )}
             </button>
           )}
