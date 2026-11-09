@@ -26,5 +26,17 @@
     ],
     "compiler": "solc 0.8.24, optimizer off, evm paris",
     "constructorArguements": "000000000000000000000000aBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C"
+  },
+  "ownershipTransfer": {
+    "txHash": "0x16bb7414f3ae81265cb3bbfa3b2e8e046769782b42413753ebe73838ea5fb690",
+    "blockNumber": 29686331,
+    "status": "success",
+    "previousOwner": "0x15451254A70e5bD6FEcA12447c42DCc9B26f3947",
+    "newOwner": "0x7d2E9fB3efa5fB8a42a6e1778A605814CB16E391",
+    "gasUsed": 29042,
+    "feeBOT": "0.000581",
+    "confirmationsAtVerification": 125,
+    "residualRiskAccepted": "Safe retains testnet development signer 0x374A94C75BD463635Cc6C96141B0EF31aCd02EF3 as 1-of-3 (threshold 2). Signer replacement still pending user action.",
+    "explorer": "https://scan.botchain.ai/tx/0x16bb7414f3ae81265cb3bbfa3b2e8e046769782b42413753ebe73838ea5fb690"
   }
 }
