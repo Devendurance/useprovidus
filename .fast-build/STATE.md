@@ -9,8 +9,8 @@
 ## P1.1 in progress
 - P0.2 commit `00596fc` remains the base. P1.1 has not changed application code yet.
 - The chat route is stateless today. The selected design uses separate session and message tables, SIWE-derived ownership, and a composite owner foreign key. User messages carry idempotent turn and retry state. See `.fast-build/P1.1-ARCHITECTURE.md`.
-- A disposable Postgres 16 database at `127.0.0.1:55432` has migrations `0000` through `0006`. Two synthetic owners are seeded in existing Celo and BOT ledger tables. Their row counts and SHA-256 checksums are recorded in `.fast-build/p11-ledger-baseline.json`.
-- Migration `0007` is not generated or applied yet. The implementation is in progress in isolated worktree branch `codex/p11-persistent-chat`. Production migration, push, deployment, live payments, P1.2, and P2 remain out of scope.
+- A disposable Postgres 16 database at `127.0.0.1:55432` has migrations `0000` through `0007`. Two synthetic owners are seeded in existing Celo and BOT ledger tables. Their row counts and SHA-256 checksums match the baseline after `0007`.
+- A direct SQL probe confirmed the composite owner foreign key rejects a message attached to another owner's session. Application service, API, and UI work is in progress in isolated worktree branch `codex/p11-persistent-chat`. Production migration, push, deployment, live payments, P1.2, and P2 remain out of scope.
 
 ## P0.2 complete
 - Owner-scoped receipt list and detail routes derive the wallet from `requireOwner`. No client-supplied owner is trusted.
