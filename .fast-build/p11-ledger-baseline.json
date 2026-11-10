@@ -1,0 +1,22 @@
+{
+  "database": "providus_p11",
+  "migrationCount": 7,
+  "tables": {
+    "agent_transactions": {
+      "rows": 2,
+      "sha256": "2bdaaceb4a234cfebc3a1e1d6893d8a843be2020f3fa07277af4f90350164f58"
+    },
+    "saved_recipients": {
+      "rows": 2,
+      "sha256": "f1ed58d4bdac0e2ced57b4317f957bddbe5973d7201432cb7695d1e2dc4e3963"
+    },
+    "wallet_transfer_intents": {
+      "rows": 2,
+      "sha256": "345b22886aa178ba2ed0febceffbb0dfc5304a7d4d32e49f1f00105dc5d17d49"
+    },
+    "transfer_submissions": {
+      "rows": 2,
+      "sha256": "9e475ec4c809880d06411308c434aaf5b77e43699d5fdb22ddf30547a85a41ac"
+    }
+  }
+}

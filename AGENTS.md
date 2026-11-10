@@ -15,6 +15,7 @@
 - Receipt history and detail reads derive ownership from authenticated `requireOwner` state. Never trust a caller-supplied wallet address for receipt access.
 - A BOT payment is Verified only when B5 says confirmed and provides `verifiedAt`. Submitted hashes remain pending or unknown until verified.
 - Do not invent actual gas fees, recipient addresses, or approval history absent from source records. Token approvals stay separate from payment receipts.
+- Conversation history must derive its owner from a verified SIWE session. Persist readable text only, keep payment intents and receipts in their existing stores, and never restore an approval or payment action from chat history.
 
 
 ## WRITING

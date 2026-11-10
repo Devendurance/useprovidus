@@ -72,6 +72,7 @@
 - Receipt: explicit `?tx=` lookup only, revalidate on wallet change, never enumerate another wallet's rows.
 - `sanitizeFailureReason` must redact `UserID=`/`token=`/key-value credential pairs, not just Bearer tokens.
 - `isFiatDelivered`/`isFiatFinal` derive ONLY from Paycrest `validated`/`settled` — never from internal status fallbacks.
+- Conversation sessions and messages are separate from saved-recipient memory and payment ledgers. Derive owners from verified SIWE claims, use a composite owner foreign key, and persist no actionable payment payloads.
 
 ## Sprint discipline (from AGENTS.md)
 - Repo is implementation source of truth; build plan is sprint authority. Inspect files before planning/editing.

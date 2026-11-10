@@ -6,6 +6,13 @@
 - Actual gas is unavailable in both source ledgers and full recipient address is absent from Celo records. Approval transactions have no durable ledger and are excluded from payment history.
 - Mobile navigation uses an opaque compact sticky header, safe-area spacing, and modal focus/scroll management. Public copy reflects BOT Mainnet 677 live and keeps Celo intact. Testnet remains historical/disabled publicly; utility settlement is unavailable pending verified settlement and provider delivery.
 - Focused receipt and positioning self-checks, `test:all`, TypeScript, lint, build, `git diff --check`, and full Playwright browser QA pass. Local route fixtures covered 320, 375, 390, 768, desktop, mobile navigation, and modal dismissal/focus. Screenshots are in `output/playwright/`.
+
+## P1.1 persistent conversation sessions, in progress, 2026-11-10
+- Current branch starts at P0.2 commit `00596fc`. No P1.1 application code is implemented yet.
+- `how` traces confirmed the chat route is stateless, `useAssistant` owns the client transcript, and SIWE is the only owner authority. Saved recipients, B3 intents, B5 submissions, and payment receipts stay separate.
+- Architecture selected two additive tables. The message row holds idempotent turn state and an attempt lease. A composite foreign key binds each message to the session owner. See `.fast-build/P1.1-ARCHITECTURE.md`.
+- Disposable Postgres 16 is bound to `127.0.0.1:55432`, with `0000` through `0006` applied. The migration harness seeded two synthetic owners and captured SHA-256 baselines for the four existing owner-scoped ledger tables.
+- Production migration, database writes, push, deploy, and blockchain transactions remain out of scope.
 ## P0.1 compact payment UX and public Mainnet activation, 2026-11-10
 - Public BOT Chain Mainnet activation is complete at `7820480` for native BOT and Official USDT. BOT Testnet is hidden and disabled publicly. Existing Celo services remain intact. BOT-funded utilities are not live without independently verified settlement and provider delivery.
 - The evidence-based UX audit and story-driven plan remain in `docs/ux/`. `DESIGN.md` is the current Providus design system.

@@ -6,6 +6,12 @@
 - Primary path: Ask, review exact terms, authorize each required wallet action, then inspect verified evidence.
 - Public status: BOT Chain Mainnet native BOT and Official USDT payments are live on chain 677, activation `7820480`. Celo services remain intact. BOT Testnet is hidden from public marketing and blocked from public execution. BOT-funded utility settlement remains unavailable without verified settlement and provider delivery.
 
+## P1.1 in progress
+- P0.2 commit `00596fc` remains the base. P1.1 has not changed application code yet.
+- The chat route is stateless today. The selected design uses separate session and message tables, SIWE-derived ownership, and a composite owner foreign key. User messages carry idempotent turn and retry state. See `.fast-build/P1.1-ARCHITECTURE.md`.
+- A disposable Postgres 16 database at `127.0.0.1:55432` has migrations `0000` through `0006`. Two synthetic owners are seeded in existing Celo and BOT ledger tables. Their row counts and SHA-256 checksums are recorded in `.fast-build/p11-ledger-baseline.json`.
+- Migration `0007` is not generated or applied yet. Production migration, push, deployment, live payments, P1.2, and P2 remain out of scope.
+
 ## P0.2 complete
 - Owner-scoped receipt list and detail routes derive the wallet from `requireOwner`. No client-supplied owner is trusted.
 - Reuses existing `transfer_submissions` plus `wallet_transfer_intents` for BOT and `agent_transactions` for Celo. No schema changes, migration, or production database writes.
@@ -27,4 +33,4 @@
 ## Remaining
 - No durable token-approval history exists. Adding it needs an additive schema or reviewed chain-discovery design, explicit review, backup/restore planning, and verified wallet isolation.
 - iOS Safari and Android browser-chrome behavior were not established by Chromium emulation.
-- P1 persistent conversations and shared memory remain unstarted.
+- P1.1 persistent conversations are in progress. P1.2 shared memory remains unstarted.
