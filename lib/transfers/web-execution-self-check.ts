@@ -29,7 +29,11 @@ async function main() {
   await assert.rejects(web(intent.id, ""), /configured/);
   await assert.rejects(web(intent.id, address), /configured/);
   const mainnet = await prep(677, "USDT");
-  await assert.rejects(web(mainnet.id), /disabled until B9/);
+  // Public mainnet path: valid 677 USDT intent prepares against the audited contract.
+  const mainnetPlan = await web(mainnet.id);
+  assert.equal(mainnetPlan.plan.chainId, 677);
+  assert.equal(mainnetPlan.plan.token?.toLowerCase(), "0xababc7ddc03e501d190c676bf3d92ef0e6e87a3C".toLowerCase());
+  assert.equal(mainnetPlan.plan.value, "0");
   await assert.rejects(prep(968, "USDT"), /Only native/);
   await cancelTransferIntent(intents, { ownerAddress: owner, id: intent.id });
   await assert.rejects(web(intent.id), /pending/);

@@ -53,7 +53,7 @@ export function MessageList({
           <p className="mt-1 max-w-md text-sm text-receipt-grey leading-relaxed">
             Tell Providus who to pay or what you&apos;d like to purchase. For BOT transfers, check the recipient, review the payment, approve in your wallet, then wait for independent verification.
           </p>
-          <p className="mt-2 max-w-md text-xs leading-relaxed text-receipt-grey">MTN airtime uses Celo. BOT transfers are verified on BOT Testnet. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} BOT-funded airtime is not live.</p>
+          <p className="mt-2 max-w-md text-xs leading-relaxed text-receipt-grey">MTN airtime uses Celo. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.utilityLabel}</p>
 
           {onSelectSuggestion ? (
             <div className="mt-5 flex w-full max-w-lg flex-col gap-2">

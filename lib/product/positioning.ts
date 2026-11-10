@@ -14,9 +14,9 @@ export type ExecutionDomain = {
 
 export const BOT_MAINNET_STATUS = {
   transactionLabel: "Native BOT and Official USDT transactions are independently verified on BOT Chain Mainnet.",
-  productionLabel: "Production payment availability remains gated pending separate launch authorization.",
+  productionLabel: "BOT Chain Mainnet payments are live: native BOT and official USDT with wallet approval and verified receipts.",
   utilityLabel: "BOT-funded utilities are not live without an independently verified settlement and provider-delivery route.",
-  networkLabel: "Transactions verified · production gated",
+  networkLabel: "Live BOT Chain Mainnet payments",
 } as const;
 
 export const PRODUCT_POSITIONING = {
@@ -41,13 +41,13 @@ export const EXECUTION_DOMAINS: readonly ExecutionDomain[] = [
   {
     id: "bot",
     name: "BOT Chain",
-    availability: "tested",
-    label: "Testnet verified",
-    summary: "Pay a named recipient on BOT Testnet with a wallet-authorized native BOT transfer.",
-    examples: ["Pay Douglas 2 BOT", "Saved recipient lookup"],
-    network: "BOT Testnet · chain ID 968",
-    assets: "Native BOT on testnet",
-    boundary: `${BOT_MAINNET_STATUS.productionLabel} ${BOT_MAINNET_STATUS.utilityLabel}`,
+    availability: "live",
+    label: "Live",
+    summary: "Pay a named recipient on BOT Chain Mainnet with a wallet-authorized native BOT or official USDT transfer.",
+    examples: ["Pay Douglas 0.01 BOT", "Pay Douglas 1 USDT"],
+    network: "BOT Chain Mainnet · chain ID 677",
+    assets: "Native BOT and official USDT",
+    boundary: `${BOT_MAINNET_STATUS.transactionLabel} ${BOT_MAINNET_STATUS.utilityLabel}`,
   },
 ] as const;
 

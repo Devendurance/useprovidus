@@ -25,7 +25,7 @@ export function AssistantComposer({
   onSend,
   pending = false,
   disabled = false,
-  placeholder = "Type a payment request (e.g. 'Pay Douglas 2 BOT on BOT Testnet')...",
+  placeholder = "Type a payment request (e.g. 'Pay Douglas 2 USDT')...",
   className,
 }: AssistantComposerProps) {
   const [content, setContent] = useState("");

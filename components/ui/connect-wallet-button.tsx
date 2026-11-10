@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useProvidusWallet } from "@/hooks/use-providus-wallet";
 import { useWalletAuth } from "@/hooks/use-wallet-auth";
 import { useHydrated } from "@/lib/wallet/hydration";
-import { networkSetupCopy, WALLET_NETWORK_OPTIONS } from "@/lib/wallet/network";
+import { networkSetupCopy, PUBLIC_WALLET_NETWORK_OPTIONS, WALLET_NETWORK_OPTIONS } from "@/lib/wallet/network";
 import { truncateAddress } from "@/lib/wallet/format";
 import type { SupportedWalletId } from "@/lib/wallet/supported-wallets";
 import { cn } from "@/lib/cn";
@@ -239,7 +239,7 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
                 <p className="text-[11px] text-receipt-grey">Choose a network. Providus updates after your wallet confirms the switch.</p>
               </div>
               <ul className="space-y-2" role="list">
-                {WALLET_NETWORK_OPTIONS.map((option) => {
+                {PUBLIC_WALLET_NETWORK_OPTIONS.map((option) => {
                   const current = activeNetwork.kind === "supported" && activeNetwork.chainId === option.chainId;
                   const targetPending = switching && switchTarget === option.key;
                   const availability = option.key === "botMainnet" ? BOT_MAINNET_STATUS.networkLabel : option.key === "botTestnet" ? "Verified BOT Testnet transfers" : "Celo airtime and cash-out";

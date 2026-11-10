@@ -109,7 +109,7 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
               </span>
             </div>
             <p className="font-proof text-[11px] text-receipt-grey">
-              Ask for a Celo service or a BOT Testnet recipient payment, then review and prove the outcome
+              Ask for a Celo service or a BOT Chain Mainnet recipient payment, then review and prove the outcome
             </p>
           </div>
         </div>

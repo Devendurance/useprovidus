@@ -64,6 +64,16 @@ export const WALLET_NETWORK_OPTIONS: readonly WalletNetworkDefinition[] = [
   NETWORKS.botTestnet,
 ];
 
+/**
+ * Networks offered to ordinary users in public UI. BOT Testnet is hidden
+ * from public selection (B9C): backend execution for 968 is additionally
+ * hard-disabled in production. Internal/dev tooling keeps the full list.
+ */
+export const PUBLIC_WALLET_NETWORK_OPTIONS: readonly WalletNetworkDefinition[] = [
+  NETWORKS.celo,
+  NETWORKS.botMainnet,
+];
+
 export type ActiveWalletNetwork =
   | { kind: "disconnected" }
   | { kind: "unsupported"; chainId: number }

@@ -26,7 +26,7 @@ export default function DashboardPage() {
           <p className="mt-3 text-receipt-grey leading-relaxed">
             Providus turns approved messages into verified real-world payments.
             Describe a supported Nigerian service or ask to pay a named recipient
-            on BOT Testnet. Your wallet approves the exact terms.
+            on BOT Chain Mainnet. Your wallet approves the exact terms.
           </p>
           <div className="mt-5 rounded-[10px] border border-ledger-edge bg-receipt-field p-3.5">
             <p className="font-proof text-xs font-semibold text-ledger-stone">
@@ -77,7 +77,7 @@ export default function DashboardPage() {
             Providus Assistant
           </h2>
           <p className="mt-1 text-sm text-receipt-grey leading-relaxed">
-             Describe a Celo service or a BOT Testnet recipient payment, review
+             Describe a Celo service or a BOT Chain Mainnet recipient payment, review
              the exact details, and approve in your connected wallet.
           </p>
         </div>

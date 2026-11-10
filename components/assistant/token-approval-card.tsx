@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { PublicClient, WalletClient } from "viem";
 import { createTokenApprovalControls, prepareTokenAllowance, type ApprovalState } from "@/lib/wallet/transfer-execution";
 import type { ExecutionPlan } from "@/lib/transfers/execution";
-import { BOT_MAINNET_STATUS } from "@/lib/product/positioning";
 
 export const APPROVAL_LABELS: Record<ApprovalState, string> = {
   checking_allowance: "Checking token allowance",
@@ -15,7 +14,7 @@ export const APPROVAL_LABELS: Record<ApprovalState, string> = {
 };
 
 export function TokenApprovalStatus({ enabled, state }: { enabled: boolean; state: ApprovalState }) {
-  return <p role="status">{enabled ? APPROVAL_LABELS[state] : BOT_MAINNET_STATUS.productionLabel}</p>;
+  return <p role="status">{enabled ? APPROVAL_LABELS[state] : "Token approval is unavailable for this payment."}</p>;
 }
 
 export function TokenApprovalCard({ enabled, plan, client, wallet, revalidate }: {

@@ -53,7 +53,7 @@ export function SiteFooter() {
               <ul className="mt-3 space-y-2 text-sm leading-5 text-[#1A1A1A]/70">
                 <li>Web dashboard is the current channel</li>
                 <li>No custody or silent wallet approval</li>
-                <li>Celo is live; BOT Testnet is verified</li>
+                <li>Celo is live; BOT Chain Mainnet payments are live</li>
                 <li>{BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel}</li>
                 <li>{BOT_MAINNET_STATUS.utilityLabel}</li>
                 <li>Quotes are estimates with freshness and assumptions</li>

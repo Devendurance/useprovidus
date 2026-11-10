@@ -8,7 +8,7 @@ import type { WalletTransferIntent } from "@/lib/transfers/repository";
 import type { TransferSubmission } from "@/lib/transfers/submissions";
 import type { ExecutionPlan } from "@/lib/transfers/execution";
 import { BOT_MAINNET, BOT_TESTNET } from "@/lib/chains/registry";
-import { MAINNET_CONTRACT_ADDRESS } from "@/lib/transfers/test-mode";
+import { MAINNET_CONTRACT_ADDRESS } from "@/lib/transfers/mainnet";
 import { walletApi as requestWalletApi, type WalletAuth } from "@/hooks/use-wallet-auth";
 import { TokenApprovalCard } from "@/components/assistant/token-approval-card";
 import { isSameWalletReviewContext, type WalletReviewContext } from "@/lib/transfers/review-context";
@@ -279,7 +279,7 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
         <dt>Payment reference</dt><dd>{intent.id}</dd>
       </dl>
       {!submission && !recoveryHash && intent.chainId !== 968 && intent.chainId !== 677 && <p role="status">Unsupported network. Switch to a supported BOT Chain network.</p>}
-      {!submission && !recoveryHash && intent.chainId === 677 && !currentPlan && <p role="status">{BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} ERC-20 approval is separate from payment.</p>}
+      {!submission && !recoveryHash && intent.chainId === 677 && !currentPlan && <p role="status">{BOT_MAINNET_STATUS.transactionLabel} ERC-20 approval is separate from payment.</p>}
       {intent.tokenAddress && <TokenApprovalCard
       enabled={Boolean(currentPlan && currentPlan.chainId === 677 && currentPlan.token)}
       plan={currentPlan && currentPlan.chainId === 677 ? currentPlan : undefined}
