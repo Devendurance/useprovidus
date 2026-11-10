@@ -58,7 +58,18 @@ export function resolvePaymentCardView(input: PaymentCardViewInput): PaymentCard
     return { kind: "failed", txHash: submission.txHash, reason: submission.failureReason };
   }
   if (submission?.status === "unknown") {
-    return { kind: "unknown", txHash: submission.txHash, needsHashRecovery: !submission.txHash, reason: submission.failureReason };
+    const txHash = submission.txHash ?? input.recoveryHash;
+    return { kind: "unknown", txHash, needsHashRecovery: !txHash, reason: submission.failureReason };
+  }
+  if (submission?.status === "confirmed") {
+    return { kind: "verification_pending", txHash: submission.txHash, submitted: false };
+  }
+  if (submission?.status === "submitted") {
+    return {
+      kind: "verification_pending",
+      txHash: submission.txHash ?? input.recoveryHash,
+      submitted: true,
+    };
   }
   if (input.pendingWalletConfirmation) {
     return { kind: "review", nextAction: "await_payment_wallet" };
@@ -69,15 +80,8 @@ export function resolvePaymentCardView(input: PaymentCardViewInput): PaymentCard
   if (input.uncertainBroadcast && !input.recoveryHash) {
     return { kind: "unknown", txHash: null, needsHashRecovery: true, reason: null };
   }
-  if (submission?.status === "confirmed") {
-    return { kind: "verification_pending", txHash: submission.txHash, submitted: false };
-  }
-  if (submission || input.recoveryHash) {
-    return {
-      kind: "verification_pending",
-      txHash: submission?.txHash ?? input.recoveryHash,
-      submitted: submission?.status === "submitted",
-    };
+  if (input.recoveryHash) {
+    return { kind: "verification_pending", txHash: input.recoveryHash, submitted: false };
   }
   if (input.intentCancelled) return { kind: "cancelled" };
   if (input.intentExpired || !input.intentPending) return { kind: "expired" };

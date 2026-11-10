@@ -35,21 +35,34 @@ assert(verified.kind === "verified", "verified B5 evidence takes precedence over
 
 const confirmedWithoutEvidence = resolvePaymentCardView({
   ...base,
+  paymentPreparationPending: true,
+  uncertainBroadcast: true,
   submission: { status: "confirmed", txHash: "0xsubmitted", verifiedAt: null, failureReason: null },
 });
 assert(confirmedWithoutEvidence.kind === "verification_pending", "confirmed without verifiedAt stays pending");
 
 const submitted = resolvePaymentCardView({
   ...base,
+  pendingWalletConfirmation: true,
+  paymentPreparationPending: true,
+  uncertainBroadcast: true,
   submission: { status: "submitted", txHash: "0xsubmitted", verifiedAt: null, failureReason: null },
 });
 assert(submitted.kind === "verification_pending" && submitted.submitted, "submitted hash is never success");
+assert(submitted.kind === "verification_pending" && submitted.txHash === "0xsubmitted", "persisted submitted hash outranks transient wallet stages and uncertain broadcast");
 
 const unknown = resolvePaymentCardView({
   ...base,
   submission: { status: "unknown", txHash: "0xunknown", verifiedAt: null, failureReason: "receipt not found" },
 });
 assert(unknown.kind === "unknown" && !unknown.needsHashRecovery, "unknown transaction keeps its existing hash for recheck");
+
+const recoveredUnknown = resolvePaymentCardView({
+  ...base,
+  recoveryHash: "0xlocal-recovery",
+  submission: { status: "unknown", txHash: null, verifiedAt: null, failureReason: "missing stored hash" },
+});
+assert(recoveredUnknown.kind === "unknown" && recoveredUnknown.txHash === "0xlocal-recovery" && !recoveredUnknown.needsHashRecovery, "unknown B5 row reuses its locally retained hash");
 
 const failed = resolvePaymentCardView({
   ...base,
@@ -72,4 +85,4 @@ assert(allowanceRequired.kind === "review" && allowanceRequired.nextAction === "
 const allowanceSufficient = resolvePaymentCardView({ ...base, tokenRequired: true, allowanceState: "payment_ready" });
 assert(allowanceSufficient.kind === "review" && allowanceSufficient.nextAction === "confirm_payment", "sufficient allowance advances to separate payment approval");
 
-console.log("Payment card view checks passed (10 assertions).");
+console.log("Payment card view checks passed (12 assertions).");

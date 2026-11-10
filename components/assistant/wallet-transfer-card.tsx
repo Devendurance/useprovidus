@@ -356,8 +356,8 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
     {(view?.kind === "verification_pending" || (view?.kind === "unknown" && !view.needsHashRecovery)) ? <div className="flex flex-wrap items-center gap-3">
       {currentHash ? <a className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green" href={`${EXPLORERS[intent?.chainId ?? 968] ?? EXPLORERS[968]}/tx/${currentHash}`} target="_blank" rel="noreferrer">View transaction</a> : null}
       <button className={button} disabled={disabled} onClick={() => void run(async () => {
-        if (!submission && recoveryHash) await walletApi(`${path}/submission`, { txHash: recoveryHash });
-        else await walletApi(`${path}/submission`, { recheck: true });
+        if (recoveryHash && !submission?.txHash) await walletApi(`${path}/submission`, { txHash: recoveryHash });
+        await walletApi(`${path}/submission`, { recheck: true });
         await refresh();
       })}>Recheck status</button>
     </div> : null}
