@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { formatEther, getAddress, isAddress, type Hex } from "viem";
 import type { WalletTransferAction, WalletTransferIntent as Draft } from "@/lib/assistant/types";
@@ -14,7 +15,9 @@ import { TokenApprovalCard } from "@/components/assistant/token-approval-card";
 import { isSameWalletReviewContext, type WalletReviewContext } from "@/lib/transfers/review-context";
 import { getWalletReviewContextRevision, publishWalletReviewContext, subscribeWalletReviewContextRevision } from "@/lib/transfers/review-context-revision";
 import { useProvidusWallet } from "@/hooks/use-providus-wallet";
-import { BOT_MAINNET_STATUS } from "@/lib/product/positioning";
+import { resolvePaymentCardView } from "@/lib/transfers/payment-card-view";
+import type { PaymentCardView } from "@/lib/transfers/payment-card-view";
+import type { ApprovalState } from "@/lib/wallet/transfer-execution";
 
 type Status = { intent: WalletTransferIntent; submission: TransferSubmission | null; freshness: { fresh: boolean }; expired: boolean };
 type PlanResponse = { plan: ExecutionPlan; intent: WalletTransferIntent };
@@ -56,6 +59,7 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
   const [recoveryHash, setRecoveryHash] = useState<string | null>(null);
   const [uncertainBroadcast, setUncertainBroadcast] = useState(false);
   const [reviewAttempt, setReviewAttempt] = useState(0);
+  const [tokenAllowance, setTokenAllowance] = useState<{ reviewContextKey: string; state: ApprovalState } | null>(null);
   const mounted = useRef(true);
   const lock = useRef(false);
   // Public clients per chain (unconditional hooks); selection is plan-driven.
@@ -96,6 +100,10 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
     const result = await walletApi<Status>(`${path}/status`);
     if (mounted.current) setStatus(result);
   }, [path, auth.owner, walletApi]);
+  const revalidateAllowance = useCallback(async () => { await refresh(); }, [refresh]);
+  const onTokenAllowanceState = useCallback((state: ApprovalState, key: string) => {
+    setTokenAllowance((current) => current?.reviewContextKey === key && current.state === state ? current : { reviewContextKey: key, state });
+  }, []);
 
   useEffect(() => {
     if (!auth.owner || id || draft || action) return;
@@ -233,21 +241,54 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
   if (!auth.owner) return draft ? <div className="p-4 font-proof text-sm" role="status">Sign in with your connected wallet before continuing this payment.</div> : null;
   const intent = status?.intent;
   const submission = status?.submission;
-  const verified = submission?.status === "confirmed" && Boolean(submission.verifiedAt);
   const disabled = busy || pending;
   const needsAddress = action?.type === "ask_recipient_address";
   const recipientAction = action?.type === "confirm_recipient" || action?.type === "offer_save_recipient";
-  const verifying = Boolean(submission?.txHash || recoveryHash);
-  const phase = verified ? "Verified" : submission?.status === "failed" ? "Failed" : submission?.status === "unknown" ? "Status unknown / needs recheck" : verifying ? "Verifying transaction" : stage;
+  const tokenRequired = Boolean(intent?.tokenAddress);
+  const allowanceState = tokenAllowance?.reviewContextKey === reviewContextKey ? tokenAllowance.state : null;
+  const view = intent && status ? resolvePaymentCardView({
+    submission: submission ?? null,
+    freshnessFresh: status.freshness.fresh,
+    intentExpired: status.expired,
+    intentPending: intent.status === "pending",
+    intentCancelled: intent.status === "cancelled",
+    recoveryHash,
+    uncertainBroadcast,
+    pendingWalletConfirmation: busy && stage === "Awaiting wallet approval",
+    paymentPreparationPending: busy && stage === "Preparing",
+    supportedNetwork: intent.chainId === 968 || intent.chainId === 677,
+    accountMatches: Boolean(address && auth.owner && address.toLowerCase() === auth.owner.toLowerCase()),
+    networkMatches: chainId === intent.chainId,
+    hasPlan: Boolean(currentPlan),
+    hasGas: Boolean(currentGas),
+    reviewError: Boolean(currentReviewError),
+    tokenRequired,
+    allowanceState,
+  }) : null;
 
-  return <section aria-label="Wallet payment" className="mx-3 my-3 space-y-3 rounded-xl border border-ledger-edge bg-receipt-field p-4 font-proof text-sm sm:mx-4">
-    <h3 className="font-semibold text-ledger-stone">{verified ? "Verified on-chain receipt" : "Wallet payment"}</h3>
-    {!draft && !action && <form className="space-y-2" onSubmit={event => { event.preventDefault(); void run(async () => {
-      const lookup = lookupId.trim();
-      if (!lookup) throw new Error("Enter a BOT payment ID.");
-      const result = await walletApi<Status>(`/api/transfers/${encodeURIComponent(lookup)}/status`);
-      setPlan(null); setGas(null); setRecoveryHash(null); setUncertainBroadcast(false); setId(lookup); setStatus(result);
-    }); }}><label htmlFor="bot-payment-lookup">Resume a BOT payment by ID</label><input id="bot-payment-lookup" className="min-h-11 w-full rounded-lg border border-ledger-edge bg-clear-paper px-3" value={lookupId} onChange={event => setLookupId(event.target.value)} placeholder="pi_…" /><button className={button} disabled={disabled}>Load BOT payment</button></form>}
+  if (!draft && !action && !intent && !uncertainBroadcast && !recoveryHash) {
+    return <details className="mx-4 mb-2 rounded-lg border border-ledger-edge bg-receipt-field px-3 py-2 font-proof text-sm">
+      <summary className="min-h-11 cursor-pointer py-2 font-semibold text-ledger-stone focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green">Find a BOT payment</summary>
+      <form className="space-y-2 pb-2" onSubmit={event => { event.preventDefault(); void run(async () => {
+        const lookup = lookupId.trim();
+        if (!lookup) throw new Error("Enter a BOT payment ID.");
+        const result = await walletApi<Status>(`/api/transfers/${encodeURIComponent(lookup)}/status`);
+        setPlan(null); setGas(null); setRecoveryHash(null); setUncertainBroadcast(false); setId(lookup); setStatus(result);
+      }); }}>
+        <label htmlFor="bot-payment-lookup">Payment ID</label>
+        <input id="bot-payment-lookup" className="min-h-11 w-full rounded-lg border border-ledger-edge bg-clear-paper px-3" value={lookupId} onChange={event => setLookupId(event.target.value)} placeholder="pi_…" />
+        <button className={button} disabled={disabled}>Load payment</button>
+      </form>
+      {error ? <p role="alert" className="break-words text-red-700">{error}</p> : null}
+    </details>;
+  }
+
+  const currentHash = submission?.txHash ?? recoveryHash;
+  const isVerified = view?.kind === "verified";
+  const currentViewLabel = view ? paymentStatusLabel(view) : null;
+
+  return <section aria-label="Wallet payment" className="mx-3 my-2 space-y-3 rounded-lg border border-ledger-edge bg-receipt-field p-3 font-proof text-sm sm:mx-4">
+    {!intent ? <h3 className="font-semibold text-ledger-stone">Wallet payment</h3> : null}
     {action?.type === "reject_unsupported_request" && <p role="alert">{action.reason}</p>}
     {action?.type === "ask_missing_details" && <p>Provide {action.missingFields.join(", ")} in the chat to continue.</p>}
     {action?.type === "cancelled" && <p>Payment cancelled. Nothing was authorized by chat.</p>}
@@ -263,61 +304,132 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
       <input id="bot-recipient-address" className="min-h-11 w-full rounded-lg border border-ledger-edge bg-clear-paper px-3" value={input} onChange={event => setInput(event.target.value)} autoComplete="off" required />
       <button className={button} disabled={disabled} type="submit">{editing ? "Update and review again" : "Review address"}</button>
     </form>}
-    {intent && <>
-      <p className="text-xs font-semibold text-provident-green" role="status">{verified ? "Independently verified on-chain." : submission?.status === "unknown" ? "Status unknown. Recheck the transaction without resending." : submission?.status === "failed" ? "Verification failed. Review the reason below." : verifying ? "Step 4 of 4: Verifying transaction." : stage === "Awaiting wallet approval" ? "Step 3 of 4: Confirm the transaction in your wallet." : "Step 2 of 4: Review the recipient and payment details."}</p>
-      <h4 className="text-xl font-semibold">{intent.amountDisplay} {intent.assetSymbol}</h4>
-      <dl className="grid grid-cols-1 gap-1 [&>dd]:mb-2 [&>dd]:break-all [&>dt]:text-receipt-grey">
-        <dt>Sending wallet</dt><dd>{intent.ownerAddress}</dd>
-        <dt>Recipient</dt><dd>{intent.recipientLabel}</dd>
-        <dt>Full recipient address</dt><dd data-testid="review-address">{intent.recipientAddress}</dd>
-        <dt>Network</dt><dd>{intent.chainId === 968 ? "BOT Chain Testnet" : "BOT Chain Mainnet"} · Chain ID {intent.chainId}</dd>
-        <dt>Asset contract</dt><dd>{intent.tokenAddress ?? "Native BOT"}</dd>
-        <dt>Estimated network gas</dt><dd>{currentGas ? `${currentGas} BOT, estimate may change` : "Unavailable until RPC estimation succeeds"}</dd>
-        <dt>Payment contract</dt><dd>{submission?.contractAddress ?? currentPlan?.to ?? "Execution disabled or unavailable"}</dd>
-        <dt>Intent expiry</dt><dd>{intent.expiresAt}</dd>
-        <dt>Payment status</dt><dd>{phase || intent.status}</dd>
-        <dt>Payment reference</dt><dd>{intent.id}</dd>
-      </dl>
-      {!submission && !recoveryHash && intent.chainId !== 968 && intent.chainId !== 677 && <p role="status">Unsupported network. Switch to a supported BOT Chain network.</p>}
-      {!submission && !recoveryHash && intent.chainId === 677 && !currentPlan && <p role="status">{BOT_MAINNET_STATUS.transactionLabel} ERC-20 approval is separate from payment.</p>}
-      {intent.tokenAddress && <TokenApprovalCard
-      enabled={Boolean(currentPlan && currentPlan.chainId === 677 && currentPlan.token)}
-      plan={currentPlan && currentPlan.chainId === 677 ? currentPlan : undefined}
-      client={client ?? undefined}
-      wallet={wallet ?? undefined}
-      revalidate={async () => { await refresh(); }}
-    />}
-      {!submission && !recoveryHash && !uncertainBroadcast && (intent.chainId === 968 || intent.chainId === 677) && intent.status === "pending" && status.freshness.fresh && <>
-        <p>Review these exact stored terms. Only approval in your wallet authorizes payment.</p>
-        {chainId !== intent.chainId ? <button className={primary} disabled={disabled || providusWallet.isNetworkSwitchPending} onClick={() => void run(() => providusWallet.requestNetworkSwitch(intent.chainId === 677 ? "botMainnet" : "botTestnet"))}>Switch to {intent.chainId === 677 ? "BOT Chain Mainnet" : "BOT Chain Testnet"}</button> : currentPlan && currentGas ? <button className={primary} disabled={disabled} onClick={() => void run(authorize)}>Approve in wallet</button> : currentReviewError ? <button className={primary} disabled={disabled} onClick={() => { setReviewError(null); setReviewAttempt(value => value + 1); }}>Retry review and gas estimate</button> : <p className="text-xs text-receipt-grey" role="status">Reviewing payment details and estimating gas…</p>}
-      </>}
-      {!status.freshness.fresh && !submission && <p role="alert">Payment expired or saved recipient changed. Cancel and prepare a fresh payment.</p>}
-    </>}
-    {uncertainBroadcast && !recoveryHash && !submission && <form className="space-y-2" onSubmit={event => { event.preventDefault(); void run(async () => {
+    {intent && view ? <>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-ledger-stone" role="status" aria-live="polite">{currentViewLabel}</p>
+        {isVerified ? <span className="rounded-full bg-provident-green/10 px-2.5 py-1 text-xs font-semibold text-provident-green">Verified</span> : null}
+      </div>
+      <div>
+        <h3 className="text-2xl font-semibold tracking-tight text-ledger-stone">
+          {view.kind === "verified" ? "Sent" : view.kind === "failed" ? "Payment failed" : view.kind === "unknown" ? "Payment status unknown for" : view.kind === "verification_pending" ? "Checking" : view.kind === "cancelled" ? "Cancelled payment" : view.kind === "stale" ? "Changed payment" : view.kind === "expired" ? "Expired payment" : view.kind === "unsupported" ? "Unavailable payment" : "Pay"} {intent.amountDisplay} {intent.assetSymbol}
+        </h3>
+        <p className="mt-1 text-sm text-receipt-grey">To {intent.recipientLabel}</p>
+        <p className="mt-1 break-all text-xs text-ledger-stone" data-testid="review-address">{intent.recipientAddress}</p>
+        <p className="mt-2 text-xs font-semibold text-ledger-stone">{intent.chainId === 968 ? "BOT Chain Testnet" : "BOT Chain Mainnet"}</p>
+        {!isVerified ? <p className="mt-1 text-xs text-receipt-grey">Valid until {intent.expiresAt}</p> : null}
+      </div>
+      {view.kind === "review" && view.nextAction !== "check_allowance" && view.nextAction !== "approve_allowance" && view.nextAction !== "await_allowance_wallet" && view.nextAction !== "verify_allowance" ? <p className="text-xs leading-5 text-receipt-grey">{paymentStatusMessage(view.nextAction)}</p> : null}
+      {view.kind === "failed" ? <p role="alert" className="text-sm text-loss-red">{view.reason ?? "The transaction failed verification."} No payment retry is available from this card.</p> : null}
+      {view.kind === "unknown" ? <p role="alert" className="text-sm text-loss-red">{view.reason ?? (view.needsHashRecovery ? "Check your wallet activity and recover the existing transaction hash. Do not send again." : "The transaction status is unknown. Recheck the existing transaction without resending.")}</p> : null}
+      {view.kind === "cancelled" ? <p role="status" className="text-sm text-receipt-grey">This payment was cancelled. No new wallet authorization is available from this intent.</p> : null}
+      {view.kind === "stale" ? <p role="status" className="text-sm text-receipt-grey">Payment details changed after review. Ask Providus to prepare a fresh payment before authorizing anything.</p> : null}
+      {view.kind === "expired" ? <p role="status" className="text-sm text-receipt-grey">This payment intent expired. Ask Providus to prepare a fresh payment.</p> : null}
+      {view.kind === "unsupported" ? <p role="status" className="text-sm text-receipt-grey">This payment uses an unsupported network. No transaction can be sent from this intent.</p> : null}
+      {view.kind === "verified" ? <Link href="/receipt" className={`${primary} inline-flex min-h-11 items-center justify-center rounded-lg px-4 no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green`}>View receipt</Link> : null}
+      {view.kind === "review" && intent.tokenAddress && currentPlan && (currentPlan.chainId === 677 || currentPlan.chainId === 968) && view.nextAction !== "switch_network" && view.nextAction !== "retry_review" && view.nextAction !== "prepare_review" ? <TokenApprovalCard
+        key={reviewContextKey ?? "stale-review"}
+        enabled={Boolean(currentPlan.token && reviewContextKey)}
+        plan={currentPlan}
+        client={client ?? undefined}
+        wallet={wallet ?? undefined}
+        revalidate={revalidateAllowance}
+        reviewContextKey={reviewContextKey ?? ""}
+        onStateChange={onTokenAllowanceState}
+      /> : null}
+      {view.kind === "review" && view.nextAction === "switch_network" ? <button type="button" className={primary} disabled={disabled || providusWallet.isNetworkSwitchPending} onClick={() => void run(() => providusWallet.requestNetworkSwitch(intent.chainId === 677 ? "botMainnet" : "botTestnet"))}>Switch to {intent.chainId === 677 ? "BOT Chain Mainnet" : "BOT Chain Testnet"}</button> : null}
+      {view.kind === "review" && view.nextAction === "retry_review" ? <button type="button" className={primary} disabled={disabled} onClick={() => { setReviewError(null); setReviewAttempt(value => value + 1); }}>Retry payment review</button> : null}
+      {view.kind === "review" && view.nextAction === "confirm_payment" ? <button type="button" className={primary} disabled={disabled} onClick={() => void run(authorize)}>Confirm payment in wallet</button> : null}
+      {view.kind === "review" && view.nextAction === "check_allowance" ? <p className="text-xs text-receipt-grey" role="status">Checking the exact token allowance before showing the next action.</p> : null}
+      {view.kind === "review" && view.nextAction === "await_allowance_wallet" ? <p className="text-xs text-receipt-grey" role="status">Waiting for the separate token approval in your wallet. Payment has not been sent.</p> : null}
+      {view.kind === "review" && view.nextAction === "verify_allowance" ? <p className="text-xs text-receipt-grey" role="status">Token approval submitted. Waiting for confirmation. Payment has not been sent.</p> : null}
+      {view.kind === "review" && view.nextAction === "await_payment_wallet" ? <p className="text-xs text-receipt-grey" role="status">Waiting for your wallet response. No payment was submitted until you approve it.</p> : null}
+      {view.kind === "review" && view.nextAction === "connect_wallet" ? <p className="text-xs text-receipt-grey" role="status">Connect the wallet used to sign in before continuing this payment.</p> : null}
+      {view.kind === "review" && view.nextAction === "prepare_review" ? <p className="text-xs text-receipt-grey" role="status">Preparing the exact payment terms and current gas estimate…</p> : null}
+      {view.kind === "review" && view.nextAction === "prepare_payment" ? <p className="text-xs text-receipt-grey" role="status">Checking payment terms before opening your wallet…</p> : null}
+    </> : null}
+    {view?.kind === "unknown" && view.needsHashRecovery ? <form className="space-y-2" onSubmit={event => { event.preventDefault(); void run(async () => {
       if (!/^0x[0-9a-fA-F]{64}$/.test(input)) throw new Error("Enter the transaction hash from your wallet activity.");
       setRecoveryHash(input);
       localStorage.setItem(storageKey, JSON.stringify({ id, hash: input }));
       await walletApi(`${path}/submission`, { txHash: input }); await refresh();
-    }); }}><p role="alert">The earlier wallet request may have broadcast. Check wallet activity. Do not send again.</p><label htmlFor="bot-recovery-hash">Transaction hash from wallet activity</label><input id="bot-recovery-hash" className="min-h-11 w-full rounded-lg border px-3" value={input} onChange={event => setInput(event.target.value)} /><button className={button} disabled={disabled}>Recover transaction</button></form>}
-    {(submission?.txHash || recoveryHash) && <div className="space-y-2">
-      <p className="break-all">Transaction hash {submission?.txHash ?? recoveryHash}</p>
-      <a className="underline" href={`${EXPLORERS[intent?.chainId ?? 968] ?? EXPLORERS[968]}/tx/${submission?.txHash ?? recoveryHash}`} target="_blank" rel="noreferrer">View on {intent?.chainId === 677 ? "BOT Chain" : "BOT Testnet"} explorer</a>
-      {submission && <p>{submission.confirmations ?? 0} confirmations {submission.verifiedAt ? `· Verified ${submission.verifiedAt}` : "· Awaiting independent verification"}</p>}
-      {submission?.failureReason && <p role="alert">{submission.failureReason}</p>}
+    }); }}><p role="alert">A wallet request may have broadcast. Check wallet activity and recover the existing hash. Do not send again.</p><label htmlFor="bot-recovery-hash">Transaction hash from wallet activity</label><input id="bot-recovery-hash" className="min-h-11 w-full rounded-lg border border-ledger-edge bg-clear-paper px-3" value={input} onChange={event => setInput(event.target.value)} /><button className={primary} disabled={disabled}>Recover existing transaction</button></form> : null}
+    {(view?.kind === "verification_pending" || (view?.kind === "unknown" && !view.needsHashRecovery)) ? <div className="flex flex-wrap items-center gap-3">
+      {currentHash ? <a className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green" href={`${EXPLORERS[intent?.chainId ?? 968] ?? EXPLORERS[968]}/tx/${currentHash}`} target="_blank" rel="noreferrer">View transaction</a> : null}
       <button className={button} disabled={disabled} onClick={() => void run(async () => {
         if (!submission && recoveryHash) await walletApi(`${path}/submission`, { txHash: recoveryHash });
         else await walletApi(`${path}/submission`, { recheck: true });
         await refresh();
-      })}>Recheck payment, never resend</button>
-      <p>On-chain verification proves a transfer to this address. It does not verify the recipient&apos;s real-world identity.</p>
-    </div>}
-    {phase && <p role="status" aria-live="polite">{phase}</p>}
-    {error && <p role="alert" className="break-words text-red-700">{error}</p>}
-    {!submission && !recoveryHash && !uncertainBroadcast && draft && <div className="flex flex-wrap gap-2">
-      <button className={button} disabled={disabled} onClick={() => setEditing(!editing)}>Edit recipient</button>
-      <button className={button} disabled={disabled} onClick={() => void run(async () => { if (id) await walletApi(path, undefined, "DELETE"); setPlan(null); await send("cancel"); })}>Cancel payment</button>
-    </div>}
+      })}>Recheck status</button>
+    </div> : null}
+    {view ? <details className="border-t border-ledger-edge pt-2">
+      <summary className="min-h-11 cursor-pointer py-2 text-xs font-semibold text-ledger-stone focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green">{isVerified ? "Transaction proof" : "Payment details"}</summary>
+      <dl className="grid grid-cols-1 gap-1 break-all pb-2 text-xs [&>dd]:mb-2 [&>dt]:text-receipt-grey">
+        <dt>Current status</dt><dd>{currentViewLabel}</dd>
+        <dt>Payment reference</dt><dd>{intent?.id}</dd>
+        <dt>Chain ID</dt><dd>{intent?.chainId}</dd>
+        <dt>Sending wallet</dt><dd>{intent?.ownerAddress}</dd>
+        <dt>Recipient address</dt><dd>{intent?.recipientAddress}</dd>
+        <dt>Asset contract</dt><dd>{intent?.tokenAddress ?? "Native BOT"}</dd>
+        {submission?.contractAddress ?? currentPlan?.to ? <><dt>Payment contract</dt><dd>{submission?.contractAddress ?? currentPlan?.to}</dd></> : null}
+        {currentGas ? <><dt>Estimated network gas</dt><dd>{currentGas} BOT, estimate may change</dd></> : null}
+        {currentPlan ? <><dt>Call value</dt><dd>{currentPlan.value}</dd><dt>Contract call data</dt><dd>{currentPlan.data}</dd></> : null}
+        {allowanceState ? <><dt>Token allowance state</dt><dd>{allowanceState}</dd></> : null}
+        {currentHash ? <><dt>Transaction hash</dt><dd>{currentHash}</dd><dt>Explorer</dt><dd><a className="underline" href={`${EXPLORERS[intent?.chainId ?? 968] ?? EXPLORERS[968]}/tx/${currentHash}`} target="_blank" rel="noreferrer">Open on {intent?.chainId === 677 ? "BOT Chain" : "BOT Testnet"}</a></dd></> : null}
+        {submission?.blockNumber != null ? <><dt>Block</dt><dd>{submission.blockNumber}</dd></> : null}
+        {submission?.confirmations != null ? <><dt>Confirmations</dt><dd>{submission.confirmations}</dd></> : null}
+        {submission?.verifiedAt ? <><dt>Verified at</dt><dd>{submission.verifiedAt}</dd></> : null}
+        {submission?.failureReason ? <><dt>Verification detail</dt><dd>{submission.failureReason}</dd></> : null}
+      </dl>
+    </details> : null}
+    {error ? <p role="alert" className="break-words text-red-700">{error}</p> : null}
+    {view?.kind === "review" && !submission && !recoveryHash && !uncertainBroadcast && draft ? <div className="flex flex-wrap gap-2 border-t border-ledger-edge pt-2">
+      <button type="button" className={button} disabled={disabled} onClick={() => setEditing(!editing)}>Edit recipient</button>
+      <button type="button" className={button} disabled={disabled} onClick={() => void run(async () => { if (id) await walletApi(path, undefined, "DELETE"); setPlan(null); await send("cancel"); })}>Cancel payment</button>
+    </div> : null}
   </section>;
 }
 
 function message(error: unknown) { return error instanceof Error ? error.message : "Payment status unknown. Recheck without sending again."; }
+
+function paymentStatusLabel(view: PaymentCardView): string {
+  switch (view.kind) {
+    case "verified": return "Payment verified";
+    case "failed": return "Payment failed";
+    case "unknown": return "Payment status unknown";
+    case "verification_pending": return "Verification in progress";
+    case "cancelled": return "Payment cancelled";
+    case "stale": return "Payment details changed";
+    case "expired": return "Payment review expired";
+    case "unsupported": return "Network unavailable";
+    case "review":
+      switch (view.nextAction) {
+        case "switch_network": return "Switch network to continue";
+        case "connect_wallet": return "Reconnect the signing wallet";
+        case "prepare_payment": return "Preparing payment";
+        case "retry_review": return "Payment review needs attention";
+        case "prepare_review": return "Preparing payment review";
+        case "check_allowance": return "Checking token allowance";
+        case "approve_allowance": return "Token approval required";
+        case "await_allowance_wallet": return "Token approval awaiting your wallet";
+        case "verify_allowance": return "Checking token approval";
+        case "confirm_payment": return "Ready for payment approval";
+        case "await_payment_wallet": return "Payment awaiting your wallet";
+      }
+  }
+}
+
+function paymentStatusMessage(action: Extract<PaymentCardView, { kind: "review" }> ["nextAction"]): string {
+  switch (action) {
+    case "switch_network": return "Switch to the payment network before reviewing this transfer.";
+    case "connect_wallet": return "Connect the wallet that owns this payment before continuing.";
+    case "prepare_payment": return "Preparing the payment details. No wallet request has been opened.";
+    case "retry_review": return "The payment terms or gas estimate could not be checked. Review again before authorizing anything.";
+    case "prepare_review": return "Checking the payment terms and current gas estimate before showing a wallet action.";
+    case "check_allowance": return "Checking the exact token allowance before showing an approval or payment action.";
+    case "approve_allowance": return "This token needs a separate, exact allowance approval. Payment will still require its own wallet confirmation.";
+    case "await_allowance_wallet": return "Approve the exact token allowance in your wallet. Payment has not been sent.";
+    case "verify_allowance": return "Checking the separate token approval. Payment has not been sent.";
+    case "confirm_payment": return "Review the full recipient address and amount. Your wallet will ask you to authorize the payment.";
+    case "await_payment_wallet": return "Waiting for your wallet response. Payment is submitted only after you approve it.";
+  }
+}

@@ -2,10 +2,9 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TokenApprovalCard, TokenApprovalStatus } from "@/components/assistant/token-approval-card";
 
-const blocked = renderToStaticMarkup(<TokenApprovalCard enabled={false} />);
-assert.match(blocked, /disabled=""/);
-assert.match(blocked, /disabled until B9/);
-assert.match(blocked, /never unlimited allowance/);
+const blocked = renderToStaticMarkup(<TokenApprovalCard enabled={false} reviewContextKey="blocked" onStateChange={() => {}} />);
+assert.match(blocked, /unavailable for this payment/);
+assert.doesNotMatch(blocked, /Approve exact allowance in wallet/);
 const confirming = renderToStaticMarkup(<TokenApprovalStatus enabled state="approval_confirming" />);
 assert.match(confirming, /Payment has not been sent/);
 const approved = renderToStaticMarkup(<TokenApprovalStatus enabled state="payment_ready" />);
