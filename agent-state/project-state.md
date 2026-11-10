@@ -1,5 +1,15 @@
 # Providus — Project State
 
+## Story-driven UX audit and Mainnet status update, 2026-11-10
+- Added the evidence-based UX audit and staged experience plan in `docs/ux/`.
+- Replaced the stale Global Bank design document with the current Providus visual and interaction system in `DESIGN.md`.
+- Centralized BOT Mainnet status in `lib/product/positioning.ts`. Native BOT and Official USDT transaction evidence is verified. Production payment availability remains gated pending separate launch authorization. BOT-funded utilities remain unavailable without independently verified settlement and provider delivery.
+- Updated current Mainnet status copy across the app, README, and AGENTS.md. No payment engine, production gate, contract, database schema, migration, production data, or wallet transaction changed.
+- Owner-supplied Mainnet transaction hashes: native BOT `0x13787ebb2dd9cdb10be10f6b15cdb7b25790da9a7e82bc53ca2d1339b92f663f`; Official USDT `0x0360a9b7755ebf334ce19f8658262a3e79c96c401dd710233f43778c219f05bf`. The live local dashboard showed the USDT hash as B5 verified with 30 confirmations.
+- Current gaps: verified BOT cards do not link to a Providus receipt, receipt history is Celo-only, B5 lacks persisted gas fee values, approval transactions have no separate ledger, chat history is client-held, and general user memory is absent.
+- The next Fast-Build slice is compact payment review and verified completion. It must preserve B3/B5 semantics and unknown payment recovery. See `.fast-build/STATE.md`.
+- Verification for this checkpoint is pending.
+
 ## B9 UX hotfix completed, 2026-11-09
 - Scope: multichain wallet dropdown/switching, session-state clarity, assistant and review copy. No payment execution rebuild, contract/backend/schema change, push, deploy, production write, or mainnet transaction.
 - B1 registry defines Celo 42220, BOT Mainnet 677, BOT Testnet 968. Wagmi registers all three while existing Celo-only readiness remains required by cash-out and airtime.

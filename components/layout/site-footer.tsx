@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
-import { BOT_CHAIN_LINKS } from "@/lib/product/positioning";
+import { BOT_CHAIN_LINKS, BOT_MAINNET_STATUS } from "@/lib/product/positioning";
 
 const FOOTER_LINKS = [
   { href: "/how-it-works", label: "How it works" },
@@ -54,8 +54,8 @@ export function SiteFooter() {
                 <li>Web dashboard is the current channel</li>
                 <li>No custody or silent wallet approval</li>
                 <li>Celo is live; BOT Testnet is verified</li>
-                <li>BOT Chain mainnet is pending B9</li>
-                <li>BOT-funded utilities need a verified settlement route</li>
+                <li>{BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel}</li>
+                <li>{BOT_MAINNET_STATUS.utilityLabel}</li>
                 <li>Quotes are estimates with freshness and assumptions</li>
                 <li>Future services are roadmap, not shipped</li>
               </ul>
@@ -69,7 +69,7 @@ export function SiteFooter() {
               src="/brand/bot-chain-official-logo.png"
               alt="BOT Chain"
               width={150}
-              height={28}
+              height={29}
               className="h-7 w-auto max-w-[150px]"
               style={{ width: "auto", height: "auto" }}
             />

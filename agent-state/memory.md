@@ -1,5 +1,13 @@
 # Providus — Memory (decisions, invariants, lessons)
 
+## Mainnet evidence and production gate, 2026-11-10
+- Native BOT and Official USDT transactions on BOT Chain Mainnet have verified evidence. Their hashes are recorded in `agent-state/project-state.md`.
+- Mainnet transaction verification does not authorize production availability. Keep the production payment gate until separate launch authorization.
+- Use `BOT_MAINNET_STATUS` in `lib/product/positioning.ts` to distinguish verified transaction evidence, gated production payments, and unavailable utility payments.
+- Mainnet payment approvals and transfers stay separate wallet actions where ERC-20 allowance is required. B5 confirmed plus `verifiedAt` is the only verified payment UI state.
+- Do not add chat, message, memory, gas, or approval schema without explicit review, backup and restore planning, and wallet-isolation proof.
+- Keep conversation sessions, conversation messages, saved recipients, memory facts, Celo transactions, and BOT transfer submissions as distinct data concepts.
+
 ## B9 wallet UX invariants, 2026-11-09
 - Keep B1 registry metadata authoritative for 42220, 677, and 968. A recognized/switchable network does not grant payment capability.
 - Do not force Celo during connect. Network changes require an explicit user action and provider-confirmed resulting chain.

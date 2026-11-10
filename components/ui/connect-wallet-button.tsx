@@ -11,6 +11,7 @@ import { networkSetupCopy, WALLET_NETWORK_OPTIONS } from "@/lib/wallet/network";
 import { truncateAddress } from "@/lib/wallet/format";
 import type { SupportedWalletId } from "@/lib/wallet/supported-wallets";
 import { cn } from "@/lib/cn";
+import { BOT_MAINNET_STATUS } from "@/lib/product/positioning";
 
 type ConnectWalletButtonProps = {
   className?: string;
@@ -241,7 +242,7 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
                 {WALLET_NETWORK_OPTIONS.map((option) => {
                   const current = activeNetwork.kind === "supported" && activeNetwork.chainId === option.chainId;
                   const targetPending = switching && switchTarget === option.key;
-                  const availability = option.key === "botMainnet" ? "Payments coming soon" : option.key === "botTestnet" ? "Verified BOT Testnet transfers" : "Celo airtime and cash-out";
+                  const availability = option.key === "botMainnet" ? BOT_MAINNET_STATUS.networkLabel : option.key === "botTestnet" ? "Verified BOT Testnet transfers" : "Celo airtime and cash-out";
                   return <li key={option.key}>
                     <button type="button" disabled={current || wallet.isNetworkSwitchPending} aria-pressed={current} aria-label={current ? `${option.displayName}, current network` : `Switch to ${option.displayName}, chain ID ${option.chainId}`} onClick={() => { wallet.clearNetworkSwitchMessage(); void wallet.requestNetworkSwitch(option.key); }} className={cn("flex min-h-12 w-full items-center justify-between gap-3 rounded-[10px] border-ledger px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green", current ? "bg-provident-green/10 text-ledger-stone" : "bg-receipt-field text-ledger-stone hover:bg-ledger-edge/50", wallet.isNetworkSwitchPending && !targetPending && "opacity-60")}>
                       <span className="min-w-0"><span className="block truncate text-sm font-semibold">{option.displayName}</span><span className="block truncate font-proof text-[10px] text-receipt-grey">{availability} · {option.chainId}</span></span>
@@ -250,7 +251,7 @@ export function ConnectWalletButton({ className, size = "sm", fullWidth = false,
                   </li>;
                 })}
               </ul>
-              {activeNetwork.kind === "supported" && activeNetwork.key === "botMainnet" ? <p className="rounded-[8px] bg-receipt-field px-3 py-2 text-xs font-semibold text-ledger-stone" role="status">BOT Chain Mainnet: Payments coming soon.</p> : null}
+              {activeNetwork.kind === "supported" && activeNetwork.key === "botMainnet" ? <p className="rounded-[8px] bg-receipt-field px-3 py-2 text-xs font-semibold text-ledger-stone" role="status">{BOT_MAINNET_STATUS.productionLabel}</p> : null}
               {wallet.networkSwitch.status === "requesting" ? <p className="text-xs text-receipt-grey" role="status">Confirm the network switch in your wallet.</p> : null}
               {wallet.networkSwitch.status === "slow" ? <p className="text-xs text-receipt-grey" role="status">Still waiting for wallet confirmation. Keep the wallet open. The active network changes only after confirmation.</p> : null}
               {confirmedTarget ? <p className="text-xs text-provident-green" role="status">Wallet confirmed {WALLET_NETWORK_OPTIONS.find((item) => item.key === confirmedTarget)?.displayName}.</p> : null}

@@ -14,6 +14,7 @@ import { TokenApprovalCard } from "@/components/assistant/token-approval-card";
 import { isSameWalletReviewContext, type WalletReviewContext } from "@/lib/transfers/review-context";
 import { getWalletReviewContextRevision, publishWalletReviewContext, subscribeWalletReviewContextRevision } from "@/lib/transfers/review-context-revision";
 import { useProvidusWallet } from "@/hooks/use-providus-wallet";
+import { BOT_MAINNET_STATUS } from "@/lib/product/positioning";
 
 type Status = { intent: WalletTransferIntent; submission: TransferSubmission | null; freshness: { fresh: boolean }; expired: boolean };
 type PlanResponse = { plan: ExecutionPlan; intent: WalletTransferIntent };
@@ -278,7 +279,7 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
         <dt>Payment reference</dt><dd>{intent.id}</dd>
       </dl>
       {!submission && !recoveryHash && intent.chainId !== 968 && intent.chainId !== 677 && <p role="status">Unsupported network. Switch to a supported BOT Chain network.</p>}
-      {!submission && !recoveryHash && intent.chainId === 677 && !currentPlan && <p role="status">BOT Chain Mainnet: Payments coming soon. ERC-20 approval is separate from payment. Mainnet execution is disabled in this build.</p>}
+      {!submission && !recoveryHash && intent.chainId === 677 && !currentPlan && <p role="status">{BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} ERC-20 approval is separate from payment.</p>}
       {intent.tokenAddress && <TokenApprovalCard
       enabled={Boolean(currentPlan && currentPlan.chainId === 677 && currentPlan.token)}
       plan={currentPlan && currentPlan.chainId === 677 ? currentPlan : undefined}

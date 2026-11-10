@@ -1,25 +1,28 @@
-# Left Off: B9 wallet UX hotfix complete
+# Left off: Providus UX audit complete
 
 ## What we are doing
-- The focused B9 frontend UX slice is complete. Stop here unless the user asks for new work.
-- Mainnet payment execution remains hard-gated. No push, deploy, migration, production write, or new payment transaction.
+- Phase 0 evidence-based UX audit and story-driven experience plan are complete.
+- Mainnet copy now distinguishes verified native BOT and Official USDT transaction evidence from gated production payment availability.
+- No payment engine, contract, database schema, migration, production data, deployment, push, wallet signature, or new transaction changed.
 
 ## Done
-- Read current project state, UI system, skills, and wallet/auth/assistant/review flows.
-- Cross-judged two independent designs. Decision and risks are in `.audit/b9-ux-hotfix-design.md`.
-- Baseline `npm run test:all`, `npx tsc --noEmit`, and `npm run lint` all pass before source edits.
-- Added `test:wallet-network`, wired into `test:all`. It covers B1 metadata, mocked add/switch/rejection/disconnect/RPC outcomes, auth states, and stale reviews. It passes; no real wallet or transaction was used.
-- Wired all three registry networks into wagmi and the wallet dropdown. Connect no longer forces Celo. Network rows switch explicitly and show provider-confirmed state, balances, explorers, manual setup, and network availability.
-- Added shared auth UI state, normalized wallet matching, stale-request suppression, owner-bound assistant draft clearing, and immediate plan/gas invalidation on account or chain events. Chain switches don't force logout under current server owner policy.
-- Updated assistant examples, BOT review steps/status, and Celo airtime chain gating. 677 remains switchable and blocked at execution.
-- Full `npm run test:all` passes, including `test:web-execution` for the mainnet hard gate and 14 local contract unit tests. `npx tsc --noEmit`, `npm run lint`, `npm run build` with `DATABASE_URL` empty, and `git diff --check` pass.
-- Mocked-wallet UI checks and desktop/mobile captures are saved under `.audit/b9-ux-hotfix/`. No wallet signature or transaction broadcast was requested by the test provider.
-- Local source checkpoints are `7fa05ac` and `519bc88`. Nothing was pushed.
+- Inspected the live dashboard and receipt route, B7/B8 screenshots, B9 wallet menu screenshots, payment and receipt components, B5 status route, schema, assistant chat route, design tokens, and project instructions.
+- Saved `docs/ux/providus-story-driven-ux-audit.md` and `docs/ux/providus-story-driven-experience-plan.md`.
+- Updated `DESIGN.md` to match the current Providus visual system.
+- Centralized BOT Mainnet messaging in `lib/product/positioning.ts` and updated the visible app copy, README, and AGENTS.md. The production execution gate remains unchanged.
+- Updated `.fast-build/STATE.md`, `agent-state/project-state.md`, and `agent-state/memory.md`.
+- The live local dashboard showed the supplied Official USDT hash as B5 verified with 30 confirmations. No wallet signature or payment was triggered.
 
 ## Next
-1. None for this slice. If resumed, start from the current local main commit and preserve all existing untracked folders.
+1. Run an isolated production build so the active development server and `.next` data stay untouched.
+2. Start the next Fast-Build slice with compact payment review and verified completion. First settle its read-only receipt data shape against B5. Preserve unknown and submitted-payment evidence.
+
+## Verification
+- `npm run test:b8-positioning`, `npm run test:web-execution`, `npx tsc --noEmit`, `npm run lint`, and `git diff --check` pass.
+- Playwright CLI reload reports zero errors and zero warnings after the BOT logo dimensions were corrected. The 390px viewport has no horizontal overflow.
+- Full keyboard, receipt-modal, and payment-state E2E coverage remains for the dedicated QA slice.
 
 ## Worktree and risks
-- Preserve pre-existing untracked `.omp/`, `bridge/`, and `video-demo/` content.
-- Existing `npm run dev` server at port 3000 may use live environment values. It was not used or stopped for mock-wallet checks.
-- Never remount the payment review card on chain change. Preserve B5 hash and unknown-broadcast recovery.
+- Preserve pre-existing untracked `.omp/`, `bridge/`, and `video-demo/` folders.
+- Do not run database migrations until explicit review, backup and restore planning, and verified wallet isolation are complete.
+- Do not deploy, push, write production data, or initiate Mainnet transactions.

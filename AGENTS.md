@@ -6,8 +6,8 @@
 - Auto-clean temporary files and build clutter.
 - Keep the repository in a recoverable state.
 - B7 overrides automatic push. Keep B7 local, with no deploy or production database writes. Migrations through 0006 already exist and must not be rerun.
-- BOT payments require explicit review-card wallet authorization and B5 verification before success. Mainnet execution stays disabled until B9, regardless of environment configuration.
-- B8 positioning must describe Celo and BOT Chain with availability labels. BOT Testnet is verified, BOT Chain mainnet is pending B9, and BOT-funded utility payments are not live without an independently verified settlement and provider-delivery route.
+- BOT payments require explicit review-card wallet authorization and B5 verification before success. Controlled BOT Chain Mainnet browser transactions using native BOT and Official USDT are verified. Production payment execution remains gated pending separate launch authorization, regardless of environment configuration.
+- B8 positioning must describe Celo and BOT Chain with availability labels. BOT Testnet transfers are verified, BOT Chain Mainnet transaction evidence is verified while production availability remains gated, and BOT-funded utility payments are not live without an independently verified settlement and provider-delivery route.
 - Use the official BOT Chain website `https://www.botchain.ai`, mainnet explorer `https://scan.botchain.ai`, and testnet explorer `https://scan.bohr.life`. Never fabricate partner branding or announce mainnet launch early.
 - For B9 wallet UX, network selection and payment capability are independent. Use the B1 chain registry for network metadata, keep 677 payment execution blocked, and retain B5 verified receipt semantics.
 - Wallet account changes must clear prior-owner assistant drafts and ignore stale async results while preserving submitted/unknown payment recovery evidence. A chain switch alone does not invalidate SIWE under the current `requireOwner` policy.

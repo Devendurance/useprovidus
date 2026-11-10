@@ -59,9 +59,9 @@ Current user-facing flows:
 | Network | Availability | Current payment use | Assets and limits |
 |---|---|---|---|
 | **Celo** | Live | Nigerian airtime and bank cash-out | USDC and cNGN. Airtime has a live mainnet proof. |
-| **BOT Chain** | Testnet verified | Named-recipient wallet transfers | Native BOT on BOT Testnet, chain ID 968. Mainnet payment submission is pending B9. |
+| **BOT Chain** | Testnet verified; Mainnet transaction evidence verified | Named-recipient wallet transfers on BOT Testnet | Native BOT on BOT Testnet, chain ID 968. Native BOT and Official USDT Mainnet transactions are independently verified. Production payment availability remains gated pending separate launch authorization. |
 
-BOT Chain mainnet explorer links to [`scan.botchain.ai`](https://scan.botchain.ai). Testnet transaction proof uses [`scan.bohr.life`](https://scan.bohr.life). BOT-funded airtime, data, electricity and cable payments are not live. They need a supported conversion or settlement route, provider delivery and independent verification before launch.
+BOT Chain Mainnet proof uses [`scan.botchain.ai`](https://scan.botchain.ai). Testnet transaction proof uses [`scan.bohr.life`](https://scan.bohr.life). Production Mainnet payment availability remains gated pending separate launch authorization. BOT-funded airtime, data, electricity and cable payments are not live. They need a supported conversion or settlement route, provider delivery and independent verification before launch.
 
 
 ### Supported airtime payment assets

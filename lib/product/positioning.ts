@@ -12,6 +12,13 @@ export type ExecutionDomain = {
   boundary: string;
 };
 
+export const BOT_MAINNET_STATUS = {
+  transactionLabel: "Native BOT and Official USDT transactions are independently verified on BOT Chain Mainnet.",
+  productionLabel: "Production payment availability remains gated pending separate launch authorization.",
+  utilityLabel: "BOT-funded utilities are not live without an independently verified settlement and provider-delivery route.",
+  networkLabel: "Transactions verified · production gated",
+} as const;
+
 export const PRODUCT_POSITIONING = {
   tagline: "Ask. Approve. Prove.",
   heroHeadline: "Payments that understand your intent. And prove the outcome.",
@@ -40,7 +47,7 @@ export const EXECUTION_DOMAINS: readonly ExecutionDomain[] = [
     examples: ["Pay Douglas 2 BOT", "Saved recipient lookup"],
     network: "BOT Testnet · chain ID 968",
     assets: "Native BOT on testnet",
-    boundary: "BOT Chain mainnet and BOT-funded utility payments are pending separate verification.",
+    boundary: `${BOT_MAINNET_STATUS.productionLabel} ${BOT_MAINNET_STATUS.utilityLabel}`,
   },
 ] as const;
 

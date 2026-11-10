@@ -23,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { BOT_CHAIN_LINKS, EXECUTION_DOMAINS } from "@/lib/product/positioning";
+import { BOT_CHAIN_LINKS, BOT_MAINNET_STATUS, EXECUTION_DOMAINS } from "@/lib/product/positioning";
 
 export const metadata: Metadata = {
   title: "How it works",
@@ -947,7 +947,7 @@ export default function HowItWorksPage() {
           ))}
         </div>
         <p className="mt-5 border-t border-ledger-edge pt-4 text-sm leading-6 text-receipt-grey">
-          BOT Testnet recipient payments are verified. BOT Chain mainnet payments and BOT-funded Nigerian utility payments remain pending separate B9 verification.
+          BOT Testnet recipient payments are verified. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} {BOT_MAINNET_STATUS.utilityLabel}
         </p>
       </section>
 

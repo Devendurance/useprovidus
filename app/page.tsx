@@ -4,6 +4,7 @@ import { ArrowRight, Coins, ExternalLink, Eye, ShieldCheck } from "lucide-react"
 import { CELO_EXPLORER_URL } from "@/lib/wallet/celo";
 import {
   BOT_CHAIN_LINKS,
+  BOT_MAINNET_STATUS,
   EXECUTION_DOMAINS,
   PRODUCT_POSITIONING,
   UTILITY_ROADMAP,
@@ -396,7 +397,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mt-6 max-w-[360px] text-[11px] leading-[18px] text-[#1A1A1A]/60 lg:mt-7 lg:max-w-[480px] lg:text-[13px] lg:leading-5">
-              Current channel: web dashboard. Celo services are live, and BOT Testnet recipient payments are verified. BOT Chain mainnet is pending B9.
+              Current channel: web dashboard. Celo services are live, and BOT Testnet recipient payments are verified. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel}
             </p>
           </div>
           <div className="relative mt-4 min-h-[360px] min-[600px]:min-h-[430px] md:min-h-[470px] lg:-ml-[clamp(56px,7.5vw,120px)] lg:mt-0 lg:h-full lg:min-h-[calc(100svh-81px)]">
@@ -508,7 +509,7 @@ export default function HomePage() {
             ))}
           </div>
           <p className="mt-5 rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#1A1A1A] px-4 py-3 text-sm leading-6 text-[#F5F2EA]/85">
-            BOT Testnet payment proof uses the testnet explorer. BOT Chain mainnet payment submission and BOT-funded Nigerian utility payments are not live.
+            BOT Testnet payment proof uses the testnet explorer. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} {BOT_MAINNET_STATUS.utilityLabel}
           </p>
         </div>
       </section>
@@ -701,7 +702,7 @@ export default function HomePage() {
                   <span className="font-semibold">{item.name}</span> · {item.availability === "live" ? "Live" : "Planned"} · {item.note}
                 </li>
               ))}
-              <li>BOT Chain mainnet and BOT-funded utility payments remain in development.</li>
+              <li>{BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} {BOT_MAINNET_STATUS.utilityLabel}</li>
             </ul>
             <p className="mt-5 border-t border-[#1A1A1A]/20 pt-4 text-xs leading-5 text-[#1A1A1A]/60">
               Any new utility route needs its own conversion, provider delivery and verification proof before it becomes a live claim.
@@ -713,7 +714,7 @@ export default function HomePage() {
                 src="/brand/bot-chain-official-logo.png"
                 alt="BOT Chain"
                 width={170}
-                height={32}
+                height={33}
                 className="h-8 w-auto max-w-[170px]"
                 style={{ width: "auto", height: "auto" }}
               />
