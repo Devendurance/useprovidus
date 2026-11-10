@@ -49,6 +49,8 @@ export function MessageBubble({ message, className }: MessageBubbleProps) {
               {formattedTime}
             </time>
           ) : null}
+          {message.turnStatus === "pending" ? <span role="status" className="mt-1 font-proof text-[10px] text-receipt-grey">Reply in progress</span> : null}
+          {message.turnStatus === "failed" ? <span role="status" className="mt-1 font-proof text-[10px] text-loss-red">Reply needs a retry</span> : null}
         </div>
       </div>
     );

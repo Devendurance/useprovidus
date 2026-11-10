@@ -23,6 +23,7 @@
     "test:ai": "npx --yes tsx --conditions=react-server lib/ai/self-check.ts",
     "test:channel": "npx --yes tsx --conditions=react-server lib/channels/imessage-self-check.ts",
     "test:assistant": "npx --yes tsx --conditions=react-server lib/assistant/validation-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/status-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/chat-route-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/provider-chain-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/preview-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/confirmation-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/preview-authority-self-check.ts && npx --yes tsx --conditions=react-server lib/assistant/payment-service-self-check.ts && npx --yes tsx components/assistant/self-check.ts",
+    "test:conversation-db": "npx --yes tsx --conditions=react-server lib/conversations/self-check.ts",
     "test:payment-card-view": "npx --yes tsx --conditions=react-server lib/transfers/payment-card-view-self-check.ts",
     "test:receipt": "npx --yes tsx lib/transactions/receipt-self-check.ts",
     "test:auth": "npx --yes tsx lib/auth/self-check.ts",
@@ -40,7 +41,8 @@
     "test:contract": "npx hardhat test",
     "test:all": "npm run test:wallet-helpers && npm run test:wallet-network && npm run test:money-helpers && npm run test:recipient-helpers && npm run test:order-helpers && npm run test:order-route && npm run test:attribution && npm run test:persistence && npm run test:reconciliation && npm run test:recovery-security && npm run test:clubkonnect && npm run test:ai && npm run test:receipt && npm run test:receipt-history && npm run test:chains && npm run test:auth && npm run test:auth-store && npm run test:recipients && npm run test:transfers && npm run test:execution && npm run test:web-execution && npm run test:submission && npm run test:verification && npm run test:mainnet-policy && npm run test:contract && npm run test:channel && npm run test:assistant && npm run test:wallet-assistant",
     "test:receipt-history": "npx --yes tsx lib/receipts/self-check.ts",
-    "test:p02-ui": "playwright test --config=playwright.p02.config.ts"
+    "test:p02-ui": "playwright test --config=playwright.p02.config.ts",
+    "test:p11-ui": "playwright test --config=playwright.p11.config.ts"
   },
   "dependencies": {
     "@celo/attribution-tags": "^0.3.0",

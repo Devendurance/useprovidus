@@ -12,6 +12,10 @@ import type {
   AssistantChatResponse,
   UserConversationMessage,
 } from "@/lib/assistant/types";
+import type {
+  ConversationMessageView,
+  ConversationSummary,
+} from "@/lib/conversations/types";
 import { normalizePaymentAssetSymbol, type PaymentAssetSymbol } from "@/lib/celo/assets";
 import { isSameWalletAddress, normalizeWalletAddress } from "@/lib/auth/wallet-ui-state";
 import type {
@@ -231,6 +235,18 @@ export function resolveRehydrationState(input: RehydrationStateInput): Rehydrati
 
 export interface UseAssistantState {
   messages: ConversationMessage[];
+  conversations: ConversationSummary[];
+  activeConversationId: string | null;
+  activeConversationTitle: string | null;
+  conversationOwner: string | null;
+  conversationsLoading: boolean;
+  conversationLoading: boolean;
+  conversationCreating: boolean;
+  conversationError: string | null;
+  conversationCursor: string | null;
+  olderBeforeSequence: number | null;
+  olderMessagesLoading: boolean;
+  retryableMessage: { turnId: string; content: string } | null;
   conversationAddress: string | null;
   walletAction: import("@/lib/assistant/types").WalletTransferAction | null;
   activeIntent: PaymentIntent | null;
@@ -262,6 +278,13 @@ export interface UseAssistantOptions {
 
 export interface UseAssistantResult extends UseAssistantState {
   send(message: string): Promise<void>;
+  createConversation(): Promise<boolean>;
+  openConversation(sessionId: string): Promise<boolean>;
+  renameConversation(sessionId: string, title: string): Promise<boolean>;
+  deleteConversation(sessionId: string): Promise<boolean>;
+  loadMoreConversations(): Promise<void>;
+  loadOlderMessages(): Promise<void>;
+  retryLastMessage(): Promise<void>;
   reset(): void;
   selectAsset(asset: PaymentAssetSymbol): void;
   confirmPayment(walletOverride?: string): Promise<void>;
@@ -272,6 +295,49 @@ export interface UseAssistantResult extends UseAssistantState {
   ): Promise<{ ok: boolean; celoTxHash?: string; error?: string }>;
   confirmDeposit(celoTxHash: string): Promise<{ ok: boolean; error?: string }>;
   loadTransaction(transactionId: string, walletOverride?: string): Promise<{ ok: boolean; error?: string }>;
+}
+
+function createClientUuid(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+    const value = Math.floor(Math.random() * 16);
+    return (character === "x" ? value : (value & 3) | 8).toString(16);
+  });
+}
+
+function updateConversationUrl(sessionId: string | null) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (sessionId) url.searchParams.set("conversation", sessionId);
+  else url.searchParams.delete("conversation");
+  window.history.replaceState(window.history.state, "", url);
+}
+
+function toConversationMessage(row: ConversationMessageView): ConversationMessage {
+  if (row.role === "user") {
+    return {
+      role: "user",
+      content: row.content,
+      timestamp: row.timestamp,
+      id: row.id,
+      sessionId: row.sessionId,
+      turnId: row.turnId,
+      sequence: row.sequence,
+      turnStatus: row.turnStatus,
+      failureCode: row.failureCode ?? null,
+    };
+  }
+  return {
+    role: "assistant",
+    content: row.content,
+    timestamp: row.timestamp,
+    id: row.id,
+    sessionId: row.sessionId,
+    turnId: row.turnId,
+    sequence: row.sequence,
+  };
 }
 
 /**
@@ -311,6 +377,18 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
   const walletTransferOwnerRef = useRef(options?.walletTransferOwner);
   useEffect(() => { walletTransferOwnerRef.current = options?.walletTransferOwner; }, [options?.walletTransferOwner]);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationTitle, setActiveConversationTitle] = useState<string | null>(null);
+  const [conversationOwner, setConversationOwner] = useState<string | null>(null);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [conversationLoading, setConversationLoading] = useState(false);
+  const [conversationCreating, setConversationCreating] = useState(false);
+  const [conversationError, setConversationError] = useState<string | null>(null);
+  const [conversationCursor, setConversationCursor] = useState<string | null>(null);
+  const [olderBeforeSequence, setOlderBeforeSequence] = useState<number | null>(null);
+  const [olderMessagesLoading, setOlderMessagesLoading] = useState(false);
+  const [retryableMessage, setRetryableMessage] = useState<{ turnId: string; content: string } | null>(null);
   const [activeIntent, setActiveIntent] = useState<PaymentIntent | null>(null);
   const [walletAction, setWalletAction] = useState<import("@/lib/assistant/types").WalletTransferAction | null>(null);
   const [pending, setPending] = useState(false);
@@ -339,6 +417,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
   const [rehydrationError, setRehydrationError] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const conversationsAbortRef = useRef<AbortController | null>(null);
+  const conversationAbortRef = useRef<AbortController | null>(null);
+  const olderMessagesAbortRef = useRef<AbortController | null>(null);
   const previewAbortControllerRef = useRef<AbortController | null>(null);
   const activeIntentRef = useRef<PaymentIntent | null>(activeIntent);
   const previewRef = useRef<AirtimePreview | null>(preview);
@@ -350,12 +431,32 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
   const assetRef = useRef<PaymentAssetSymbol>(asset);
   const prevIntentTupleRef = useRef<string | null>(null);
   const walletContextRevisionRef = useRef(0);
+  const conversationContextRevisionRef = useRef(0);
+  const conversationLoadRevisionRef = useRef(0);
+  const effectiveConversationOwnerRef = useRef<string | null>(null);
+  const activeConversationIdRef = useRef<string | null>(null);
+  const pendingRef = useRef(false);
+  const sendInFlightRef = useRef(false);
+  const walletAddressForConversationRef = useRef<string | null>(null);
+  const createRequestIdRef = useRef<string | null>(null);
+  const conversationContextRef = useRef<{ owner: string | null; address: string | null } | null>(null);
 
   // Wallet address resolution
   const connectedAddress = useSafeConnectedAddress();
+  const currentWalletAddress = normalizeWalletAddress(options?.walletAddress ?? connectedAddress) ?? null;
+  const normalizedOwner = normalizeWalletAddress(options?.walletTransferOwner);
+  const effectiveConversationOwner =
+    normalizedOwner &&
+    (!currentWalletAddress || isSameWalletAddress(normalizedOwner, currentWalletAddress))
+      ? normalizedOwner
+      : null;
   const [conversationAddress, setConversationAddress] = useState(() => normalizeWalletAddress(connectedAddress));
   const previousConnectedAddress = useRef(normalizeWalletAddress(connectedAddress));
   const previousTransferOwner = useRef(normalizeWalletAddress(options?.walletTransferOwner));
+  useEffect(() => {
+    effectiveConversationOwnerRef.current = effectiveConversationOwner;
+    walletAddressForConversationRef.current = currentWalletAddress;
+  }, [effectiveConversationOwner, currentWalletAddress]);
   useEffect(() => {
     const currentAddress = normalizeWalletAddress(connectedAddress);
     const currentOwner = normalizeWalletAddress(options?.walletTransferOwner);
@@ -365,8 +466,8 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     previousTransferOwner.current = currentOwner;
     if (!accountChanged && !ownerChanged) return;
     walletContextRevisionRef.current += 1;
-    if (!accountChanged && activeIntentRef.current?.type !== "wallet_transfer") return;
     setConversationAddress(currentAddress);
+    if (!accountChanged && activeIntentRef.current?.type !== "wallet_transfer") return;
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     previewAbortControllerRef.current?.abort();
@@ -378,6 +479,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     setActiveIntent(null);
     setWalletAction(null);
     setMessages([]);
+    pendingRef.current = false;
     setPending(false);
     setError(null);
     setPreview(null);
@@ -397,6 +499,10 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
   useEffect(() => {
     activeIntentRef.current = activeIntent;
   }, [activeIntent]);
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   useEffect(() => {
     previewRef.current = preview;
@@ -423,6 +529,9 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     return () => {
       abortControllerRef.current?.abort();
       previewAbortControllerRef.current?.abort();
+      conversationsAbortRef.current?.abort();
+      conversationAbortRef.current?.abort();
+      olderMessagesAbortRef.current?.abort();
     };
   }, []);
 
@@ -436,14 +545,28 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       previewAbortControllerRef.current.abort();
       previewAbortControllerRef.current = null;
     }
+    conversationsAbortRef.current?.abort();
+    conversationAbortRef.current?.abort();
+    olderMessagesAbortRef.current?.abort();
+    conversationLoadRevisionRef.current += 1;
     prevIntentTupleRef.current = null;
     assetRef.current = "USDC";
     setAsset("USDC");
+    messagesRef.current = [];
     setMessages([]);
+    activeConversationIdRef.current = null;
+    setActiveConversationId(null);
+    setActiveConversationTitle(null);
+    setOlderBeforeSequence(null);
+    setRetryableMessage(null);
+    setConversationLoading(false);
+    setConversationError(null);
+    updateConversationUrl(null);
     setActiveIntent(null);
     setWalletAction(null);
     setError(null);
     setPending(false);
+    pendingRef.current = false;
     setPreview(null);
     setPreviewId(null);
     setPreviewLoading(false);
@@ -460,6 +583,393 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     setRehydrating(false);
     setRehydrationError(null);
   }, []);
+
+  const refreshConversations = useCallback(async (cursor?: string, append = false) => {
+    const owner = effectiveConversationOwnerRef.current;
+    if (!owner) return;
+    conversationsAbortRef.current?.abort();
+    const controller = new AbortController();
+    conversationsAbortRef.current = controller;
+    const revision = conversationContextRevisionRef.current;
+    setConversationsLoading(true);
+    setConversationError(null);
+    try {
+      const params = new URLSearchParams({ limit: "20" });
+      if (cursor) params.set("cursor", cursor);
+      const response = await fetch("/api/conversations?" + params.toString(), {
+        headers: {
+          Accept: "application/json",
+          "x-providus-wallet": walletAddressForConversationRef.current ?? owner,
+        },
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      const json = (await response.json()) as {
+        ok?: boolean;
+        sessions?: ConversationSummary[];
+        nextCursor?: string | null;
+        error?: { message?: string };
+      };
+      if (revision !== conversationContextRevisionRef.current) return;
+      if (!response.ok || !json.ok || !Array.isArray(json.sessions)) {
+        setConversationError(json.error?.message ?? "Conversation history could not be loaded.");
+        return;
+      }
+      setConversations((current) => {
+        const merged = append ? [...current, ...json.sessions!] : json.sessions!;
+        return [...new Map(merged.map((session) => [session.id, session])).values()];
+      });
+      if (!append && activeConversationIdRef.current) {
+        const active = json.sessions.find((session) => session.id === activeConversationIdRef.current);
+        if (active) setActiveConversationTitle(active.title);
+      }
+      setConversationCursor(json.nextCursor ?? null);
+    } catch (requestError) {
+      if (controller.signal.aborted || revision !== conversationContextRevisionRef.current) return;
+      setConversationError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Conversation history could not be loaded.",
+      );
+    } finally {
+      if (conversationsAbortRef.current === controller) {
+        conversationsAbortRef.current = null;
+        setConversationsLoading(false);
+      }
+    }
+  }, []);
+
+  const openConversation = useCallback(async (sessionId: string): Promise<boolean> => {
+    const owner = effectiveConversationOwnerRef.current;
+    if (!owner) {
+      setConversationError("Sign in with your connected wallet to open saved conversations.");
+      return false;
+    }
+    conversationAbortRef.current?.abort();
+    olderMessagesAbortRef.current?.abort();
+    const controller = new AbortController();
+    conversationAbortRef.current = controller;
+    const ownerRevision = conversationContextRevisionRef.current;
+    const loadRevision = ++conversationLoadRevisionRef.current;
+    reset();
+    setConversationOwner(owner);
+    activeConversationIdRef.current = sessionId;
+    setActiveConversationId(sessionId);
+    setActiveConversationTitle(
+      conversations.find((session) => session.id === sessionId)?.title ?? "Conversation",
+    );
+    messagesRef.current = [];
+    setMessages([]);
+    setRetryableMessage(null);
+    setOlderBeforeSequence(null);
+    setConversationLoading(true);
+    setConversationError(null);
+    updateConversationUrl(sessionId);
+
+    try {
+      const response = await fetch("/api/conversations/" + encodeURIComponent(sessionId), {
+        headers: {
+          Accept: "application/json",
+          "x-providus-wallet": walletAddressForConversationRef.current ?? owner,
+        },
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      const json = (await response.json()) as {
+        ok?: boolean;
+        session?: ConversationSummary;
+        messages?: ConversationMessageView[];
+        olderBeforeSequence?: number | null;
+        error?: { message?: string };
+      };
+      if (
+        ownerRevision !== conversationContextRevisionRef.current ||
+        loadRevision !== conversationLoadRevisionRef.current
+      ) {
+        return false;
+      }
+      if (!response.ok || !json.ok || !json.session || !Array.isArray(json.messages)) {
+        setConversationError(json.error?.message ?? "This conversation could not be opened.");
+        if (response.status === 404) {
+          activeConversationIdRef.current = null;
+          setActiveConversationId(null);
+          setActiveConversationTitle(null);
+          updateConversationUrl(null);
+        }
+        return false;
+      }
+      const restored = json.messages.map(toConversationMessage);
+      messagesRef.current = restored;
+      setMessages(restored);
+      setActiveConversationTitle(json.session.title);
+      setConversations((current) => [
+        json.session!,
+        ...current.filter((session) => session.id !== json.session!.id),
+      ]);
+      setOlderBeforeSequence(json.olderBeforeSequence ?? null);
+      const lastRetryable = [...json.messages]
+        .reverse()
+        .find((item) => item.role === "user" && item.turnStatus === "failed");
+      setRetryableMessage(
+        lastRetryable?.turnId && lastRetryable.role === "user"
+          ? { turnId: lastRetryable.turnId, content: lastRetryable.content }
+          : null,
+      );
+      return true;
+    } catch (requestError) {
+      if (controller.signal.aborted || ownerRevision !== conversationContextRevisionRef.current) return false;
+      setConversationError(
+        requestError instanceof Error
+          ? requestError.message
+          : "This conversation could not be opened.",
+      );
+      return false;
+    } finally {
+      if (conversationAbortRef.current === controller) {
+        conversationAbortRef.current = null;
+        if (loadRevision === conversationLoadRevisionRef.current) setConversationLoading(false);
+      }
+    }
+  }, [conversations, reset]);
+
+  const createConversation = useCallback(async (): Promise<boolean> => {
+    const owner = effectiveConversationOwnerRef.current;
+    if (!owner) {
+      reset();
+      setConversationOwner(null);
+      return true;
+    }
+    const requestId = createRequestIdRef.current ?? createClientUuid();
+    createRequestIdRef.current = requestId;
+    const ownerRevision = conversationContextRevisionRef.current;
+    setConversationCreating(true);
+    setConversationError(null);
+    try {
+      const response = await fetch("/api/conversations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "x-providus-wallet": walletAddressForConversationRef.current ?? owner,
+        },
+        body: JSON.stringify({ requestId }),
+        cache: "no-store",
+      });
+      const json = (await response.json()) as {
+        ok?: boolean;
+        session?: ConversationSummary;
+        error?: { message?: string };
+      };
+      if (ownerRevision !== conversationContextRevisionRef.current) return false;
+      if (!response.ok || !json.ok || !json.session) {
+        setConversationError(json.error?.message ?? "A new conversation could not be created.");
+        return false;
+      }
+      createRequestIdRef.current = null;
+      reset();
+      setConversationOwner(owner);
+      activeConversationIdRef.current = json.session.id;
+      setActiveConversationId(json.session.id);
+      setActiveConversationTitle(json.session.title);
+      setConversations((current) => [
+        json.session!,
+        ...current.filter((session) => session.id !== json.session!.id),
+      ]);
+      updateConversationUrl(json.session.id);
+      return true;
+    } catch (requestError) {
+      if (ownerRevision !== conversationContextRevisionRef.current) return false;
+      setConversationError(
+        requestError instanceof Error
+          ? requestError.message
+          : "A new conversation could not be created.",
+      );
+      return false;
+    } finally {
+      if (ownerRevision === conversationContextRevisionRef.current) {
+        setConversationCreating(false);
+      }
+    }
+  }, [reset]);
+
+  const renameConversation = useCallback(async (sessionId: string, title: string): Promise<boolean> => {
+    const owner = effectiveConversationOwnerRef.current;
+    if (!owner) return false;
+    const revision = conversationContextRevisionRef.current;
+    try {
+      const response = await fetch("/api/conversations/" + encodeURIComponent(sessionId), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "x-providus-wallet": walletAddressForConversationRef.current ?? owner,
+        },
+        body: JSON.stringify({ title }),
+        cache: "no-store",
+      });
+      const json = (await response.json()) as {
+        ok?: boolean;
+        session?: ConversationSummary;
+        error?: { message?: string };
+      };
+      if (revision !== conversationContextRevisionRef.current) return false;
+      if (!response.ok || !json.ok || !json.session) {
+        setConversationError(json.error?.message ?? "Conversation title could not be saved.");
+        return false;
+      }
+      setConversations((current) => current.map((session) => session.id === sessionId ? json.session! : session));
+      if (activeConversationIdRef.current === sessionId) {
+        setActiveConversationTitle(json.session.title);
+      }
+      return true;
+    } catch {
+      if (revision === conversationContextRevisionRef.current) {
+        setConversationError("Conversation title could not be saved.");
+      }
+      return false;
+    }
+  }, []);
+
+  const deleteConversation = useCallback(async (sessionId: string): Promise<boolean> => {
+    const owner = effectiveConversationOwnerRef.current;
+    if (!owner) return false;
+    const revision = conversationContextRevisionRef.current;
+    try {
+      const response = await fetch("/api/conversations/" + encodeURIComponent(sessionId), {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "x-providus-wallet": walletAddressForConversationRef.current ?? owner,
+        },
+        body: JSON.stringify({ confirm: true }),
+        cache: "no-store",
+      });
+      const json = (await response.json()) as { ok?: boolean; error?: { message?: string } };
+      if (revision !== conversationContextRevisionRef.current) return false;
+      if (!response.ok || !json.ok) {
+        setConversationError(json.error?.message ?? "Conversation could not be deleted.");
+        return false;
+      }
+      setConversations((current) => current.filter((session) => session.id !== sessionId));
+      if (activeConversationIdRef.current === sessionId) reset();
+      return true;
+    } catch {
+      if (revision === conversationContextRevisionRef.current) {
+        setConversationError("Conversation could not be deleted.");
+      }
+      return false;
+    }
+  }, [reset]);
+
+  const loadMoreConversations = useCallback(async () => {
+    if (conversationCursor) await refreshConversations(conversationCursor, true);
+  }, [conversationCursor, refreshConversations]);
+
+  const loadOlderMessages = useCallback(async () => {
+    const owner = effectiveConversationOwnerRef.current;
+    const sessionId = activeConversationIdRef.current;
+    const beforeSequence = olderBeforeSequence;
+    if (!owner || !sessionId || !beforeSequence || olderMessagesLoading) return;
+    olderMessagesAbortRef.current?.abort();
+    const controller = new AbortController();
+    olderMessagesAbortRef.current = controller;
+    const ownerRevision = conversationContextRevisionRef.current;
+    setOlderMessagesLoading(true);
+    try {
+      const url =
+        "/api/conversations/" +
+        encodeURIComponent(sessionId) +
+        "/messages?beforeSequence=" +
+        String(beforeSequence);
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          "x-providus-wallet": walletAddressForConversationRef.current ?? owner,
+        },
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      const json = (await response.json()) as {
+        ok?: boolean;
+        messages?: ConversationMessageView[];
+        olderBeforeSequence?: number | null;
+        error?: { message?: string };
+      };
+      if (ownerRevision !== conversationContextRevisionRef.current) return;
+      if (!response.ok || !json.ok || !Array.isArray(json.messages)) {
+        setConversationError(json.error?.message ?? "Earlier messages could not be loaded.");
+        return;
+      }
+      setMessages((current) => {
+        const combined = [...json.messages!.map(toConversationMessage), ...current];
+        const unique = new Map(
+          combined.map((entry, index) => [entry.id ?? entry.turnId ?? String(index), entry]),
+        );
+        const ordered = [...unique.values()].sort((left, right) => (left.sequence ?? 0) - (right.sequence ?? 0));
+        messagesRef.current = ordered;
+        return ordered;
+      });
+      setOlderBeforeSequence(json.olderBeforeSequence ?? null);
+    } catch {
+      if (!controller.signal.aborted && ownerRevision === conversationContextRevisionRef.current) {
+        setConversationError("Earlier messages could not be loaded.");
+      }
+    } finally {
+      if (olderMessagesAbortRef.current === controller) {
+        olderMessagesAbortRef.current = null;
+        setOlderMessagesLoading(false);
+      }
+    }
+  }, [olderBeforeSequence, olderMessagesLoading]);
+
+  useEffect(() => {
+    const address = currentWalletAddress;
+    const owner = effectiveConversationOwner;
+    const previous = conversationContextRef.current;
+    const sameContext =
+      previous?.owner === owner &&
+      (previous?.address === address ||
+        (!previous?.address && !address) ||
+        Boolean(previous?.address && address && isSameWalletAddress(previous.address, address)));
+    if (sameContext) return;
+    conversationContextRef.current = { owner, address };
+    effectiveConversationOwnerRef.current = owner;
+    conversationContextRevisionRef.current += 1;
+    conversationLoadRevisionRef.current += 1;
+    conversationsAbortRef.current?.abort();
+    conversationAbortRef.current?.abort();
+    olderMessagesAbortRef.current?.abort();
+    abortControllerRef.current?.abort();
+    pendingRef.current = false;
+    setPending(false);
+    setConversationOwner(owner);
+    setConversations([]);
+    setConversationCursor(null);
+    setConversationError(null);
+    activeConversationIdRef.current = null;
+    setActiveConversationId(null);
+    setActiveConversationTitle(null);
+    messagesRef.current = [];
+    setMessages([]);
+    setRetryableMessage(null);
+    setOlderBeforeSequence(null);
+    setConversationLoading(false);
+    const clearUrl = Boolean(
+      previous &&
+        ((previous.owner && previous.owner !== owner) ||
+          (previous.address && address && !isSameWalletAddress(previous.address, address))),
+    );
+    if (clearUrl) updateConversationUrl(null);
+    if (!owner) return;
+    void (async () => {
+      await refreshConversations();
+      if (!clearUrl && typeof window !== "undefined") {
+        const sessionId = new URL(window.location.href).searchParams.get("conversation");
+        if (sessionId) await openConversation(sessionId);
+      }
+    })();
+  }, [currentWalletAddress, effectiveConversationOwner, openConversation, refreshConversations]);
 
   const selectAsset = useCallback((next: PaymentAssetSymbol) => {
     const normalized = normalizePaymentAssetSymbol(next) ?? "USDC";
@@ -479,10 +989,29 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     setDepositError(null);
   }, []);
 
-  const send = useCallback(async (content: string) => {
+  const sendTurn = useCallback(async (content: string, retryTurnId?: string) => {
     const trimmed = content.trim();
     if (!trimmed) {
       return;
+    }
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
+    pendingRef.current = true;
+    setPending(true);
+
+    // Authenticated chat is always attached to a server-created session.
+    // An unauthenticated visitor keeps the existing ephemeral experience.
+    let sessionId = activeConversationIdRef.current;
+    const owner = effectiveConversationOwnerRef.current;
+    if (owner && !sessionId) {
+      const created = await createConversation();
+      if (!created) {
+        sendInFlightRef.current = false;
+        pendingRef.current = false;
+        setPending(false);
+        return;
+      }
+      sessionId = activeConversationIdRef.current;
     }
 
     // Abort superseded in-flight request if present
@@ -494,10 +1023,14 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     abortControllerRef.current = controller;
     const walletContextRevision = walletContextRevisionRef.current;
 
+    const turnId = retryTurnId ?? createClientUuid();
     const userMessage: UserConversationMessage = {
       role: "user",
       content: trimmed,
       timestamp: new Date().toISOString(),
+      id: `local-${turnId}`,
+      turnId,
+      ...(sessionId ? { sessionId, turnStatus: "pending" as const } : {}),
     };
 
     // Prior messages before adding current turn
@@ -505,15 +1038,25 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     const currentIntent = activeIntentRef.current;
 
     // Immediately append user message locally and enter pending state
-    setMessages((prev) => [...prev, userMessage]);
+    if (retryTurnId) {
+      setMessages((previous) => previous.map((entry) =>
+        entry.role === "user" && entry.turnId === retryTurnId
+          ? { ...entry, turnStatus: "pending", failureCode: null }
+          : entry,
+      ));
+    } else {
+      setMessages((prev) => [...prev, userMessage]);
+      messagesRef.current = [...priorHistory, userMessage];
+    }
     setPending(true);
     setError(null);
 
     const payload: AssistantChatRequest = {
       message: trimmed,
       walletTransferOwner: walletTransferOwnerRef.current,
-      history: priorHistory,
+      history: owner && sessionId ? [] : priorHistory,
       activeIntent: currentIntent,
+      ...(owner && sessionId ? { sessionId, turnId } : {}),
     };
 
     try {
@@ -538,18 +1081,66 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       if (walletContextRevision !== walletContextRevisionRef.current) return;
 
       if (!response.ok || !json?.ok) {
+        const errorCode = json && !json.ok ? json.error?.code : undefined;
+        if (owner && sessionId && (errorCode === "TURN_IN_PROGRESS" || errorCode === "TURN_STALE")) {
+          const ownerRevision = conversationContextRevisionRef.current;
+          const restored = await openConversation(sessionId);
+          if (restored && ownerRevision === conversationContextRevisionRef.current) {
+            setError(errorCode === "TURN_IN_PROGRESS"
+              ? "This reply is still in progress. Refresh the conversation to check its status."
+              : "This reply was superseded. Send a new message to continue.");
+          }
+          return;
+        }
         const errorMessage =
           json && !json.ok && json.error?.message
             ? json.error.message
             : `Request failed with status ${response.status}`;
 
         setError(errorMessage);
+        if (owner && sessionId) {
+          setMessages((previous) => previous.map((entry) =>
+            entry.role === "user" && entry.turnId === turnId
+              ? { ...entry, turnStatus: "failed" }
+              : entry,
+          ));
+          setRetryableMessage({ turnId, content: trimmed });
+        }
         return;
       }
 
       // Success path
       const { turn, activeIntent: newActiveIntent } = json;
-      setMessages((prev) => [...prev, turn.message]);
+      if (owner && sessionId && json.persisted) {
+        const persistedAssistant = toConversationMessage(json.persisted.assistantMessage);
+        const liveAssistant = turn.message.intent && persistedAssistant.role === "assistant"
+          ? { ...persistedAssistant, intent: turn.message.intent }
+          : persistedAssistant;
+        const persistedMessages = [
+          toConversationMessage(json.persisted.userMessage),
+          liveAssistant,
+        ];
+        setMessages((previous) => {
+          const next = previous.filter((entry) => entry.turnId !== turnId);
+          const combined = [...next, ...persistedMessages];
+          const unique = [...new Map(combined.map((entry, index) => [entry.id ?? entry.turnId ?? String(index), entry])).values()];
+          const ordered = unique.sort((left, right) => (left.sequence ?? Number.MAX_SAFE_INTEGER) - (right.sequence ?? Number.MAX_SAFE_INTEGER));
+          messagesRef.current = ordered;
+          return ordered;
+        });
+        setRetryableMessage(null);
+        void refreshConversations();
+      } else {
+        const assistantMessage = turn.message;
+        setMessages((prev) => {
+          const updated = prev.map((entry) => entry.role === "user" && entry.turnId === turnId
+            ? { ...entry, turnStatus: "complete" as const }
+            : entry);
+          const next = [...updated, assistantMessage];
+          messagesRef.current = next;
+          return next;
+        });
+      }
       setActiveIntent(newActiveIntent);
       setWalletAction(turn.action ?? null);
       setError(null);
@@ -563,13 +1154,32 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       const message =
         err instanceof Error ? err.message : "Failed to communicate with assistant.";
       setError(message);
+      if (owner && sessionId) {
+        setMessages((previous) => previous.map((entry) =>
+          entry.role === "user" && entry.turnId === turnId
+            ? { ...entry, turnStatus: "failed" }
+            : entry,
+        ));
+        setRetryableMessage({ turnId, content: trimmed });
+      }
     } finally {
       if (abortControllerRef.current === controller) {
         abortControllerRef.current = null;
+        sendInFlightRef.current = false;
+        pendingRef.current = false;
         setPending(false);
       }
     }
-  }, []);
+  }, [createConversation, openConversation, refreshConversations]);
+
+  const send = useCallback((content: string) => sendTurn(content), [sendTurn]);
+
+  const retryLastMessage = useCallback(async () => {
+    const retry = retryableMessage;
+    if (!retry || pendingRef.current) return;
+    setError(null);
+    await sendTurn(retry.content, retry.turnId);
+  }, [retryableMessage, sendTurn]);
 
   const fetchPreview = useCallback(async (intent: AirtimeIntent, assetOverride?: PaymentAssetSymbol) => {
     if (
@@ -1262,11 +1872,25 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
   );
 
 
-  const currentConversationMatches = normalizeWalletAddress(connectedAddress) === conversationAddress;
+  const currentConversationMatches =
+    currentWalletAddress === conversationAddress &&
+    conversationOwner === effectiveConversationOwner;
   const currentPaymentOwnerMatches = paymentOwner === null || isSameWalletAddress(paymentOwner, connectedAddress);
 
   return {
     messages: currentConversationMatches ? messages : [],
+    conversations: currentConversationMatches ? conversations : [],
+    activeConversationId: currentConversationMatches ? activeConversationId : null,
+    activeConversationTitle: currentConversationMatches ? activeConversationTitle : null,
+    conversationOwner: currentConversationMatches ? conversationOwner : null,
+    conversationsLoading: currentConversationMatches && conversationsLoading,
+    conversationLoading: currentConversationMatches && conversationLoading,
+    conversationCreating: currentConversationMatches && conversationCreating,
+    conversationError: currentConversationMatches ? conversationError : null,
+    conversationCursor: currentConversationMatches ? conversationCursor : null,
+    olderBeforeSequence: currentConversationMatches ? olderBeforeSequence : null,
+    olderMessagesLoading: currentConversationMatches && olderMessagesLoading,
+    retryableMessage: currentConversationMatches ? retryableMessage : null,
     conversationAddress,
     walletAction: currentConversationMatches ? walletAction : null,
     activeIntent: currentConversationMatches ? activeIntent : null,
@@ -1289,6 +1913,13 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     rehydrating: currentPaymentOwnerMatches && rehydrating,
     rehydrationError: currentPaymentOwnerMatches ? rehydrationError : null,
     send,
+    createConversation,
+    openConversation,
+    renameConversation,
+    deleteConversation,
+    loadMoreConversations,
+    loadOlderMessages,
+    retryLastMessage,
     reset,
     selectAsset,
     confirmPayment,

@@ -8,17 +8,18 @@ import { PaymentInstructionsCard } from "@/components/assistant/payment-instruct
 import { cn } from "@/lib/cn";
 import {
   Sparkles,
-  RotateCcw,
   AlertTriangle,
   X,
   ShieldAlert,
   ReceiptText,
   Loader2,
+  Menu,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWalletAuth, type WalletAuth } from "@/hooks/use-wallet-auth";
 import { WalletTransferCard } from "@/components/assistant/wallet-transfer-card";
 import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
+import { ConversationHistory } from "@/components/assistant/conversation-history";
 
 export interface AssistantPanelProps {
   className?: string;
@@ -36,11 +37,30 @@ export function AssistantPanel({ className }: AssistantPanelProps) {
 function AssistantContent({ className, auth }: AssistantPanelProps & { auth: WalletAuth }) {
   const {
     messages,
+    conversations,
+    activeConversationId,
+    activeConversationTitle,
+    conversationOwner,
+    conversationsLoading,
+    conversationLoading,
+    conversationCreating,
+    conversationError,
+    conversationCursor,
+    olderBeforeSequence,
+    olderMessagesLoading,
+    retryableMessage,
     walletAction,
     activeIntent,
     pending,
     error,
     send,
+    createConversation,
+    openConversation,
+    renameConversation,
+    deleteConversation,
+    loadMoreConversations,
+    loadOlderMessages,
+    retryLastMessage,
     reset,
     preview,
     previewLoading,
@@ -66,15 +86,11 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [lookupId, setLookupId] = useState("");
   const [lookupDismissedFor, setLookupDismissedFor] = useState<string | null>(null);
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
+  const historyTriggerRef = useRef<HTMLButtonElement>(null);
 
   const displayError = error && error !== dismissedError ? error : null;
-
-  const handleReset = () => {
-    reset();
-    setDismissedError(null);
-    setLookupId("");
-    setLookupDismissedFor(null);
-  };
+  const storedTurnInProgress = messages.some((message) => message.role === "user" && message.turnStatus === "pending");
 
   return (
     <div
@@ -104,31 +120,50 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
               <h2 className="font-display text-base font-semibold text-ledger-stone sm:text-lg">
                 Providus Assistant
               </h2>
-              <span className="rounded border border-provident-green/40 bg-provident-green/10 px-1.5 py-0.5 font-proof text-[10px] font-semibold text-deep-provision">
+              <span className="hidden rounded border border-provident-green/40 bg-provident-green/10 px-1.5 py-0.5 font-proof text-[10px] font-semibold text-deep-provision sm:inline-flex">
                 Live · payment preview
               </span>
             </div>
-            <p className="font-proof text-[11px] text-receipt-grey">
-              Ask for a Celo service or a BOT Chain Mainnet recipient payment, then review and prove the outcome
+            <p className="hidden font-proof text-[11px] text-receipt-grey sm:block">
+              Ask for Celo services or BOT Chain Mainnet payments, then approve each in your wallet
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {messages.length > 0 ? (
-            <button
-              type="button"
-              onClick={handleReset}
-              disabled={pending}
-              aria-label="Reset conversation"
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-[8px] border border-ledger-edge bg-clear-paper px-2.5 py-1.5 font-display text-xs font-semibold text-ledger-stone shadow-none transition-all hover:border-ledger hover:shadow-base active:translate-x-px active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RotateCcw className="h-3.5 w-3.5 text-receipt-grey" />
-              <span>Reset</span>
-            </button>
-          ) : null}
+          <span className="hidden max-w-40 truncate font-proof text-xs text-receipt-grey sm:block" title={activeConversationTitle ?? undefined}>{activeConversationTitle ?? "New conversation"}</span>
+          <button
+            ref={historyTriggerRef}
+            type="button"
+            onClick={() => setMobileHistoryOpen(true)}
+            aria-label="Open conversation history"
+            aria-haspopup="dialog"
+            className="inline-flex min-h-11 items-center gap-2 rounded-[8px] border border-ledger-edge bg-clear-paper px-3 font-display text-xs font-semibold text-ledger-stone hover:border-ledger focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus md:hidden"
+          ><Menu className="h-4 w-4" aria-hidden="true" /><span>Chats</span></button>
         </div>
       </div>
+
+      <div className="flex min-w-0">
+      <ConversationHistory
+        ownerAvailable={Boolean(conversationOwner)}
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        activeConversationTitle={activeConversationTitle}
+        loading={conversationsLoading}
+        creating={conversationCreating}
+        error={conversationError}
+        hasMore={Boolean(conversationCursor)}
+        onNew={() => { if (conversationOwner) void createConversation(); else reset(); }}
+        onOpen={openConversation}
+        onRename={renameConversation}
+        onDelete={deleteConversation}
+        onLoadMore={() => void loadMoreConversations()}
+        mobileOpen={mobileHistoryOpen}
+        onMobileClose={() => setMobileHistoryOpen(false)}
+        mobileTriggerRef={historyTriggerRef}
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+      {conversationLoading ? <div role="status" className="flex min-h-[300px] items-center justify-center gap-2 bg-clear-paper text-sm text-receipt-grey"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Opening conversation</div> : null}
 
       {/* Payment asset selector: switching requests a fresh preview via selectAsset */}
       {activeIntent && activeIntent.type === "airtime" && activeIntent.readyForConfirmation && !paymentInstructions ? (
@@ -200,6 +235,12 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
 
 
       {/* Message List */}
+      {olderBeforeSequence ? <div className="border-b border-ledger-edge bg-clear-paper px-4 py-2 text-center">
+        <button type="button" onClick={() => void loadOlderMessages()} disabled={olderMessagesLoading || conversationLoading} className="inline-flex min-h-11 items-center gap-2 rounded-[8px] px-3 text-xs font-semibold text-quote-blue underline underline-offset-2 hover:bg-receipt-field disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+          {olderMessagesLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+          {olderMessagesLoading ? "Loading earlier messages…" : "Load earlier messages"}
+        </button>
+      </div> : null}
       <MessageList
         messages={messages}
         pending={pending}
@@ -273,6 +314,8 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
               <p className="mt-0.5 text-receipt-grey">{displayError}</p>
             </div>
           </div>
+          {retryableMessage ? <button type="button" onClick={() => void retryLastMessage()} disabled={pending} className="min-h-11 shrink-0 rounded-[8px] border border-ledger bg-clear-paper px-3 font-display text-xs font-semibold text-ledger-stone hover:bg-receipt-field disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Retry reply</button> : null}
+          {storedTurnInProgress && activeConversationId ? <button type="button" onClick={() => void openConversation(activeConversationId)} disabled={conversationLoading} className="min-h-11 shrink-0 rounded-[8px] border border-ledger bg-clear-paper px-3 font-display text-xs font-semibold text-ledger-stone hover:bg-receipt-field disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Refresh conversation</button> : null}
           <button
             type="button"
             onClick={() => setDismissedError(displayError)}
@@ -295,6 +338,8 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
       {/* Composer */}
       <div className="border-t border-ledger bg-receipt-field p-3 sm:p-4">
         <AssistantComposer onSend={send} pending={pending} />
+      </div>
+      </div>
       </div>
     </div>
   );

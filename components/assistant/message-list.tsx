@@ -26,11 +26,20 @@ export function MessageList({
   className,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const previousMessageBounds = useRef<{ first: string | null; last: string | null } | null>(null);
 
-  // Auto-scroll to bottom on new messages or pending state
+  // Keep new turns in view while preserving the reader's position when older
+  // pages are prepended to the transcript.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, pending]);
+    const key = (message: ConversationMessage | undefined) =>
+      message ? message.id ?? `${message.role}:${message.turnId ?? message.timestamp}` : null;
+    const first = key(messages[0]);
+    const last = key(messages[messages.length - 1]);
+    const previous = previousMessageBounds.current;
+    const olderPagePrepended = Boolean(previous && previous.last === last && previous.first !== first);
+    previousMessageBounds.current = { first, last };
+    if (!olderPagePrepended) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, pending]);
 
   return (
     <div
@@ -79,7 +88,7 @@ export function MessageList({
       ) : (
         messages.map((message, index) => (
           <MessageBubble
-            key={`${message.timestamp}-${index}`}
+          key={message.id ?? `${message.role}-${message.turnId ?? message.timestamp}-${index}`}
             message={message}
           />
         ))
