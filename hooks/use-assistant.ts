@@ -647,11 +647,11 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     }
     conversationAbortRef.current?.abort();
     olderMessagesAbortRef.current?.abort();
+    const ownerRevision = conversationContextRevisionRef.current;
+    reset();
     const controller = new AbortController();
     conversationAbortRef.current = controller;
-    const ownerRevision = conversationContextRevisionRef.current;
     const loadRevision = ++conversationLoadRevisionRef.current;
-    reset();
     setConversationOwner(owner);
     activeConversationIdRef.current = sessionId;
     setActiveConversationId(sessionId);
@@ -875,6 +875,7 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
     const controller = new AbortController();
     olderMessagesAbortRef.current = controller;
     const ownerRevision = conversationContextRevisionRef.current;
+    const loadRevision = conversationLoadRevisionRef.current;
     setOlderMessagesLoading(true);
     try {
       const url =
@@ -896,12 +897,23 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
         olderBeforeSequence?: number | null;
         error?: { message?: string };
       };
-      if (ownerRevision !== conversationContextRevisionRef.current) return;
+      if (
+        controller.signal.aborted ||
+        ownerRevision !== conversationContextRevisionRef.current ||
+        loadRevision !== conversationLoadRevisionRef.current ||
+        activeConversationIdRef.current !== sessionId
+      ) return;
       if (!response.ok || !json.ok || !Array.isArray(json.messages)) {
         setConversationError(json.error?.message ?? "Earlier messages could not be loaded.");
         return;
       }
       setMessages((current) => {
+        if (
+          controller.signal.aborted ||
+          ownerRevision !== conversationContextRevisionRef.current ||
+          loadRevision !== conversationLoadRevisionRef.current ||
+          activeConversationIdRef.current !== sessionId
+        ) return current;
         const combined = [...json.messages!.map(toConversationMessage), ...current];
         const unique = new Map(
           combined.map((entry, index) => [entry.id ?? entry.turnId ?? String(index), entry]),
@@ -912,7 +924,12 @@ export function useAssistant(options?: UseAssistantOptions): UseAssistantResult 
       });
       setOlderBeforeSequence(json.olderBeforeSequence ?? null);
     } catch {
-      if (!controller.signal.aborted && ownerRevision === conversationContextRevisionRef.current) {
+      if (
+        !controller.signal.aborted &&
+        ownerRevision === conversationContextRevisionRef.current &&
+        loadRevision === conversationLoadRevisionRef.current &&
+        activeConversationIdRef.current === sessionId
+      ) {
         setConversationError("Earlier messages could not be loaded.");
       }
     } finally {
