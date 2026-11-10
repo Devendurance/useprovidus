@@ -43,6 +43,23 @@ The live screenshots from earlier milestones are useful context, but they do not
 - P2 means the issue adds substantial effort or reduces consistency, accessibility, or confidence.
 - P3 means polish or a check that did not reproduce as a current product defect.
 
+## Nielsen's 10 heuristics summary
+
+| Heuristic | Evidence and assessment | Finding or follow-up |
+|---|---|---|
+| Visibility of system status | B5 distinguishes submitted, unknown, failed, and verified. The current verified card still exposes controls that look actionable, and public Mainnet copy was stale. | UX-01, UX-02. Keep transaction status and production availability separate. |
+| Match between system and the real world | “Pending B9” did not describe the supplied verified Mainnet transfers. SIWE purpose is partly explained before the signing prompt. | UX-01, UX-07. Name transaction evidence, production gate, and non-payment sign-in effect. |
+| User control and freedom | Wallet approval remains explicit, unknown recovery preserves the hash and says never resend. Verified cards still show obsolete controls; Reset is the only conversation boundary. | UX-02, UX-05. Remove stale actions only after B5 verification and add safe session controls. |
+| Consistency and standards | Mainnet labels differed across the app, and `DESIGN.md` specified an unrelated product. The shared positioning and design guide now align. | UX-01, UX-08. Preserve one availability model and the documented design tokens. |
+| Error prevention | Review cards show exact terms and ERC-20 allowance is a separate authorization. Technical detail competes with the primary approval action. | UX-02, UX-04. Keep exact terms in view, disclose implementation details progressively, never merge approvals. |
+| Recognition rather than recall | Users can recheck a payment ID, but the Receipts page has no list. Conversation context does not survive refresh. | UX-03, UX-05, UX-06. Provide owner-scoped receipt and session lists. |
+| Flexibility and efficiency of use | Receipt lookup requires a known transaction ID and has no filters or pagination. | UX-06. Add search, chain/token/status filters, and pagination. |
+| Aesthetic and minimalist design | Payment cards expose addresses, gas, contracts, expiry, allowance, and transaction data together. The dashboard repeats explanatory content below the assistant. | UX-02, UX-04, UX-09. Keep a compact primary summary and move technical detail behind clear disclosures. |
+| Help users recognize, diagnose, and recover from errors | Unknown and failed states preserve transaction evidence and avoid unsafe resubmission. The receipt destination cannot help users recover a past BOT payment. | UX-02, UX-03. Keep conservative recovery and make verified proof findable. |
+| Help and documentation | The How it works page explains the broad flow, and wallet/payment cards provide contextual prompts. The exact SIWE message and all failure-state instructions were not exercised. | UX-07, UX-10. Validate contextual help during keyboard and payment-state walkthroughs. |
+
+Norman's feedback loop is strongest after submission, where B5 exposes the authoritative state, hash, confirmations, and verification time. The weakest mapping is the dense review card, where wallet action, implementation details, and the user's financial decision share the same visual weight. Progressive disclosure should keep amount, token, recipient, network, expiry, and the next approval visible, while contract and raw transaction evidence remain available before signing.
+
 ## Severity-ranked issue register
 
 ### UX-01. Mainnet availability copy contradicts verified transaction evidence
