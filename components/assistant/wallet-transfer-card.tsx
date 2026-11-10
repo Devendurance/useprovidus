@@ -314,7 +314,7 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
           {view.kind === "verified" ? "Sent" : view.kind === "failed" ? "Payment failed" : view.kind === "unknown" ? "Payment status unknown for" : view.kind === "verification_pending" ? "Checking" : view.kind === "cancelled" ? "Cancelled payment" : view.kind === "stale" ? "Changed payment" : view.kind === "expired" ? "Expired payment" : view.kind === "unsupported" ? "Unavailable payment" : "Pay"} {intent.amountDisplay} {intent.assetSymbol}
         </h3>
         <p className="mt-1 text-sm text-receipt-grey">To {intent.recipientLabel}</p>
-        <p className="mt-1 break-all text-xs text-ledger-stone" data-testid="review-address">{intent.recipientAddress}</p>
+        {!isVerified ? <p className="mt-1 break-all text-xs text-ledger-stone" data-testid="review-address">{intent.recipientAddress}</p> : null}
         <p className="mt-2 text-xs font-semibold text-ledger-stone">{intent.chainId === 968 ? "BOT Chain Testnet" : "BOT Chain Mainnet"}</p>
         {!isVerified ? <p className="mt-1 text-xs text-receipt-grey">Valid until {intent.expiresAt}</p> : null}
       </div>

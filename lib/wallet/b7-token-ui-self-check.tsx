@@ -5,6 +5,17 @@ import { TokenApprovalCard, TokenApprovalStatus } from "@/components/assistant/t
 const blocked = renderToStaticMarkup(<TokenApprovalCard enabled={false} reviewContextKey="blocked" onStateChange={() => {}} />);
 assert.match(blocked, /unavailable for this payment/);
 assert.doesNotMatch(blocked, /Approve exact allowance in wallet/);
+const checking = renderToStaticMarkup(<TokenApprovalCard
+  enabled
+  plan={{} as never}
+  client={{} as never}
+  wallet={{} as never}
+  revalidate={async () => {}}
+  reviewContextKey="ready"
+  onStateChange={() => {}}
+/>);
+assert.match(checking, /Checking token allowance/);
+assert.doesNotMatch(checking, /Approve exact allowance in wallet/);
 const confirming = renderToStaticMarkup(<TokenApprovalStatus enabled state="approval_confirming" />);
 assert.match(confirming, /Payment has not been sent/);
 const approved = renderToStaticMarkup(<TokenApprovalStatus enabled state="payment_ready" />);

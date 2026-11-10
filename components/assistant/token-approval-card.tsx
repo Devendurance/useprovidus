@@ -26,7 +26,7 @@ export function TokenApprovalCard({ enabled, plan, client, wallet, revalidate, r
   reviewContextKey: string;
   onStateChange: (state: ApprovalState, reviewContextKey: string) => void;
 }) {
-  const [state, setState] = useState<ApprovalState>("approval_required");
+  const [state, setState] = useState<ApprovalState>("checking_allowance");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [readFailed, setReadFailed] = useState(false);
