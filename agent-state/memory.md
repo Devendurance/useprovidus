@@ -1,10 +1,13 @@
 # Providus — Memory (decisions, invariants, lessons)
 
-## Mainnet evidence and production gate, 2026-11-10
+## Mainnet activation and payment UX invariants, 2026-11-10
 - Native BOT and Official USDT transactions on BOT Chain Mainnet have verified evidence. Their hashes are recorded in `agent-state/project-state.md`.
-- Mainnet transaction verification does not authorize production availability. Keep the production payment gate until separate launch authorization.
-- Use `BOT_MAINNET_STATUS` in `lib/product/positioning.ts` to distinguish verified transaction evidence, gated production payments, and unavailable utility payments.
+- Public BOT Chain Mainnet activation is complete at commit `7820480` for native BOT and Official USDT. BOT Testnet is hidden and disabled publicly. Celo remains intact.
+- BOT-funded utility payments are not live without independently verified settlement and provider delivery.
+- Use `BOT_MAINNET_STATUS` in `lib/product/positioning.ts` for current public availability labels. Do not reintroduce a Mainnet block based on pre-activation B8/B9 notes.
 - Mainnet payment approvals and transfers stay separate wallet actions where ERC-20 allowance is required. B5 confirmed plus `verifiedAt` is the only verified payment UI state.
+- Compact payment UI derives its state from persisted B3/B5 status and current wallet/review facts. Never let transient local flags override submitted, unknown, failed, or verified B5 evidence.
+- Read exact USDT allowance before exposing its approval action. Approval requests the exact amount and never authorizes payment. The payment needs a separate explicit wallet confirmation.
 - Do not add chat, message, memory, gas, or approval schema without explicit review, backup and restore planning, and wallet-isolation proof.
 - Keep conversation sessions, conversation messages, saved recipients, memory facts, Celo transactions, and BOT transfer submissions as distinct data concepts.
 

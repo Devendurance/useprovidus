@@ -1,30 +1,25 @@
-# Left off: Providus UX audit complete
+# Left off: P0.1 compact payment UX complete
 
 ## What we are doing
-- Phase 0 evidence-based UX audit and story-driven experience plan are complete.
-- Mainnet copy now distinguishes verified native BOT and Official USDT transaction evidence from gated production payment availability.
-- No payment engine, contract, database schema, migration, production data, deployment, push, wallet signature, or new transaction changed.
+- P0.1 compact payment conversations and single-next-action UI are complete. Next is P0.2 receipt history and evidence modal.
+- Public BOT Mainnet activation is complete at `7820480` for native BOT and Official USDT. BOT Testnet is hidden/disabled publicly. Celo remains intact.
 
 ## Done
-- Inspected the live dashboard and receipt route, B7/B8 screenshots, B9 wallet menu screenshots, payment and receipt components, B5 status route, schema, assistant chat route, design tokens, and project instructions.
-- Saved `docs/ux/providus-story-driven-ux-audit.md` and `docs/ux/providus-story-driven-experience-plan.md`.
-- Updated `DESIGN.md` to match the current Providus visual system.
-- Centralized BOT Mainnet messaging in `lib/product/positioning.ts` and updated the visible app copy, README, and AGENTS.md. The production execution gate remains unchanged.
-- Updated `.fast-build/STATE.md`, `agent-state/project-state.md`, and `agent-state/memory.md`.
-- The live local dashboard showed the supplied Official USDT hash as B5 verified with 30 confirmations. No wallet signature or payment was triggered.
+- Commits `af13af3`, `c84da3f`, and `aa5b75d` add the compact status-driven cards, allowance-first flow, B5 precedence fix, recoverable pending/unknown UI, and verified cleanup. The allowance action stays hidden until its initial read completes.
+- Verified card shows amount, recipient, network, status, and `View receipt`. Hash, contract, chain, gas, and evidence remain in a disclosure. Obsolete approval/retry/recheck actions are removed after verification.
+- Captured synthetic-fixture Playwright screenshots at desktop and 390px mobile in `output/playwright/`.
+- Updated `.fast-build/STATE.md`, `agent-state/project-state.md`, `agent-state/memory.md`, and AGENTS.md for current public status and P0.1.
 
 ## Next
-1. Start the next Fast-Build slice with compact payment review and verified completion. First settle its read-only receipt data shape against B5. Preserve unknown and submitted-payment evidence.
-2. Plan receipt history after the payment completion path is stable. Review any additive schema proposal, backup and restore plan, and wallet-isolation proof before migration work.
+1. Start P0.2 with searchable receipt history and responsive receipt detail. Support outside click, Escape, focus trap/restoration, copy hash, explorer link, and separate token approval records.
+2. Reuse existing B5 and Celo persistence. Do not migrate without explicit review, backup/restore planning, and verified wallet isolation.
 
 ## Verification
-- `npm run test:b8-positioning`, `npm run test:web-execution`, `npx tsc --noEmit`, `npm run lint`, and `git diff --check` pass.
-- Playwright CLI reload reports zero errors and zero warnings after the BOT logo dimensions were corrected. The 390px viewport has no horizontal overflow.
-- `npm run build` passes in a separate worktree with `DATABASE_URL` unset. No database, wallet, or network transaction was used.
-- Full keyboard, receipt-modal, and payment-state E2E coverage remains for the dedicated QA slice.
+- P0.1 resolver, assistant, web-execution, submission, verification, Mainnet policy, chain, wallet/network, Celo attribution, and ERC-20 UI self-checks pass.
+- Playwright synthetic fixture asserts verified summary cleanup, receipt navigation, keyboard reachability, and no 390px horizontal overflow. Screenshots are local fixtures, not chain evidence.
+- `npx tsc --noEmit`, `npm run lint`, `npm run build` with `DATABASE_URL` unset, and `git diff --check` pass.
+- No database migration/write, real wallet signature, transaction, push, or deploy occurred. Full wallet signing E2E and P0.2 modal behavior remain.
 
 ## Worktree and risks
-- Preserve pre-existing untracked `.omp/`, `bridge/`, and `video-demo/` folders.
-- A temporary isolated-build path remains outside the repository at `C:\Users\USER\Documents\ideas\providus-build-check-f083f55`. It contains only a `node_modules` junction to the primary worktree. The automatic safety review rejected deleting that junction. The successful build worktree and its installed dependencies were removed.
-- Do not run database migrations until explicit review, backup and restore planning, and verified wallet isolation are complete.
-- Do not deploy, push, write production data, or initiate Mainnet transactions.
+- Preserve pre-existing untracked `.omp/`, `bridge/`, and `video-demo/` folders. `output/playwright/` contains this slice's requested screenshots.
+- Do not change payment gates, run migrations, write production data, push, deploy, or initiate real transactions as part of P0.1.

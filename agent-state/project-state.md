@@ -1,17 +1,18 @@
 # Providus — Project State
 
-## Story-driven UX audit and Mainnet status update, 2026-11-10
-- Added the evidence-based UX audit and staged experience plan in `docs/ux/`.
-- Replaced the stale Global Bank design document with the current Providus visual and interaction system in `DESIGN.md`.
-- Centralized BOT Mainnet status in `lib/product/positioning.ts`. Native BOT and Official USDT transaction evidence is verified. Production payment availability remains gated pending separate launch authorization. BOT-funded utilities remain unavailable without independently verified settlement and provider delivery.
-- Updated current Mainnet status copy across the app, README, and AGENTS.md. No payment engine, production gate, contract, database schema, migration, production data, or wallet transaction changed.
-- Owner-supplied Mainnet transaction hashes: native BOT `0x13787ebb2dd9cdb10be10f6b15cdb7b25790da9a7e82bc53ca2d1339b92f663f`; Official USDT `0x0360a9b7755ebf334ce19f8658262a3e79c96c401dd710233f43778c219f05bf`. The live local dashboard showed the USDT hash as B5 verified with 30 confirmations.
-- Current gaps: verified BOT cards do not link to a Providus receipt, receipt history is Celo-only, B5 lacks persisted gas fee values, approval transactions have no separate ledger, chat history is client-held, and general user memory is absent.
-- The next Fast-Build slice is compact payment review and verified completion. It must preserve B3/B5 semantics and unknown payment recovery. See `.fast-build/STATE.md`.
-- Verification passed: positioning and web-execution self-checks, TypeScript, lint, and an isolated production build with `DATABASE_URL` unset. Playwright CLI reports zero console warnings/errors after fixing the logo aspect ratio, and no horizontal overflow at 390px.
-- Full keyboard-only payment flows, 320px/zoom reflow, receipt modal behavior, and payment-state E2E remain for the dedicated QA slice.
+## P0.1 compact payment UX and public Mainnet activation, 2026-11-10
+- Public BOT Chain Mainnet activation is complete at `7820480` for native BOT and Official USDT. BOT Testnet is hidden and disabled publicly. Existing Celo services remain intact. BOT-funded utilities are not live without independently verified settlement and provider delivery.
+- The evidence-based UX audit and story-driven plan remain in `docs/ux/`. `DESIGN.md` is the current Providus design system.
+- P0.1 is complete in `af13af3`, `c84da3f`, and `aa5b75d`: compact payment cards, one stage-specific primary action, B5-authoritative verified cleanup, explicit exact USDT allowance, and readable technical proof disclosure. The approval button stays hidden until the initial allowance read completes.
+- Success requires B5 `confirmed` plus `verifiedAt`. A submitted hash stays pending. Unknown/failed/expired states keep their truthful recovery or stop state. Native and USDT wallet authorizations remain separate as required.
+- P0.1 did not change B3/B5 execution, contracts, Safe ownership, production payment gates, Celo integrations, schema, migrations, or database data. No real transaction, push, or deploy occurred.
+- Owner-supplied Mainnet transaction hashes remain recorded below. The UI fixture screenshots are synthetic and make no live-transaction claim.
+- Current gaps: receipt history/modal is Celo-only, B5 does not persist gas fee values, approval transactions have no separate durable ledger, chat history is client-held, and general user memory is absent.
+- Next Fast-Build slice is P0.2 receipt history and evidence detail. Reuse existing data first. Any migration requires review, backup/restore planning, and verified wallet isolation. See `.fast-build/STATE.md`.
+- P0.1 checks passed: payment-card view (12 assertions), wallet assistant, web execution, submission, B5 verification, Mainnet policy, assistant, chain registry, wallet/network, Celo attribution, and ERC-20 UI self-checks. Playwright synthetic fixture verified cleanup, receipt link, proof disclosure, keyboard reachability, and no horizontal overflow at 390px. TypeScript, lint, build with `DATABASE_URL` unset, and diff check passed.
 
 ## B9 UX hotfix completed, 2026-11-09
+- This captures the pre-activation state. Public BOT Mainnet activation completed at `7820480` on 2026-11-10, as summarized above.
 - Scope: multichain wallet dropdown/switching, session-state clarity, assistant and review copy. No payment execution rebuild, contract/backend/schema change, push, deploy, production write, or mainnet transaction.
 - B1 registry defines Celo 42220, BOT Mainnet 677, BOT Testnet 968. Wagmi registers all three while existing Celo-only readiness remains required by cash-out and airtime.
 - Design checkpoint: shared auth controller plus registry-derived network display. See `.audit/b9-ux-hotfix-design.md`. The independent review found and recorded the forced-Celo connect risk and wagmi 4902 add behavior.
