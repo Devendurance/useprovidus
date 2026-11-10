@@ -182,6 +182,10 @@ test("authenticated user can restore a saved conversation without restoring paym
   await expect(page.getByText("What is 10% of 20 BOT?", { exact: true })).toBeVisible();
   await expect(page.getByText("10% of 20 BOT is 2 BOT.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Approve allowance|Approve payment|Confirm in wallet|Retry gas estimate/i })).toHaveCount(0);
+  await page.setViewportSize({ width: 1365, height: 900 });
+  await page.getByRole("heading", { name: "Providus Assistant" }).last().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "output/playwright/p1.1-assistant-restored-chat-desktop.png", fullPage: false });
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("heading", { name: "Providus Assistant" }).last().scrollIntoViewIfNeeded();
   await page.screenshot({ path: "output/playwright/p1.1-assistant-restored-chat-390.png", fullPage: false });
 });
