@@ -40,7 +40,8 @@
 - Live dashboard and receipt pages, B8/B9 screenshots, targeted source paths, and the landing page were inspected. No wallet signature or payment was triggered.
 - Playwright CLI reload reports zero errors and zero warnings after correcting the BOT logo aspect ratio. The 390px viewport has no horizontal overflow.
 - `npm run test:b8-positioning`, `npm run test:web-execution`, `npx tsc --noEmit`, `npm run lint`, and `git diff --check` pass.
-- Isolated production build remains to run. Full desktop/mobile payment E2E, keyboard, modal, and wallet-state coverage remains for the dedicated QA slice.
+- `npm run build` passes in an isolated worktree with `DATABASE_URL` unset. The active dev output was not used.
+- Full desktop/mobile payment E2E, keyboard, modal, and wallet-state coverage remains for the dedicated QA slice.
 
 ## Next action
 - Build the compact payment review and verified completion slice. First settle its read-only receipt data shape against B5. Keep submitted and unknown recovery evidence mounted.

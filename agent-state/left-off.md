@@ -14,12 +14,13 @@
 - The live local dashboard showed the supplied Official USDT hash as B5 verified with 30 confirmations. No wallet signature or payment was triggered.
 
 ## Next
-1. Run an isolated production build so the active development server and `.next` data stay untouched.
-2. Start the next Fast-Build slice with compact payment review and verified completion. First settle its read-only receipt data shape against B5. Preserve unknown and submitted-payment evidence.
+1. Start the next Fast-Build slice with compact payment review and verified completion. First settle its read-only receipt data shape against B5. Preserve unknown and submitted-payment evidence.
+2. Plan receipt history after the payment completion path is stable. Review any additive schema proposal, backup and restore plan, and wallet-isolation proof before migration work.
 
 ## Verification
 - `npm run test:b8-positioning`, `npm run test:web-execution`, `npx tsc --noEmit`, `npm run lint`, and `git diff --check` pass.
 - Playwright CLI reload reports zero errors and zero warnings after the BOT logo dimensions were corrected. The 390px viewport has no horizontal overflow.
+- `npm run build` passes in a separate worktree with `DATABASE_URL` unset. No database, wallet, or network transaction was used.
 - Full keyboard, receipt-modal, and payment-state E2E coverage remains for the dedicated QA slice.
 
 ## Worktree and risks
