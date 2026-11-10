@@ -86,7 +86,7 @@ function missingQuestion(missing: WalletMissingField[]): string {
   if (missing.includes("recipient")) parts.push("who to pay");
   if (missing.includes("amount")) parts.push("how much");
   if (missing.includes("asset")) parts.push("which asset (BOT or USDT)");
-  if (missing.includes("chain")) parts.push("which network (BOT Chain or BOT Chain Testnet)");
+  if (missing.includes("chain")) parts.push("which network (BOT Chain Mainnet)");
   return `To prepare this transfer I still need ${parts.join(", ")}.`;
 }
 
@@ -527,7 +527,7 @@ async function prepareReview(
       if (code === "UNSUPPORTED_ASSET" || code === "UNSUPPORTED_CHAIN" || code === "CELO_WALLET_TRANSFER_UNSUPPORTED") {
         const rejected: WalletTransferIntent = { ...draft, unsupportedReason: err.message, phase: "collecting" };
         return {
-          reply: `${err.message} I support native BOT and USDT on BOT Chain, and native test BOT on BOT Chain Testnet. What would you like to change?`,
+          reply: `${err.message} I support native BOT and Official USDT transfers on BOT Chain Mainnet. BOT-funded utility payments are not live. What would you like to change?`,
           draft: rejected,
           action: { type: "reject_unsupported_request", reason: err.message },
         };

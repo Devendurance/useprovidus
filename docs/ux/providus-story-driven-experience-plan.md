@@ -26,8 +26,8 @@ The first four stages are the payment spine. Returning conversations and explici
 ### Public entry
 
 1. Keep the existing Providus identity, promise, and one direct route into the dashboard.
-2. Explain the real Celo, BOT Testnet, and BOT Mainnet status in short availability labels.
-3. Show the transaction path and approval boundaries with real evidence. Do not call production Mainnet payments live before launch authorization.
+2. Explain Celo service availability and live BOT Chain Mainnet native BOT and Official USDT payments on chain 677 with short availability labels. Keep BOT Testnet out of public marketing and payment setup.
+3. Show the transaction path and approval boundaries with real evidence. Mainnet payments are live. BOT-funded utility settlement remains unavailable until independently verified settlement and provider delivery exist.
 4. Keep long-form trust explanation on How it works instead of repeating it below the dashboard conversation.
 
 ### Dashboard workspace
@@ -86,7 +86,7 @@ The payment UI should derive from one discriminated presentation model rather th
 | Authentication | Existing owner session and `requireOwner` route pattern | Reuse this boundary for sessions, memory, receipt lists, and detail reads. The owner comes from authentication, never a client-supplied wallet value. | None for the audit. |
 | Conversation sessions and messages | No session or message tables. `/api/assistant/chat` is stateless and accepts bounded client-held history. | Add a separate session and message model after migration review. | Additive migration required. |
 | Shared user memory | No general memory table. Saved recipients are the only current explicit user memory-like record. | Keep recipient facts in `saved_recipients`. Add a separate store for other user-approved facts. Never use a memory fact as payment authorization. | Additive migration required for new facts. |
-| BOT gas fee | B5 stores transaction, block, confirmation, status, and verification time. It does not store gas used or effective gas price. | Derive the fee from the canonical chain receipt for display, or propose a reviewed additive field if durable storage is required. Show unavailable when the chain read cannot establish it. | Migration required only if the fee is stored durably. |
+| BOT gas fee | B5 stores transaction, block, confirmation, status, and verification time. It does not store gas used or effective gas price. | Show a gas fee only when the current authoritative record contains actual fee data. Existing BOT B5 and Celo records do not persist actual gas, so show unavailable without guessing or implying an estimate is actual. | Migration required only if the fee is stored durably. |
 | Token approval transaction | No approval transaction table exists. The current allowance component keeps its display state in React. | Record approval hash and verification separately from the payment ledger before adding approval history. | Additive migration or a reviewed chain-discovery design required. |
 
 No database schema changed during this session. Do not run `db:generate` or `db:migrate` until a concrete migration proposal has explicit review, a backup and restore plan, and verified wallet-isolation tests. Do not run `drizzle push`.
@@ -97,8 +97,8 @@ No database schema changed during this session. Do not run `db:generate` or `db:
 
 Status: Complete in this session.
 
-- Show that native BOT and Official USDT Mainnet transaction evidence is verified.
-- Show that production payment availability remains gated pending separate launch authorization.
+- Show that native BOT and Official USDT payments are live on BOT Chain Mainnet, chain 677.
+- Keep the BOT Testnet 968 production execution block and utility settlement limitations accurate. Mainnet payment availability is live.
 - Keep the B1 network registry, local test mode, and production execution gate unchanged.
 - Verify the shared positioning and the existing Mainnet execution hard gate.
 
@@ -115,12 +115,14 @@ Priority: First implementation slice.
 
 ### Slice 2. Add searchable owner-scoped receipts
 
+Status: Complete locally in P0.2.
+
 Priority: Second implementation slice, before session and memory work.
 
 - Read Celo records from their existing ledger and BOT records from B5.
 - Add searchable previews, status/token/chain filters, pagination, and the responsive detail modal.
-- Keep approval transactions separate from payment receipts.
-- Show gas only when an authoritative receipt provides it. Review whether approval evidence needs an additive table.
+- No durable approval ledger exists. Keep approval transactions out of payment receipt history. A future approval history requires an additive schema or reviewed chain-discovery design.
+- Show actual gas only when stored authoritative evidence provides it. Existing records lack it, so show unavailable. Do not fabricate full Celo recipient addresses when the ledger does not store them.
 - Gate any required schema migration on explicit review, backup planning, and owner isolation proof.
 
 ### Slice 3. Add persistent conversation sessions
@@ -144,6 +146,8 @@ Priority: After sessions.
 
 ### Slice 5. Complete browser and accessibility QA
 
+Status: P0.2 local Chromium checks passed at 320, 375, 390, 768, and desktop widths. iOS Safari and Android browser chrome remain unverified.
+
 Run as a gate for each preceding slice and as a final regression sweep.
 
 - Exercise desktop, 768px tablet, 390px mobile, 320px reflow, and 200-percent zoom.
@@ -161,5 +165,5 @@ Run as a gate for each preceding slice and as a final regression sweep.
 - Every verified payment has a usable receipt path that preserves the original evidence.
 - Receipt and session data stay within the authenticated wallet owner.
 - Saved memory is explicit, editable, removable, and never a payment authorization.
-- The existing Celo service flows and BOT Testnet flows keep their current execution and receipt semantics.
-- BOT Mainnet product execution remains gated until separate production launch authorization.
+- The existing Celo service flows remain intact. Historical BOT Testnet receipts stay inspectable with TESTNET labeling, while public Testnet payment setup and production execution remain disabled.
+- BOT Chain Mainnet native BOT and Official USDT payments are live. BOT Testnet 968 remains blocked from public production execution. Utility settlement remains unavailable pending verified settlement and provider delivery.

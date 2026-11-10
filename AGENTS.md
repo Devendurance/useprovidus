@@ -12,6 +12,9 @@
 - Network selection and payment capability are independent. Use the B1 chain registry for network metadata, preserve the live native BOT/Official USDT Mainnet route and its security checks, and retain B5 verified receipt semantics.
 - Wallet account changes must clear prior-owner assistant drafts and ignore stale async results while preserving submitted/unknown payment recovery evidence. A chain switch alone does not invalidate SIWE under the current `requireOwner` policy.
 - Wallet connection must not force a chain. Only explicit network selection may request a switch, and displayed wallet network state must follow provider confirmation.
+- Receipt history and detail reads derive ownership from authenticated `requireOwner` state. Never trust a caller-supplied wallet address for receipt access.
+- A BOT payment is Verified only when B5 says confirmed and provides `verifiedAt`. Submitted hashes remain pending or unknown until verified.
+- Do not invent actual gas fees, recipient addresses, or approval history absent from source records. Token approvals stay separate from payment receipts.
 
 
 ## WRITING

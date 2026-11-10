@@ -74,7 +74,7 @@ export function SiteFooter() {
               style={{ width: "auto", height: "auto" }}
             />
             <p className="text-xs leading-5 text-[#F5F2EA]/70">
-              Official ecosystem acknowledgment for the verified BOT Testnet payment path.
+              BOT Chain Mainnet payments are live for wallet-authorized native BOT and Official USDT transfers.
             </p>
           </div>
           <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold sm:mt-0">

@@ -5,7 +5,7 @@ import { ReceiptClient } from "./receipt-client";
 export const metadata: Metadata = {
   title: "Payment proof",
   description:
-    "A truthful proof surface for shipped airtime + cash-out payments.",
+    "Owner-scoped payment receipts across BOT Chain and Celo.",
 };
 
 export default function ReceiptPage() {

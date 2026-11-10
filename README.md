@@ -16,7 +16,7 @@ A multichain conversational payment execution layer for wallet-authorized paymen
 
 <p>
   <a href="https://celo.org"><img src="https://img.shields.io/badge/Celo-Live%20payment%20flows-FCFF52?style=flat-square&logo=celo&logoColor=111111" alt="Celo live payment flows"></a>
-  <a href="https://www.botchain.ai"><img src="https://img.shields.io/badge/BOT%20Chain-Testnet%20verified-13B897?style=flat-square" alt="BOT Chain testnet verified"></a>
+  <a href="https://www.botchain.ai"><img src="https://img.shields.io/badge/BOT%20Chain-Mainnet%20live-276645?style=flat-square" alt="BOT Chain Mainnet payments live"></a>
   <a href="https://8004scan.io/agents/celo/9851"><img src="https://img.shields.io/badge/ERC--8004-Agent%20%239851-4C6FFF?style=flat-square" alt="ERC-8004 Agent 9851"></a>
   <a href="https://github.com/Devendurance/useprovidus"><img src="https://img.shields.io/badge/ERC--8021-Attributed-2E8B57?style=flat-square" alt="ERC-8021 Attribution"></a>
   <a href="https://askbots.ai/p/k172fmf6cpxbq355mzsevk3vcd8epej8"><img src="https://img.shields.io/badge/AskBots-Round%201-6B5CE7?style=flat-square" alt="AskBots Round 1"></a>
@@ -51,7 +51,7 @@ Current user-facing flows:
 
 - **Conversational airtime (`/dashboard`)** — Nigerian MTN, Airtel, Glo, and 9mobile airtime.
 - **Direct bank cash-out (`/check`)** — Celo USDC to a verified Nigerian bank account through Paycrest.
-- **BOT Chain recipient payments (`/dashboard`)** — named-recipient native BOT transfers on BOT Testnet, with saved-recipient lookup, wallet approval and verified status.
+- **BOT Chain recipient payments (`/dashboard`)** — named-recipient native BOT and Official USDT transfers on BOT Chain Mainnet, with saved-recipient lookup, separate wallet authorization and B5-verified status.
 - **Receipt and status (`/receipt`)** — durable lifecycle and evidence for supported transactions.
 
 ### Supported networks and boundaries
@@ -59,9 +59,9 @@ Current user-facing flows:
 | Network | Availability | Current payment use | Assets and limits |
 |---|---|---|---|
 | **Celo** | Live | Nigerian airtime and bank cash-out | USDC and cNGN. Airtime has a live mainnet proof. |
-| **BOT Chain** | Testnet verified; Mainnet transaction evidence verified | Named-recipient wallet transfers on BOT Testnet | Native BOT on BOT Testnet, chain ID 968. Native BOT and Official USDT Mainnet transactions are independently verified. Production payment availability remains gated pending separate launch authorization. |
+| **BOT Chain** | Mainnet payments live | Named-recipient wallet transfers | Native BOT and Official USDT on BOT Chain Mainnet, chain ID 677. |
 
-BOT Chain Mainnet proof uses [`scan.botchain.ai`](https://scan.botchain.ai). Testnet transaction proof uses [`scan.bohr.life`](https://scan.bohr.life). Production Mainnet payment availability remains gated pending separate launch authorization. BOT-funded airtime, data, electricity and cable payments are not live. They need a supported conversion or settlement route, provider delivery and independent verification before launch.
+BOT Chain Mainnet payments use [`scan.botchain.ai`](https://scan.botchain.ai). Historical BOT Testnet receipts use [`scan.bohr.life`](https://scan.bohr.life) and remain labeled as testnet. BOT-funded airtime, data, electricity and cable payments are not live. They need an independently verified settlement route, provider delivery and payment verification before launch.
 
 
 ### Supported airtime payment assets
@@ -174,7 +174,8 @@ graph TD
     Settlement --> Reconcile[Reconciliation + Recovery]
     Fulfilment --> Reconcile
     Celo[Celo Mainnet + browser wallet<br/>USDC / cNGN] --> Reconcile
-    BOT[BOT Testnet + browser wallet<br/>native BOT, chain 968] --> Reconcile
+    BOT[BOT Chain Mainnet + browser wallet<br/>native BOT + Official USDT, chain 677] --> B5[B5 verification]
+    B5 --> Outcome
     Reconcile --> Outcome[Verified Outcome]
     Outcome --> Receipt[Receipt]
 ```

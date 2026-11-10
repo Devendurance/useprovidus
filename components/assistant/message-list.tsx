@@ -15,7 +15,7 @@ export interface MessageListProps {
 }
 
 const STARTER_SUGGESTIONS = [
-  "Pay Douglas 0.01 BOT on BOT Testnet",
+  "Pay Douglas 0.01 BOT on BOT Chain Mainnet",
   "Buy ₦1,000 MTN airtime",
 ];
 

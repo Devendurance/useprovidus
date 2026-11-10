@@ -58,7 +58,7 @@ USDT follows Review, Exact token approval if needed, Separate payment wallet con
 
 Only a B5-confirmed submission with verifiedAt may appear as Verified. A submitted hash is evidence for recovery, not success. Unknown submissions keep their original hash and recovery path. Do not create a second payment during recovery.
 
-Mainnet transaction evidence is verified for native BOT and Official USDT. Production payment availability remains gated pending separate launch authorization. Keep network selection and payment availability separate.
+BOT Chain Mainnet payments are live for native BOT and Official USDT. Keep network selection and payment capability separate.
 
 ## Accessibility
 
@@ -75,8 +75,8 @@ Mainnet transaction evidence is verified for native BOT and Official USDT. Produ
 
 - Say what the system understood before asking for approval.
 - Say what happens next and what needs wallet authorization.
-- Label Celo, BOT Testnet, and BOT Mainnet according to their actual payment availability.
-- BOT Mainnet transaction evidence is verified. Production payment execution is still gated.
+- Label Celo and BOT Chain Mainnet according to their actual payment availability. Keep BOT Testnet wording on historical receipts only.
+- BOT Chain Mainnet native BOT and Official USDT payments are live. Historical Testnet evidence stays labeled as Testnet.
 - BOT-funded utility payments are not live without an independently verified settlement and provider-delivery route.
 - Separate submitted, pending, unknown, failed, and B5-verified states.
 - Never imply that a saved recipient proves the recipient identity.

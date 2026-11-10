@@ -397,7 +397,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mt-6 max-w-[360px] text-[11px] leading-[18px] text-[#1A1A1A]/60 lg:mt-7 lg:max-w-[480px] lg:text-[13px] lg:leading-5">
-              Current channel: web dashboard. Celo services are live, and BOT Testnet recipient payments are verified. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel}
+              Current channel: web dashboard. Celo services and BOT Chain Mainnet recipient payments are live. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel}
             </p>
           </div>
           <div className="relative mt-4 min-h-[360px] min-[600px]:min-h-[430px] md:min-h-[470px] lg:-ml-[clamp(56px,7.5vw,120px)] lg:mt-0 lg:h-full lg:min-h-[calc(100svh-81px)]">
@@ -509,7 +509,7 @@ export default function HomePage() {
             ))}
           </div>
           <p className="mt-5 rounded-[8px] border-[1.5px] border-[#1A1A1A] bg-[#1A1A1A] px-4 py-3 text-sm leading-6 text-[#F5F2EA]/85">
-            BOT Testnet payment proof uses the testnet explorer. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} {BOT_MAINNET_STATUS.utilityLabel}
+            BOT Chain Mainnet payment proof uses the official explorer. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} {BOT_MAINNET_STATUS.utilityLabel}
           </p>
         </div>
       </section>
@@ -683,7 +683,7 @@ export default function HomePage() {
             </h2>
             <ul className="mt-6 space-y-3 text-sm leading-6 text-[#F5F2EA]/75">
               <li>Celo live: supported USDC and cNGN airtime, plus separate Nigerian bank cash-out.</li>
-              <li>BOT Testnet verified: wallet-authorized native BOT recipient transfers.</li>
+              <li>BOT Chain Mainnet live: wallet-authorized native BOT and Official USDT recipient transfers.</li>
               <li>Human approval and browser-wallet signing stay explicit; Providus does not custody user funds.</li>
               <li>Chain confirmation, settlement and service fulfilment remain separate states.</li>
               <li>Quotes are estimates with freshness and assumptions.</li>
@@ -719,7 +719,7 @@ export default function HomePage() {
                 style={{ width: "auto", height: "auto" }}
               />
               <p className="max-w-xl text-sm leading-6 text-[#F5F2EA]/70">
-                Providus acknowledges BOT Chain as the network behind the verified testnet recipient-payment path.
+                BOT Chain Mainnet supports wallet-authorized native BOT and Official USDT payments.
               </p>
             </div>
             <div className="flex flex-wrap gap-4 text-sm font-semibold">

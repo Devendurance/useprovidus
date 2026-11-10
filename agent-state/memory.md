@@ -1,3 +1,9 @@
+## P0.2 receipt and evidence invariants, 2026-11-10
+- Receipt API ownership comes from authenticated `requireOwner`; list and detail reads must never accept client-selected owners.
+- Existing BOT B5 and Celo ledgers do not persist actual gas. Celo receipt rows omit a full recipient address. Display unavailable for absent fields.
+- BOT Verified requires B5 `confirmed` and `verifiedAt`. Celo records retain their own status vocabulary.
+- Approval transactions are not payment receipts and there is no durable approval ledger. Do not invent approval rows or apply a migration without explicit review and backup/isolation planning.
+- Keep mobile modal dismissal reachable through X, Escape, and outside click, with focus restoration and background scroll lock.
 # Providus — Memory (decisions, invariants, lessons)
 
 ## Mainnet activation and payment UX invariants, 2026-11-10

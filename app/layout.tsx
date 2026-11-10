@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Baloo_2, Georama, VT323 } from "next/font/google";
 import { cookieToInitialState } from "wagmi";
@@ -70,6 +70,13 @@ export const metadata: Metadata = {
     description: PRODUCT_POSITIONING.heroSupport,
     images: ["/brand/providus mascot full.png"],
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#CBD2C4",
 };
 
 export default async function RootLayout({

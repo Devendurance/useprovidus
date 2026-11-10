@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 const FLOW = [
   {
     title: "Request",
-    body: "Tell the web dashboard what you want to pay in ordinary language. Ask for a supported Nigerian service or name a recipient on BOT Testnet.",
+    body: "Tell the web dashboard what you want to pay in ordinary language. Ask for a supported Celo service or name a recipient on BOT Chain Mainnet.",
     icon: ClipboardList,
   },
   {
@@ -220,7 +220,7 @@ const VERDICT_FIELDS = [
   "Requested outcome and validated PaymentIntent",
   "Recipient, network and verified account or phone",
   "Amount, quote, fee, expiry and exact total",
-  "Celo mainnet or BOT Testnet, with the selected asset",
+  "Celo Mainnet or BOT Chain Mainnet, with the selected asset",
   "Order approval and browser-wallet signing boundary",
   "On-chain payment status",
   "NGN delivery status",
@@ -947,7 +947,7 @@ export default function HowItWorksPage() {
           ))}
         </div>
         <p className="mt-5 border-t border-ledger-edge pt-4 text-sm leading-6 text-receipt-grey">
-          BOT Testnet recipient payments are verified. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} {BOT_MAINNET_STATUS.utilityLabel}
+          BOT Chain Mainnet recipient payments are live. {BOT_MAINNET_STATUS.transactionLabel} {BOT_MAINNET_STATUS.productionLabel} {BOT_MAINNET_STATUS.utilityLabel}
         </p>
       </section>
 

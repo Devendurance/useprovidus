@@ -325,7 +325,7 @@ export function WalletTransferCard({ auth, action, draft, send, pending }: {
       {view.kind === "stale" ? <p role="status" className="text-sm text-receipt-grey">Payment details changed after review. Ask Providus to prepare a fresh payment before authorizing anything.</p> : null}
       {view.kind === "expired" ? <p role="status" className="text-sm text-receipt-grey">This payment intent expired. Ask Providus to prepare a fresh payment.</p> : null}
       {view.kind === "unsupported" ? <p role="status" className="text-sm text-receipt-grey">This payment uses an unsupported network. No transaction can be sent from this intent.</p> : null}
-      {view.kind === "verified" ? <Link href="/receipt" className={`${primary} inline-flex min-h-11 items-center justify-center rounded-lg px-4 no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green`}>View receipt</Link> : null}
+      {view.kind === "verified" ? <Link href={intent ? { pathname: "/receipt", query: { tx: `bot:${intent.id}` } } : "/receipt"} className={`${primary} inline-flex min-h-11 items-center justify-center rounded-lg px-4 no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-provident-green`}>View receipt</Link> : null}
       {view.kind === "review" && intent.tokenAddress && currentPlan && (currentPlan.chainId === 677 || currentPlan.chainId === 968) && view.nextAction !== "switch_network" && view.nextAction !== "retry_review" && view.nextAction !== "prepare_review" ? <TokenApprovalCard
         key={reviewContextKey ?? "stale-review"}
         enabled={Boolean(currentPlan.token && reviewContextKey)}

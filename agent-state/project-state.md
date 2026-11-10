@@ -1,5 +1,11 @@
 # Providus — Project State
 
+## P0.2 receipts, mobile navigation, and public copy, 2026-11-10
+- P0.2 uses authenticated owner-scoped API reads across existing BOT B5 and Celo `agent_transactions` records. No schema migration or production database write.
+- Added compact searchable/filterable receipt history and a responsive evidence dialog. BOT Verified requires B5 `confirmed` plus `verifiedAt`; Celo retains its source status.
+- Actual gas is unavailable in both source ledgers and full recipient address is absent from Celo records. Approval transactions have no durable ledger and are excluded from payment history.
+- Mobile navigation uses an opaque compact sticky header, safe-area spacing, and modal focus/scroll management. Public copy reflects BOT Mainnet 677 live and keeps Celo intact. Testnet remains historical/disabled publicly; utility settlement is unavailable pending verified settlement and provider delivery.
+- Focused receipt and positioning self-checks, `test:all`, TypeScript, lint, build, `git diff --check`, and full Playwright browser QA pass. Local route fixtures covered 320, 375, 390, 768, desktop, mobile navigation, and modal dismissal/focus. Screenshots are in `output/playwright/`.
 ## P0.1 compact payment UX and public Mainnet activation, 2026-11-10
 - Public BOT Chain Mainnet activation is complete at `7820480` for native BOT and Official USDT. BOT Testnet is hidden and disabled publicly. Existing Celo services remain intact. BOT-funded utilities are not live without independently verified settlement and provider delivery.
 - The evidence-based UX audit and story-driven plan remain in `docs/ux/`. `DESIGN.md` is the current Providus design system.
@@ -7,8 +13,8 @@
 - Success requires B5 `confirmed` plus `verifiedAt`. A submitted hash stays pending. Unknown/failed/expired states keep their truthful recovery or stop state. Native and USDT wallet authorizations remain separate as required.
 - P0.1 did not change B3/B5 execution, contracts, Safe ownership, production payment gates, Celo integrations, schema, migrations, or database data. No real transaction, push, or deploy occurred.
 - Owner-supplied Mainnet transaction hashes remain recorded below. The UI fixture screenshots are synthetic and make no live-transaction claim.
-- Current gaps: receipt history/modal is Celo-only, B5 does not persist gas fee values, approval transactions have no separate durable ledger, chat history is client-held, and general user memory is absent.
-- Next Fast-Build slice is P0.2 receipt history and evidence detail. Reuse existing data first. Any migration requires review, backup/restore planning, and verified wallet isolation. See `.fast-build/STATE.md`.
+- At P0.1 completion the remaining gaps included receipt history/modal, absent gas fee storage, no approval ledger, client-held chat, and no general memory. P0.2 now adds owner-scoped receipts. Gas/approval storage, sessions, and memory remain gaps.
+- P0.2 is complete. P1 persistent conversation sessions and shared memory remain unstarted and require separate migration review, backup/restore planning, and wallet-isolation verification. See `.fast-build/STATE.md`.
 - P0.1 checks passed: payment-card view (12 assertions), wallet assistant, web execution, submission, B5 verification, Mainnet policy, assistant, chain registry, wallet/network, Celo attribution, and ERC-20 UI self-checks. Playwright synthetic fixture verified cleanup, receipt link, proof disclosure, keyboard reachability, and no horizontal overflow at 390px. TypeScript, lint, build with `DATABASE_URL` unset, and diff check passed.
 
 ## B9 UX hotfix completed, 2026-11-09
