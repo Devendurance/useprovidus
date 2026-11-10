@@ -1,20 +1,21 @@
-# Left off: P1.1 planning and migration baseline
+# Left off: P1.1 complete locally
 
 ## What we are doing
-- Implement durable wallet-owner-scoped Providus assistant sessions and conversation history.
-- Preserve P0.1/P0.2, payment behavior, Celo, and existing records. Do not push, deploy, run live payments, or migrate production.
+- P1.1 wallet-owner-scoped persistent assistant conversations are implemented locally.
+- Preserve P0.1/P0.2 and all payment semantics. Do not push, deploy, migrate production, run live payments, or start P1.2/P2.
 
 ## Done
-- Read `.fast-build/STATE.md`, the story-driven UX skill, the UX audit, and the experience plan.
-- Traced SIWE ownership, stateless chat flow, the `useAssistant` hook, saved recipients, and separate B3/B5 ledgers.
-- Compared two designs. Selected two tables with a composite owner foreign key and idempotent turn state on user messages. See `.fast-build/P1.1-ARCHITECTURE.md`.
-- Started isolated Postgres 16 at `127.0.0.1:55432` and applied migrations `0000` through `0007` to that disposable database only.
-- Added `scripts/p11-migration-isolation-self-check.mjs`. Prepared two synthetic owners and recorded counts and SHA-256 baselines in `.fast-build/p11-ledger-baseline.json`.
-- Verified all four existing ledger tables retain their baseline counts and checksums after `0007`. A SQL probe confirmed that the composite owner foreign key rejects a cross-owner message.
-- Planning and the migration harness are committed locally in `b4f8a42`. The code worker owns isolated worktree `C:/Users/USER/Documents/ideas/providus-p11` on `codex/p11-persistent-chat`. Root remains on the shared workspace and owns migration review, local DB application, and final verification.
-- Existing untracked `.omp/`, `.playwright-cli/`, `bridge/`, `video-demo/`, and P0.2 screenshots must be preserved.
+- Added separate `conversation_sessions` and `conversation_messages` tables in migration `0007`. Migration was applied only to disposable Postgres 16 at `127.0.0.1:55432`.
+- Added SIWE owner-scoped list/create/read/rename/delete/message APIs, idempotent session/turn retries, ordered messages, automatic titles, and pagination.
+- Added the desktop recent-chat sidebar and accessible mobile drawer. Restored history is plain text and cannot restore payment intents, approvals, signatures, or actions.
+- Fixed a restore race where `reset()` aborted the new conversation request. An authenticated Playwright regression restores a saved session, reloads it from the URL, and confirms no payment action returns.
+- Verified the four synthetic existing ledger tables by row count and SHA-256 after migration. A direct composite-FK probe rejected cross-owner message attachment.
+- Local `main` commits: `75e6310`, `674092e`, `d5cc0a6`, `6f01024`, `f894a3f`. No push/deploy.
+- Passed `npm run test:all`, local `npm run test:conversation-db`, `npm run test:p11-ui` (3 tests), `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check`.
+- Screenshots: `output/playwright/p1.1-assistant-restored-chat-{desktop,390}.png`, responsive viewport captures, desktop history sidebar, and mobile drawer.
+- Root workspace unrelated untracked `.omp/`, `.playwright-cli/`, `bridge/`, `video-demo/`, and P0.2 screenshots were preserved.
 
 ## Next
-- Review the worker's service/API/UI changes and tests. Do not rerun the local migration.
-- Implement the owner-scoped routes, persisted chat mode, active session UI, desktop sidebar, mobile drawer, and regressions.
-- Run the requested tests, browser checks, typecheck, lint, build, and diff check. Update all state files. Stop before production migration, push, deploy, P1.2 memory, or P2.
+- P1.2 shared memory remains unstarted. Add no memory schema until separately scoped and authorized.
+- Before production migration, obtain and review a complete backup, validate restore in isolation, and document rollback. Do not rerun migration `0007` on the local database.
+- No structured receipt pointer is stored in chat. Existing payment receipts remain in their own ledger and navigation.

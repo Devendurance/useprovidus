@@ -6,6 +6,15 @@
 - Keep mobile modal dismissal reachable through X, Escape, and outside click, with focus restoration and background scroll lock.
 # Providus — Memory (decisions, invariants, lessons)
 
+## P1.1 conversation session invariants, 2026-11-10
+- Keep `conversation_sessions` and `conversation_messages` separate. Derive ownership only from verified SIWE claims, and enforce `(session_id, owner_address)` with the composite foreign key.
+- Persist plain text and safe retry state only. Do not store payment intents, signatures, approvals, receipt ledgers, or wallet secrets in conversation tables.
+- Session-create request IDs and turn IDs are idempotency keys. Attempt leases and compare-and-set completion reject duplicate or stale replies.
+- Conversation restore is text-only. Returning to a payment request must create a fresh B3 intent and require fresh review plus wallet authorization.
+- `openConversation()` must reset old transient state before creating its new abort controller. Older-message responses must match owner revision, active session, load revision, and abort state.
+- Migration `0007` was tested only in disposable local Postgres. Production release needs a reviewed backup, tested restore, rollback plan, and separate authorization.
+- P1.1 stores no structured receipt pointer. Receipts remain in their existing owner-scoped ledger and navigation; P1.2 shared memory is unstarted.
+
 ## Mainnet activation and payment UX invariants, 2026-11-10
 - Native BOT and Official USDT transactions on BOT Chain Mainnet have verified evidence. Their hashes are recorded in `agent-state/project-state.md`.
 - Public BOT Chain Mainnet activation is complete at commit `7820480` for native BOT and Official USDT. BOT Testnet is hidden and disabled publicly. Celo remains intact.

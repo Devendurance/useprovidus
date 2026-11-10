@@ -7,12 +7,13 @@
 - Mobile navigation uses an opaque compact sticky header, safe-area spacing, and modal focus/scroll management. Public copy reflects BOT Mainnet 677 live and keeps Celo intact. Testnet remains historical/disabled publicly; utility settlement is unavailable pending verified settlement and provider delivery.
 - Focused receipt and positioning self-checks, `test:all`, TypeScript, lint, build, `git diff --check`, and full Playwright browser QA pass. Local route fixtures covered 320, 375, 390, 768, desktop, mobile navigation, and modal dismissal/focus. Screenshots are in `output/playwright/`.
 
-## P1.1 persistent conversation sessions, in progress, 2026-11-10
-- P1.1 code is in isolated branch `codex/p11-persistent-chat`. The session/message schema and migration are generated. The rest of the service, API, hook, UI, and tests are still in progress.
-- `how` traces confirmed the chat route is stateless, `useAssistant` owns the client transcript, and SIWE is the only owner authority. Saved recipients, B3 intents, B5 submissions, and payment receipts stay separate.
-- Architecture selected two additive tables. The message row holds idempotent turn state and an attempt lease. A composite foreign key binds each message to the session owner. See `.fast-build/P1.1-ARCHITECTURE.md`.
-- Disposable Postgres 16 is bound to `127.0.0.1:55432`, with `0000` through `0007` applied. The migration harness seeded two synthetic owners and verified unchanged SHA-256 baselines for the four existing owner-scoped ledger tables. A direct SQL probe confirmed that the composite owner foreign key rejects a cross-owner message.
-- Production migration, database writes, push, deploy, and blockchain transactions remain out of scope.
+## P1.1 persistent conversation sessions, complete locally, 2026-11-10
+- Local commits `75e6310`, `674092e`, `d5cc0a6`, `6f01024`, and `f894a3f` add SIWE owner-scoped sessions/messages, APIs, persistent assistant turns, desktop history, a mobile drawer, restore-race and refresh regressions, and restored-conversation screenshots.
+- Migration `0007_conversation_sessions` adds separate session and message tables. Owners come from verified SIWE claims. A composite owner foreign key protects message/session attachment. Messages are text-only and never restore intents, approvals, signatures, or payment actions.
+- Idempotent session creation, automatic titles, rename/delete, pagination, ordering, retry leases, stale response guards, and wallet-owner cache clearing are implemented. P0 payment, receipt, saved-recipient, and session data remain separate.
+- Disposable Postgres 16 at `127.0.0.1:55432` has migrations `0000` through `0007`. Two synthetic owners' rows and hashes stayed unchanged across four existing ledger tables. Direct SQL and the service self-check reject cross-owner access.
+- `test:all`, `test:conversation-db`, `test:p11-ui` (3 tests), typecheck, lint, build, and diff check passed. Browser routes used mocked wallet/SIWE/payment APIs. No real transactions occurred.
+- Migration has not been applied to production. A reviewed production backup, restore validation, rollback plan, and separate authorization remain release blockers. P1.2 shared memory remains unstarted.
 ## P0.1 compact payment UX and public Mainnet activation, 2026-11-10
 - Public BOT Chain Mainnet activation is complete at `7820480` for native BOT and Official USDT. BOT Testnet is hidden and disabled publicly. Existing Celo services remain intact. BOT-funded utilities are not live without independently verified settlement and provider delivery.
 - The evidence-based UX audit and story-driven plan remain in `docs/ux/`. `DESIGN.md` is the current Providus design system.
@@ -21,7 +22,7 @@
 - P0.1 did not change B3/B5 execution, contracts, Safe ownership, production payment gates, Celo integrations, schema, migrations, or database data. No real transaction, push, or deploy occurred.
 - Owner-supplied Mainnet transaction hashes remain recorded below. The UI fixture screenshots are synthetic and make no live-transaction claim.
 - At P0.1 completion the remaining gaps included receipt history/modal, absent gas fee storage, no approval ledger, client-held chat, and no general memory. P0.2 now adds owner-scoped receipts. Gas/approval storage, sessions, and memory remain gaps.
-- P0.2 is complete. P1 persistent conversation sessions and shared memory remain unstarted and require separate migration review, backup/restore planning, and wallet-isolation verification. See `.fast-build/STATE.md`.
+- P0.2 and P1.1 are complete locally. P1.2 shared memory remains unstarted and needs its own owner-scoped design and authorization. P1.1 production migration still requires separate backup/restore review and authorization. See `.fast-build/STATE.md`.
 - P0.1 checks passed: payment-card view (12 assertions), wallet assistant, web execution, submission, B5 verification, Mainnet policy, assistant, chain registry, wallet/network, Celo attribution, and ERC-20 UI self-checks. Playwright synthetic fixture verified cleanup, receipt link, proof disclosure, keyboard reachability, and no horizontal overflow at 390px. TypeScript, lint, build with `DATABASE_URL` unset, and diff check passed.
 
 ## B9 UX hotfix completed, 2026-11-09
