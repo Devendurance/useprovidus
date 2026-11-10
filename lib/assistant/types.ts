@@ -6,6 +6,7 @@
  */
 
 import type { PaymentAssetSymbol } from "@/lib/celo/assets";
+import type { ConversationMessageView } from "@/lib/conversations/types";
 
 export type PaymentNetwork = "mtn" | "airtel" | "glo" | "9mobile";
 
@@ -106,6 +107,12 @@ export interface UserConversationMessage {
   role: "user";
   content: string;
   timestamp: string;
+  id?: string;
+  sessionId?: string;
+  turnId?: string;
+  sequence?: number;
+  turnStatus?: "pending" | "complete" | "failed" | "superseded";
+  failureCode?: "assistant_unavailable" | "invalid_output" | "rate_limited" | null;
   intent?: never;
 }
 
@@ -113,6 +120,10 @@ export interface AssistantConversationMessage {
   role: "assistant";
   content: string;
   timestamp: string;
+  id?: string;
+  sessionId?: string;
+  turnId?: string;
+  sequence?: number;
   intent?: PaymentIntent;
 }
 
@@ -140,6 +151,8 @@ export interface AssistantChatRequest {
   walletTransferOwner?: string | null;
   history: ConversationMessage[];
   activeIntent: PaymentIntent | null;
+  sessionId?: string;
+  turnId?: string;
 }
 
 export type AssistantApiErrorCode =
@@ -149,13 +162,23 @@ export type AssistantApiErrorCode =
   | "ASSISTANT_NOT_CONFIGURED"
   | "MODEL_UNAVAILABLE"
   | "MODEL_INVALID_OUTPUT"
-  | "STATUS_UNAVAILABLE";
+  | "STATUS_UNAVAILABLE"
+  | "NOT_AUTHENTICATED"
+  | "NOT_FOUND"
+  | "STORAGE_UNAVAILABLE"
+  | "TURN_IN_PROGRESS"
+  | "TURN_STALE";
 
 export type AssistantChatResponse =
   | {
       ok: true;
       turn: AssistantTurn;
       activeIntent: PaymentIntent | null;
+      persisted?: {
+        userMessage: ConversationMessageView;
+        assistantMessage: ConversationMessageView;
+        replayed: boolean;
+      };
     }
   | {
       ok: false;

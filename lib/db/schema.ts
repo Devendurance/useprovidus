@@ -1,12 +1,15 @@
 import {
   bigint,
   boolean,
+  check,
+  foreignKey,
   index,
   integer,
   jsonb,
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -397,3 +400,123 @@ export const transferSubmissions = pgTable(
 
 export type TransferSubmission = typeof transferSubmissions.$inferSelect;
 export type NewTransferSubmission = typeof transferSubmissions.$inferInsert;
+
+export const conversationSessions = pgTable(
+  "conversation_sessions",
+  {
+    id: text("id").primaryKey(),
+    ownerAddress: text("owner_address").notNull(),
+    createRequestId: text("create_request_id").notNull(),
+    title: text("title").notNull().default("New conversation"),
+    titleSource: text("title_source").notNull().default("automatic"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true, mode: "string" }),
+    nextSequence: bigint("next_sequence", { mode: "number" }).notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("conversation_session_owner_create_idx").on(
+      table.ownerAddress,
+      table.createRequestId,
+    ),
+    unique("conversation_session_id_owner_unique").on(table.id, table.ownerAddress),
+    index("conversation_session_owner_recent_idx").on(
+      table.ownerAddress,
+      table.updatedAt,
+      table.id,
+    ),
+    check(
+      "conversation_session_title_source_check",
+      sql.raw("title_source IN ('automatic', 'manual')"),
+    ),
+    check(
+      "conversation_session_title_length_check",
+      sql.raw("char_length(trim(title)) BETWEEN 1 AND 80"),
+    ),
+    check(
+      "conversation_session_next_sequence_check",
+      sql.raw("next_sequence >= 1"),
+    ),
+  ],
+);
+
+export type ConversationSession = typeof conversationSessions.$inferSelect;
+export type NewConversationSession = typeof conversationSessions.$inferInsert;
+
+export const conversationMessages = pgTable(
+  "conversation_messages",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull(),
+    ownerAddress: text("owner_address").notNull(),
+    messageSequence: bigint("message_sequence", { mode: "number" }).notNull(),
+    turnId: text("turn_id").notNull(),
+    role: text("role").notNull().$type<"user" | "assistant">(),
+    content: text("content").notNull(),
+    turnStatus: text("turn_status").$type<
+      "pending" | "complete" | "failed" | "superseded" | null
+    >(),
+    attemptId: text("attempt_id"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true, mode: "string" }),
+    attemptCount: integer("attempt_count"),
+    failureCode: text("failure_code").$type<
+      "assistant_unavailable" | "invalid_output" | "rate_limited" | null
+    >(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: "conversation_message_session_owner_fk",
+      columns: [table.sessionId, table.ownerAddress],
+      foreignColumns: [conversationSessions.id, conversationSessions.ownerAddress],
+    }).onDelete("cascade"),
+    uniqueIndex("conversation_message_session_sequence_idx").on(
+      table.sessionId,
+      table.ownerAddress,
+      table.messageSequence,
+    ),
+    uniqueIndex("conversation_message_turn_role_idx").on(
+      table.sessionId,
+      table.ownerAddress,
+      table.turnId,
+      table.role,
+    ),
+    uniqueIndex("conversation_message_pending_turn_idx")
+      .on(table.sessionId)
+      .where(sql.raw("role = 'user' AND turn_status = 'pending'")),
+    index("conversation_message_owner_history_idx").on(
+      table.ownerAddress,
+      table.sessionId,
+      table.messageSequence,
+    ),
+    check(
+      "conversation_message_role_check",
+      sql.raw("role IN ('user', 'assistant')"),
+    ),
+    check(
+      "conversation_message_turn_state_check",
+      sql.raw("((role = 'user' AND turn_status IS NOT NULL AND turn_status IN ('pending', 'complete', 'failed', 'superseded') AND attempt_count >= 1 AND ((turn_status = 'pending' AND attempt_id IS NOT NULL AND lease_expires_at IS NOT NULL AND failure_code IS NULL) OR (turn_status <> 'pending' AND attempt_id IS NULL AND lease_expires_at IS NULL))) OR (role = 'assistant' AND turn_status IS NULL AND attempt_id IS NULL AND lease_expires_at IS NULL AND attempt_count IS NULL AND failure_code IS NULL))"),
+    ),
+    check(
+      "conversation_message_sequence_check",
+      sql.raw("message_sequence >= 1"),
+    ),
+    check(
+      "conversation_message_content_length_check",
+      sql.raw("char_length(trim(content)) BETWEEN 1 AND 2000"),
+    ),
+    check(
+      "conversation_message_failure_code_check",
+      sql.raw("failure_code IS NULL OR failure_code IN ('assistant_unavailable', 'invalid_output', 'rate_limited')"),
+    ),
+  ],
+);
+
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
+export type NewConversationMessage = typeof conversationMessages.$inferInsert;

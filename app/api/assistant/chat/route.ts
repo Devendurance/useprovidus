@@ -1,11 +1,10 @@
 /**
  * Conversational assistant endpoint.
  *
- * Server-only. The route is stateless (no conversation state is kept here),
- * never streams, never caches, and has no mutation surface: it answers from
- * recorded status or from the model's candidate intent, which is then
- * re-validated deterministically. No Paycrest, ClubKonnect, wallet, or
- * blockchain call can originate from this handler.
+ * Server-only. Anonymous chat remains ephemeral. Authenticated conversation
+ * turns use owner-scoped persistence for plain text, while each fresh intent
+ * continues through the existing deterministic validation path. This handler
+ * never calls wallet signing or blockchain services.
  */
 
 import { NextResponse } from "next/server";
@@ -14,6 +13,19 @@ import type {
   AssistantChatRequest,
   ConversationMessage,
 } from "@/lib/assistant/types";
+import { getDb } from "@/lib/db";
+import {
+  beginConversationTurn,
+  completeConversationTurn,
+  failConversationTurn,
+  isConversationId,
+  isConversationTurnId,
+} from "@/lib/conversations/service";
+import type { ConversationFailureCode } from "@/lib/conversations/types";
+import {
+  errorResponse as ownerErrorResponse,
+  requireOwnerForMutation,
+} from "@/lib/recipients/routes";
 import { resolveAssistantTurn } from "@/lib/assistant/resolve";
 import { sanitizeIncomingIntent } from "@/lib/assistant/validation";
 import {
@@ -46,6 +58,11 @@ const HTTP_STATUS_BY_CODE: Record<AssistantApiErrorCode, number> = {
   MODEL_UNAVAILABLE: 502,
   MODEL_INVALID_OUTPUT: 502,
   STATUS_UNAVAILABLE: 503,
+  NOT_AUTHENTICATED: 401,
+  NOT_FOUND: 404,
+  STORAGE_UNAVAILABLE: 503,
+  TURN_IN_PROGRESS: 409,
+  TURN_STALE: 409,
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -260,6 +277,23 @@ export async function POST(request: Request) {
     );
   }
 
+  const hasSessionId = payload.sessionId !== undefined;
+  const hasTurnId = payload.turnId !== undefined;
+  if (hasSessionId !== hasTurnId) {
+    return errorResponse("INVALID_REQUEST", "A session and turn ID are both required.");
+  }
+  if (hasSessionId) {
+    if (
+      typeof payload.sessionId !== "string" ||
+      !isConversationId(payload.sessionId) ||
+      typeof payload.turnId !== "string" ||
+      !isConversationTurnId(payload.turnId)
+    ) {
+      return errorResponse("INVALID_REQUEST", "The conversation session or turn ID is invalid.");
+    }
+    return persistentTurn(request, payload, message, payload.sessionId, payload.turnId);
+  }
+
   const historyResult = parseHistory(payload.history);
   if (!historyResult.ok) {
     return errorResponse("INVALID_REQUEST", historyResult.message);
@@ -293,4 +327,215 @@ export async function POST(request: Request) {
     status: response.ok ? 200 : HTTP_STATUS_BY_CODE[response.error.code],
     headers: NO_STORE,
   });
+}
+
+async function persistentTurn(
+  request: Request,
+  payload: Record<string, unknown>,
+  message: string,
+  sessionId: string,
+  turnId: string,
+) {
+  const auth = await requireOwnerForMutation(request);
+  if ("response" in auth) return auth.response;
+  if (
+    "walletTransferOwner" in payload &&
+    (typeof payload.walletTransferOwner !== "string" ||
+      payload.walletTransferOwner.toLowerCase() !== auth.owner.toLowerCase())
+  ) {
+    return ownerErrorResponse(
+      "WALLET_SESSION_MISMATCH",
+      "Session wallet changed. Sign in with the connected wallet again.",
+      401,
+    );
+  }
+  const db = getDb();
+  if (!db) {
+    return errorResponse("STORAGE_UNAVAILABLE", "Conversation storage is not configured.");
+  }
+
+  let claim: Awaited<ReturnType<typeof beginConversationTurn>>;
+  try {
+    claim = await beginConversationTurn(db, {
+      ownerAddress: auth.owner,
+      sessionId,
+      turnId,
+      content: message,
+    });
+  } catch {
+    return errorResponse("STORAGE_UNAVAILABLE", "Your message could not be saved.");
+  }
+  if (claim.kind === "not_found") return errorResponse("NOT_FOUND", "Conversation not found.");
+  if (claim.kind === "in_progress") {
+    return errorResponse("TURN_IN_PROGRESS", "This message is still being answered.", true);
+  }
+  if (claim.kind === "conflict") {
+    return errorResponse("TURN_STALE", "This retry key belongs to a different message.");
+  }
+  if (claim.kind === "stale") {
+    return errorResponse("TURN_STALE", "This message can no longer be retried. Send it again to continue.");
+  }
+  if (claim.kind === "replay") {
+    return NextResponse.json(
+      {
+        ok: true,
+        turn: {
+          kind: "chat",
+          message: {
+            role: "assistant",
+            content: claim.assistantMessage.content,
+            timestamp: claim.assistantMessage.timestamp,
+          },
+        },
+        activeIntent: null,
+        persisted: {
+          userMessage: {
+            role: "user",
+            content: claim.userMessage.content,
+            timestamp: claim.userMessage.timestamp,
+            id: claim.userMessage.id,
+            sessionId: claim.userMessage.sessionId,
+            turnId: claim.userMessage.turnId,
+            sequence: claim.userMessage.sequence,
+            turnStatus: claim.userMessage.turnStatus,
+            failureCode: null,
+          },
+          assistantMessage: {
+            role: "assistant",
+            content: claim.assistantMessage.content,
+            timestamp: claim.assistantMessage.timestamp,
+            id: claim.assistantMessage.id,
+            sessionId: claim.assistantMessage.sessionId,
+            turnId: claim.assistantMessage.turnId,
+            sequence: claim.assistantMessage.sequence,
+          },
+          replayed: true,
+        },
+      },
+      { headers: NO_STORE },
+    );
+  }
+
+  const history: ConversationMessage[] = claim.context.map((entry) => ({
+    role: entry.role,
+    content: entry.content,
+    timestamp: entry.timestamp,
+  }));
+  const intentResult = sanitizeIncomingIntent(payload.activeIntent ?? null, history);
+  if (!intentResult.ok) {
+    await failConversationTurn(db, {
+      ownerAddress: auth.owner,
+      sessionId,
+      turnId,
+      attemptId: claim.attemptId,
+      failureCode: "invalid_output",
+    });
+    return errorResponse("INVALID_REQUEST", intentResult.message);
+  }
+
+  try {
+    const response = await resolveAssistantTurn({
+      message,
+      history,
+      activeIntent: intentResult.intent,
+      ownerAddress: auth.owner,
+      signal: request.signal,
+    });
+    if (!response.ok) {
+      await failConversationTurn(db, {
+        ownerAddress: auth.owner,
+        sessionId,
+        turnId,
+        attemptId: claim.attemptId,
+        failureCode: safeFailureCode(response.error.code),
+      });
+      return NextResponse.json(response, {
+        status: HTTP_STATUS_BY_CODE[response.error.code],
+        headers: NO_STORE,
+      });
+    }
+
+    const completion = await completeConversationTurn(db, {
+      ownerAddress: auth.owner,
+      sessionId,
+      turnId,
+      attemptId: claim.attemptId,
+      assistantText: response.turn.message.content,
+    });
+    if (completion.kind === "not_found") return errorResponse("NOT_FOUND", "Conversation not found.");
+    if (completion.kind === "stale") {
+      return errorResponse("TURN_STALE", "This reply was superseded. Load the conversation to continue.");
+    }
+    const replayed = completion.kind === "replay";
+    if (replayed) {
+      return NextResponse.json(
+        {
+          ok: true,
+          turn: {
+            kind: "chat",
+            message: {
+              role: "assistant",
+              content: completion.assistantMessage.content,
+              timestamp: completion.assistantMessage.timestamp,
+            },
+          },
+          activeIntent: null,
+          persisted: persistedPair(completion.userMessage, completion.assistantMessage, true),
+        },
+        { headers: NO_STORE },
+      );
+    }
+    return NextResponse.json(
+      {
+        ...response,
+        persisted: persistedPair(completion.userMessage, completion.assistantMessage, false),
+      },
+      { headers: NO_STORE },
+    );
+  } catch {
+    await failConversationTurn(db, {
+      ownerAddress: auth.owner,
+      sessionId,
+      turnId,
+      attemptId: claim.attemptId,
+      failureCode: "assistant_unavailable",
+    });
+    return errorResponse("MODEL_UNAVAILABLE", "Providus could not finish this reply. You can retry it.", true);
+  }
+}
+
+function safeFailureCode(code: AssistantApiErrorCode): ConversationFailureCode {
+  if (code === "RATE_LIMITED") return "rate_limited";
+  if (code === "MODEL_INVALID_OUTPUT") return "invalid_output";
+  return "assistant_unavailable";
+}
+
+function persistedPair(
+  userMessage: import("@/lib/conversations/types").ConversationMessageView,
+  assistantMessage: import("@/lib/conversations/types").ConversationMessageView,
+  replayed: boolean,
+) {
+  return {
+    userMessage: {
+      role: "user" as const,
+      content: userMessage.content,
+      timestamp: userMessage.timestamp,
+      id: userMessage.id,
+      sessionId: userMessage.sessionId,
+      turnId: userMessage.turnId,
+      sequence: userMessage.sequence,
+      turnStatus: userMessage.turnStatus,
+      failureCode: userMessage.failureCode ?? null,
+    },
+    assistantMessage: {
+      role: "assistant" as const,
+      content: assistantMessage.content,
+      timestamp: assistantMessage.timestamp,
+      id: assistantMessage.id,
+      sessionId: assistantMessage.sessionId,
+      turnId: assistantMessage.turnId,
+      sequence: assistantMessage.sequence,
+    },
+    replayed,
+  };
 }
