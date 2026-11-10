@@ -25,5 +25,6 @@
 
 ## Worktree and risks
 - Preserve pre-existing untracked `.omp/`, `bridge/`, and `video-demo/` folders.
+- A temporary isolated-build path remains outside the repository at `C:\Users\USER\Documents\ideas\providus-build-check-f083f55`. It contains only a `node_modules` junction to the primary worktree. The automatic safety review rejected deleting that junction. The successful build worktree and its installed dependencies were removed.
 - Do not run database migrations until explicit review, backup and restore planning, and verified wallet isolation are complete.
 - Do not deploy, push, write production data, or initiate Mainnet transactions.
