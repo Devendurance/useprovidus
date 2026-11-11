@@ -9,6 +9,7 @@
 - Added SIWE owner-scoped memory APIs, explicit create/list/edit/delete, and bounded untrusted prompt context. Recipient data remains in `saved_recipients` and payment records remain in their own ledgers.
 - Added the responsive memory panel with save explanation, conflict recovery, focus trap/restoration, dismissal controls, and wallet-switch cleanup.
 - Final checks pass: `npm run test:all`, `npm run test:conversation-db`, `npm run test:shared-memory-db`, migration isolation, six P1.1/P1.2 browser tests, `npx tsc --noEmit`, lint, build with `DATABASE_URL` empty, and diff check.
+- Fresh independent review passed on `92552bb` and `698e4b8`. It confirmed memory is owner-scoped, secret detection precedes repository writes, payment terms require user evidence, and memory cannot authorize or submit transfers.
 - Screenshots: `output/playwright/p1.2-memory-mobile.png` and `output/playwright/p1.2-memory-desktop.png`.
 - No production DB access or writes, real wallet transaction, push, or deploy occurred.
 - The local `node_modules/@playwright/test` junction still points to the P1.1 worktree, and `test-results/.last-run.json` remains. The environment blocked their removal, so keep both out of the commit.

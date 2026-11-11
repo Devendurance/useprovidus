@@ -24,6 +24,7 @@
 - Migration 0008 isolation verification passed against disposable Postgres 16 after migration 0007. All 11 existing public tables were unchanged. Browser tests used mocked wallet/SIWE/API flows. No blockchain broadcast occurred.
 - Typecheck initially found malformed ignored `.next/dev/types/routes.d.ts` generated during browser testing. A fresh local dev server regenerated the route types, then typecheck and production build passed.
 - The six Playwright tests cover memory create/edit/delete, dismissal/focus, mobile/desktop layout, session restoration, and stale-owner response handling. Screenshots: `output/playwright/p1.2-memory-mobile.png` and `output/playwright/p1.2-memory-desktop.png`.
+- Fresh independent review passed on `92552bb` and `698e4b8`. It confirmed BIP39 rejection before storage, SIWE owner isolation, current-user grounding for payment terms, explicit chain-ID evidence, and no memory-driven authorization or submission path.
 
 ## P1.1 complete locally
 - Local commits: `75e6310` owner-scoped persistence/API, `674092e` chat history UX, `d5cc0a6` restore race fix, `6f01024` restored desktop screenshot, and `f894a3f` refresh-restoration regression. No push or deployment.
