@@ -20,6 +20,7 @@ import { useWalletAuth, type WalletAuth } from "@/hooks/use-wallet-auth";
 import { WalletTransferCard } from "@/components/assistant/wallet-transfer-card";
 import { ConnectWalletButton } from "@/components/ui/connect-wallet-button";
 import { ConversationHistory } from "@/components/assistant/conversation-history";
+import { SharedMemoryPanel } from "@/components/assistant/shared-memory-panel";
 
 export interface AssistantPanelProps {
   className?: string;
@@ -132,6 +133,10 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
 
         <div className="flex items-center gap-2">
           <span className="hidden max-w-40 truncate font-proof text-xs text-receipt-grey sm:block" title={activeConversationTitle ?? undefined}>{activeConversationTitle ?? "New conversation"}</span>
+          <SharedMemoryPanel
+            ownerAddress={auth.status === "authenticated" ? auth.owner ?? null : null}
+            walletAddress={auth.address ?? null}
+          />
           <button
             ref={historyTriggerRef}
             type="button"

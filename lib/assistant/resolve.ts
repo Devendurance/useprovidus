@@ -32,6 +32,7 @@ import type {
 } from "@/lib/assistant/types";
 import {
   parseAssistantModelOutput,
+  restrictModelCandidateToUserEvidence,
   resolveIntent,
   sanitizeIncomingIntent,
 } from "@/lib/assistant/validation";
@@ -52,6 +53,7 @@ import {
   formatStatusAnswer,
   readTransactionStatus,
 } from "@/lib/assistant/status";
+import type { PromptMemory } from "@/lib/shared-memory/service";
 
 export interface ResolveAssistantTurnInput {
   message: string;
@@ -60,6 +62,8 @@ export interface ResolveAssistantTurnInput {
   signal?: AbortSignal;
   /** Verified SIWE session owner, or null when logged out. Never client-supplied. */
   ownerAddress?: string | null;
+  /** Bounded, server-loaded context for this verified owner. Never an authorization source. */
+  memoryContext?: readonly PromptMemory[];
 }
 
 /** Intent extraction is deterministic work: no sampling. */
@@ -275,7 +279,12 @@ export async function resolveAssistantTurn(
   // receives at most one attempt and only for eligible provider failures.
   // A legacy single-provider test override bypasses the chain entirely.
   const completionRequest = {
-    messages: buildAssistantPrompt({ history, activeIntent, userMessage: message }),
+    messages: buildAssistantPrompt({
+      history,
+      activeIntent,
+      userMessage: message,
+      memoryContext: input.memoryContext,
+    }),
     temperature: MODEL_TEMPERATURE,
     maxTokens: MODEL_MAX_TOKENS,
     responseFormat: "json_object" as const,
@@ -312,9 +321,21 @@ export async function resolveAssistantTurn(
     };
   }
 
+  // Shared memory may improve a reply but must not supply new payment terms.
+  // Keep only candidate values stated in this turn or already held in the
+  // app-tracked draft before deterministic validation sees them.
+  const candidateForResolution = input.memoryContext?.length
+    ? restrictModelCandidateToUserEvidence(parsed.data.intent, message, activeIntent)
+    : parsed.data.intent;
+  const candidateTermsWereRestricted = Boolean(
+    input.memoryContext?.length &&
+    parsed.data.intent &&
+    JSON.stringify(candidateForResolution) !== JSON.stringify(parsed.data.intent),
+  );
+
   // 4. Deterministic re-validation owns the result.
   const resolved = resolveIntent({
-    candidate: parsed.data.intent,
+    candidate: candidateForResolution,
     userMessage: message,
     history,
     activeIntent,
@@ -406,7 +427,9 @@ export async function resolveAssistantTurn(
     kind: "payment_intent",
     message: {
       role: "assistant",
-      content: parsed.data.reply,
+      content: candidateTermsWereRestricted && isAirtimeIntent(resolved)
+        ? airtimeCandidateRestrictionReply(resolved)
+        : parsed.data.reply,
       timestamp: new Date().toISOString(),
       intent: resolved,
     },
@@ -414,4 +437,21 @@ export async function resolveAssistantTurn(
   };
 
   return { ok: true, turn, activeIntent: resolved };
+}
+
+function isAirtimeIntent(intent: PaymentIntent | null): intent is Extract<PaymentIntent, { type: "airtime" }> {
+  return intent?.type === "airtime";
+}
+
+function airtimeCandidateRestrictionReply(
+  intent: Extract<PaymentIntent, { type: "airtime" }>,
+): string {
+  const missing = intent.missingFields.map((field) => {
+    if (field === "amountNgn") return "the amount";
+    if (field === "phone") return "the phone number";
+    return "the network";
+  });
+  return missing.length > 0
+    ? `To prepare this airtime payment, I still need ${missing.join(", ")}. Please share those details here.`
+    : "I kept the payment details you shared in this conversation. Review them below, or tell me what to change.";
 }

@@ -203,6 +203,68 @@ export const savedRecipients = pgTable(
 export type SavedRecipient = typeof savedRecipients.$inferSelect;
 export type NewSavedRecipient = typeof savedRecipients.$inferInsert;
 
+export const assistantMemories = pgTable(
+  "assistant_memories",
+  {
+    id: text("id").primaryKey(),
+    ownerAddress: text("owner_address").notNull(),
+    requestId: text("request_id").notNull(),
+    kind: text("kind").notNull().$type<"fact" | "preference">(),
+    label: text("label").notNull(),
+    normalizedLabel: text("normalized_label").notNull(),
+    value: text("value").notNull(),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("assistant_memory_owner_label_idx").on(
+      table.ownerAddress,
+      table.normalizedLabel,
+    ),
+    uniqueIndex("assistant_memory_owner_request_idx").on(
+      table.ownerAddress,
+      table.requestId,
+    ),
+    index("assistant_memory_owner_updated_idx").on(
+      table.ownerAddress,
+      table.updatedAt,
+    ),
+    check(
+      "assistant_memory_owner_address_check",
+      sql.raw("owner_address ~ '^0x[0-9a-fA-F]{40}$'"),
+    ),
+    check(
+      "assistant_memory_kind_check",
+      sql.raw("kind IN ('fact', 'preference')"),
+    ),
+    check(
+      "assistant_memory_label_length_check",
+      sql.raw("char_length(trim(label)) BETWEEN 1 AND 48"),
+    ),
+    check(
+      "assistant_memory_normalized_label_length_check",
+      sql.raw("char_length(trim(normalized_label)) BETWEEN 1 AND 48"),
+    ),
+    check(
+      "assistant_memory_value_length_check",
+      sql.raw("char_length(trim(value)) BETWEEN 1 AND 300"),
+    ),
+    check(
+      "assistant_memory_request_id_length_check",
+      sql.raw("char_length(trim(request_id)) BETWEEN 12 AND 128"),
+    ),
+    check("assistant_memory_version_check", sql.raw("version >= 1")),
+  ],
+);
+
+export type AssistantMemory = typeof assistantMemories.$inferSelect;
+export type NewAssistantMemory = typeof assistantMemories.$inferInsert;
+
 /**
  * B2 — Non-sensitive audit trail for recipient address lifecycle.
  *

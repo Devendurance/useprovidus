@@ -1,3 +1,15 @@
+## P1.2 shared memory invariants, 2026-11-10
+- Save memory only after an explicit user action. Never copy general chat text into durable memory automatically.
+- Store general facts and preferences in `assistant_memories`, keyed to the wallet owner established by verified SIWE claims. Keep memory separate from conversation sessions/messages, saved recipients, and payment ledgers.
+- Keep recipient names and addresses canonical in `saved_recipients`. Do not copy recipient details into shared memory or use memory to skip the existing recipient confirmation.
+- Send at most eight memories and 1,800 characters to the assistant prompt as untrusted context. Memory cannot set an amount, recipient, address, payment status, approval, or authorization. A transfer still needs a fresh B3 intent, review, and wallet approval.
+- Accept numeric chain IDs only with explicit chain/network context. A bare amount matching 677 or 968 must not select a network, and an explicit chain ID must not fill a missing amount.
+- Reject common secret and address patterns, show users a clear warning, and never store private keys, recovery phrases, signatures, or authentication secrets.
+- At the server-side shared-memory write boundary, checksum-check all ten standard BIP39 wordlists and reject a valid phrase before repository access. Generate regression phrases from test entropy at runtime. Never derive keys.
+- Use optimistic row versions for edits and deletes. Keep create request IDs stable across retries. Preserve conflicting drafts and ask the user to reload before overwriting.
+- Wallet changes hide old-owner data immediately, cancel old requests, and discard stale responses. Chat deletion does not delete shared memory.
+- Migration `0008_shared_memories` is additive and was applied only to disposable Postgres after `0007`. Before production, review and verify a backup restore, then apply only with separate authorization. Roll back the app first and retain the additive table unless a separate data export and recovery plan is approved.
+
 ## P0.2 receipt and evidence invariants, 2026-11-10
 - Receipt API ownership comes from authenticated `requireOwner`; list and detail reads must never accept client-selected owners.
 - Existing BOT B5 and Celo ledgers do not persist actual gas. Celo receipt rows omit a full recipient address. Display unavailable for absent fields.
@@ -13,7 +25,7 @@
 - Conversation restore is text-only. Returning to a payment request must create a fresh B3 intent and require fresh review plus wallet authorization.
 - `openConversation()` must reset old transient state before creating its new abort controller. Older-message responses must match owner revision, active session, load revision, and abort state.
 - Migration `0007` was tested only in disposable local Postgres. Production release needs a reviewed backup, tested restore, rollback plan, and separate authorization.
-- P1.1 stores no structured receipt pointer. Receipts remain in their existing owner-scoped ledger and navigation; P1.2 shared memory is unstarted.
+- P1.1 stores no structured receipt pointer. Receipts remain in their existing owner-scoped ledger and navigation. P1.2 shared memory remains separate from both.
 
 ## Mainnet activation and payment UX invariants, 2026-11-10
 - Native BOT and Official USDT transactions on BOT Chain Mainnet have verified evidence. Their hashes are recorded in `agent-state/project-state.md`.

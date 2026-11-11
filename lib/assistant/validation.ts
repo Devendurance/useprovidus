@@ -744,6 +744,295 @@ export function extractAddressCandidates(text: string): string[] {
   return found;
 }
 
+function normalizeGroundingText(value: string): string {
+  return value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[\p{P}\p{S}]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function containsGroundedPhrase(value: string, userMessage: string): boolean {
+  const phrase = normalizeGroundingText(value);
+  const message = normalizeGroundingText(userMessage);
+  return Boolean(phrase) && (` ${message} `).includes(` ${phrase} `);
+}
+
+function canonicalNumericEvidence(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const text = String(value).replace(/,/g, "").trim();
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(text);
+  if (!match) return null;
+  const whole = BigInt(match[1]).toString();
+  const fraction = match[2]?.replace(/0+$/, "") ?? "";
+  return fraction ? `${whole}.${fraction}` : whole;
+}
+
+function hasSameNumericEvidence(left: unknown, right: unknown): boolean {
+  const normalizedLeft = canonicalNumericEvidence(left);
+  return normalizedLeft !== null && normalizedLeft === canonicalNumericEvidence(right);
+}
+
+const ENGLISH_NUMBER_VALUES: Readonly<Record<string, number>> = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+
+function parseEnglishNumberWords(words: readonly string[]): string | null {
+  if (words.length === 0 || words.length > 8) return null;
+  const pointIndex = words.indexOf("point");
+  if (pointIndex >= 0) {
+    const integer = parseEnglishCardinal(words.slice(0, pointIndex));
+    const decimalWords = words.slice(pointIndex + 1);
+    if (integer === null || decimalWords.length === 0) return null;
+    const decimals = decimalWords.map((word) => {
+      const value = ENGLISH_NUMBER_VALUES[word];
+      return value !== undefined && value < 10 ? String(value) : null;
+    });
+    return decimals.every((value) => value !== null) ? `${integer}.${decimals.join("")}` : null;
+  }
+  const integer = parseEnglishCardinal(words);
+  return integer === null ? null : String(integer);
+}
+
+function parseEnglishCardinal(words: readonly string[]): number | null {
+  let total = 0;
+  let current = 0;
+  let sawNumber = false;
+
+  for (const word of words) {
+    if (word === "and") continue;
+    const value = ENGLISH_NUMBER_VALUES[word];
+    if (value !== undefined) {
+      current += value;
+      sawNumber = true;
+    } else if (word === "hundred") {
+      current = (current || 1) * 100;
+      sawNumber = true;
+    } else if (word === "thousand" || word === "million") {
+      total += (current || 1) * (word === "thousand" ? 1_000 : 1_000_000);
+      current = 0;
+      sawNumber = true;
+    } else {
+      return null;
+    }
+  }
+
+  const result = total + current;
+  return sawNumber && Number.isSafeInteger(result) ? result : null;
+}
+
+function hasAmountContext(
+  userMessage: string,
+  start: number,
+  end: number,
+  allowBareAmount: boolean,
+): boolean {
+  const prefix = userMessage.slice(0, start);
+  const suffix = userMessage.slice(end);
+  if (/\b(?:chain(?:\s+id)?|network)\s*$/i.test(prefix) || /^\s*(?:chain|network)\b/i.test(suffix)) {
+    return false;
+  }
+  if (allowBareAmount) return true;
+
+  const nearbyPrefix = prefix.slice(-80);
+  const nearbySuffix = suffix.slice(0, 40);
+  const actionBefore = /\b(?:pay|send|transfer|airtime|recharge|top[\s-]?up|buy|purchase|amount|make\s+it|change\s+it|set\s+it)\b[\s\S]{0,64}$/i.test(nearbyPrefix);
+  const actionAfter = /^\s*(?:for|of|on|to)?\s*(?:airtime|recharge|top[\s-]?up|payment)\b/i.test(nearbySuffix);
+  const moneyBefore = /(?:₦\s*$|\b(?:NGN|naira|USDT|tether|BOT)\s*$)/i.test(prefix);
+  const moneyAfter = /^\s*(?:NGN|naira|USDT|tether|BOT)\b/i.test(suffix);
+  return actionBefore || actionAfter || moneyBefore || moneyAfter;
+}
+
+function containsGroundedAmount(
+  value: unknown,
+  userMessage: string,
+  allowBareAmount = false,
+): boolean {
+  const expected = canonicalNumericEvidence(value);
+  if (!expected) return false;
+
+  const withoutAddresses = userMessage.replace(/0x[0-9a-f]{40,}\b/gi, " ");
+  const withoutPhones = withoutAddresses.replace(
+    new RegExp(PHONE_CANDIDATE_PATTERN.source, "g"),
+    " ",
+  );
+  for (const match of withoutPhones.matchAll(
+    /(?<![\p{L}\p{N}])\d[\d,]*(?:\.\d+)?(?![\p{L}\p{N}])/gu,
+  )) {
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    if (
+      canonicalNumericEvidence(match[0]) === expected &&
+      hasAmountContext(withoutPhones, start, end, allowBareAmount)
+    ) return true;
+  }
+
+  const words = normalizeGroundingText(userMessage).split(" ");
+  const numberWords = new Set([...Object.keys(ENGLISH_NUMBER_VALUES), "hundred", "thousand", "million", "and", "point"]);
+  for (let start = 0; start < words.length; start += 1) {
+    if (!numberWords.has(words[start])) continue;
+    for (let end = start + 1; end <= Math.min(words.length, start + 8); end += 1) {
+      const sequence = words.slice(start, end);
+      if (!sequence.every((word) => numberWords.has(word))) break;
+      const parsed = canonicalNumericEvidence(parseEnglishNumberWords(sequence));
+      if (parsed !== expected) continue;
+      const prefix = words.slice(0, start).join(" ");
+      const suffix = words.slice(end).join(" ");
+      const phrase = sequence.join(" ");
+      const groundedText = `${prefix} ${phrase} ${suffix}`;
+      if (hasAmountContext(groundedText, prefix.length + 1, prefix.length + 1 + phrase.length, allowBareAmount)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function hasExplicitPaymentCue(userMessage: string): boolean {
+  return /\b(?:pay|payment|send|transfer|airtime|recharge|top[\s-]?up|buy|purchase)\b/i.test(userMessage);
+}
+
+function hasAssetEvidence(asset: unknown, userMessage: string): boolean {
+  const normalizedAsset = normalizeWalletTransferAsset(asset);
+  if (!normalizedAsset) return false;
+  const withoutChainName = userMessage.replace(/\bBOT\s+(?:CHAIN|MAINNET|TESTNET)\b/gi, " ");
+  return normalizedAsset === "USDT"
+    ? /\b(?:USDT|TETHER)\b/i.test(withoutChainName)
+    : /\bBOT\b/i.test(withoutChainName);
+}
+
+function hasChainEvidence(chain: unknown, userMessage: string): boolean {
+  const chainId = normalizeWalletTransferChain(chain);
+  if (!chainId) return false;
+  const normalized = normalizeGroundingText(userMessage);
+  if (chainId === 968) {
+    return ["bot testnet", "testnet", "bohr"].some((term) =>
+      (` ${normalized} `).includes(` ${term} `),
+    ) || hasExplicitChainIdEvidence(normalized, chainId);
+  }
+  return !normalized.includes("testnet") && (
+    ["bot chain", "bot mainnet", "mainnet"].some((term) =>
+      (` ${normalized} `).includes(` ${term} `),
+    ) || hasExplicitChainIdEvidence(normalized, chainId)
+  );
+}
+
+function hasExplicitChainIdEvidence(normalizedMessage: string, chainId: 677 | 968): boolean {
+  return new RegExp(`\\b(?:chain(?:\\s+id)?|network)(?:\\s+is)?\\s*#?\\s*${chainId}\\b`).test(normalizedMessage) ||
+    new RegExp(`\\b${chainId}\\s+(?:chain|network)\\b`).test(normalizedMessage);
+}
+
+function isSameGroundedText(left: unknown, right: unknown): boolean {
+  if (typeof left !== "string" || typeof right !== "string") return false;
+  const normalizedLeft = normalizeGroundingText(left);
+  return Boolean(normalizedLeft) && normalizedLeft === normalizeGroundingText(right);
+}
+
+/**
+ * Shared memory is background only. When it is present in a model prompt,
+ * accept new payment fields only if the user stated them in this turn. Existing
+ * app-tracked draft fields may continue unchanged. This makes the prompt rule
+ * enforceable even if a model copies terms from saved context.
+ */
+export function restrictModelCandidateToUserEvidence(
+  candidate: ModelIntentCandidate | null,
+  userMessage: string,
+  activeIntent: PaymentIntent | null,
+): ModelIntentCandidate | null {
+  if (!candidate) return null;
+  if (candidate.type !== "airtime" && candidate.type !== "wallet_transfer") return candidate;
+
+  const sameDraftType = activeIntent?.type === candidate.type;
+  if (!sameDraftType && !hasExplicitPaymentCue(userMessage)) return null;
+
+  if (candidate.type === "airtime") {
+    const draft = sameDraftType && activeIntent?.type === "airtime" ? activeIntent : null;
+    const amountIsGrounded =
+      (draft?.amountNgn !== undefined && hasSameNumericEvidence(candidate.amountNgn, draft.amountNgn)) ||
+      containsGroundedAmount(
+        candidate.amountNgn,
+        userMessage,
+        draft?.missingFields.includes("amountNgn") === true,
+      );
+    const candidatePhone = normalizePhoneNumber(candidate.phone);
+    const phoneIsGrounded =
+      (draft?.phone !== undefined && candidatePhone === normalizePhoneNumber(draft.phone)) ||
+      (candidatePhone !== null && extractPhoneCandidates(userMessage).includes(candidatePhone)) ||
+      (typeof candidate.phone === "string" && containsGroundedPhrase(candidate.phone, userMessage));
+    const networkIsGrounded =
+      (draft?.network !== undefined && candidate.network === draft.network) ||
+      (candidate.network !== null && candidate.network !== undefined &&
+        detectExplicitNetworks(userMessage).includes(candidate.network));
+
+    return {
+      ...candidate,
+      amountNgn: amountIsGrounded ? candidate.amountNgn : null,
+      phone: phoneIsGrounded ? candidate.phone : null,
+      network: networkIsGrounded ? candidate.network : null,
+    };
+  }
+
+  const draft = sameDraftType && activeIntent?.type === "wallet_transfer" ? activeIntent : null;
+  const recipientIsGrounded =
+    (draft?.recipientLabel !== undefined && isSameGroundedText(candidate.recipientLabel, draft.recipientLabel)) ||
+    (typeof candidate.recipientLabel === "string" && containsGroundedPhrase(candidate.recipientLabel, userMessage));
+  const amountIsGrounded =
+    (draft?.amount !== undefined && hasSameNumericEvidence(candidate.amount, draft.amount)) ||
+    containsGroundedAmount(
+      candidate.amount,
+      userMessage,
+      draft?.missingFields.includes("amount") === true,
+    );
+  const assetIsGrounded =
+    (draft?.asset !== undefined && normalizeWalletTransferAsset(candidate.asset) === draft.asset) ||
+    hasAssetEvidence(candidate.asset, userMessage);
+  const chainIsGrounded =
+    (draft?.chainId !== undefined && normalizeWalletTransferChain(candidate.chain) === draft.chainId) ||
+    hasChainEvidence(candidate.chain, userMessage);
+  const addressesTypedByUser = extractAddressCandidates(userMessage);
+  const addressIsGrounded =
+    typeof candidate.recipientAddress === "string" &&
+    isAddress(candidate.recipientAddress) &&
+    addressesTypedByUser.includes(getAddress(candidate.recipientAddress));
+
+  return {
+    ...candidate,
+    recipientLabel: recipientIsGrounded ? candidate.recipientLabel : null,
+    recipientAddress: addressIsGrounded ? candidate.recipientAddress : null,
+    amount: amountIsGrounded ? candidate.amount : null,
+    asset: assetIsGrounded ? candidate.asset : null,
+    chain: chainIsGrounded ? candidate.chain : null,
+  };
+}
+
 /** Bare cancel/restart vocabulary for wallet drafts. */
 export function isWalletCancelMessage(message: string): boolean {
   if (typeof message !== "string") return false;

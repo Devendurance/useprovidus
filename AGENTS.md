@@ -98,3 +98,15 @@
 
 - Always follow or reference the UI design system when creating or reviewing components or pages.
 - Design System: @DESIGN.md
+
+
+## SHARED MEMORY
+
+- Store shared assistant memory only after an explicit user action. Keep it separate from conversation history, saved recipients, and payment records.
+- Derive memory ownership from the verified SIWE session. Never trust a client-supplied owner address.
+- Pass a bounded set of owner-scoped memories to the assistant as untrusted background context. Memory must never set payment terms, authorize a payment, or replace a fresh B3 review and wallet approval.
+- Ground numeric chain IDs only when the user explicitly ties them to a chain or network. Never mistake an amount that equals a chain ID for network selection, or use a chain ID to fill a missing amount.
+- Keep recipient names and addresses canonical in `saved_recipients`. Never store wallet secrets, recovery phrases, signatures, or authentication secrets in memory.
+- At the server-side shared-memory write boundary, reject checksum-valid BIP39 phrases from all ten standard wordlists before any repository access. Generate mnemonic regression values at test runtime. Never derive or store keys.
+- Wallet changes must hide old-owner memory immediately, cancel stale requests, and discard late responses. Deleting a conversation must leave shared memory intact.
+- Apply migration `0008_shared_memories` to production only after an explicitly authorized, reviewed backup and restore plan. Roll back application code first and preserve the additive table unless a separate data export and recovery plan is approved.

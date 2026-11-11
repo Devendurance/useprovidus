@@ -1,21 +1,23 @@
-# Left off: P1.1 complete locally
+# Left off: P1.2 local checkpoint
 
 ## What we are doing
-- P1.1 wallet-owner-scoped persistent assistant conversations are implemented locally.
-- Preserve P0.1/P0.2 and all payment semantics. Do not push, deploy, migrate production, run live payments, or start P1.2/P2.
+- P1.2 shared wallet-owner memory is implemented locally. Final verification and local review pass. Commit only P1.2 files locally, then stop without starting P2.
 
 ## Done
-- Added separate `conversation_sessions` and `conversation_messages` tables in migration `0007`. Migration was applied only to disposable Postgres 16 at `127.0.0.1:55432`.
-- Added SIWE owner-scoped list/create/read/rename/delete/message APIs, idempotent session/turn retries, ordered messages, automatic titles, and pagination.
-- Added the desktop recent-chat sidebar and accessible mobile drawer. Restored history is plain text and cannot restore payment intents, approvals, signatures, or actions.
-- Fixed a restore race where `reset()` aborted the new conversation request. An authenticated Playwright regression restores a saved session, reloads it from the URL, and confirms no payment action returns.
-- Verified the four synthetic existing ledger tables by row count and SHA-256 after migration. A direct composite-FK probe rejected cross-owner message attachment.
-- Local `main` commits: `75e6310`, `674092e`, `d5cc0a6`, `6f01024`, `f894a3f`. No push/deploy.
-- Passed `npm run test:all`, local `npm run test:conversation-db`, `npm run test:p11-ui` (3 tests), `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check`.
-- Screenshots: `output/playwright/p1.1-assistant-restored-chat-{desktop,390}.png`, responsive viewport captures, desktop history sidebar, and mobile drawer.
-- Root workspace unrelated untracked `.omp/`, `.playwright-cli/`, `bridge/`, `video-demo/`, and P0.2 screenshots were preserved.
+- Added the separate `assistant_memories` table in additive migration `0008_shared_memories`. Applied it only to disposable Postgres 16 at `127.0.0.1:55432`, after migration `0007`.
+- Verified all 11 existing public table snapshots stayed unchanged. Owner isolation, idempotency, duplicate-label handling, optimistic conflicts, and independence from chat deletion pass the local DB check.
+- Added SIWE owner-scoped memory APIs, explicit create/list/edit/delete, and bounded untrusted prompt context. Recipient data remains in `saved_recipients` and payment records remain in their own ledgers.
+- Added the responsive memory panel with save explanation, conflict recovery, focus trap/restoration, dismissal controls, and wallet-switch cleanup.
+- Final checks pass: `npm run test:all`, `npm run test:conversation-db`, `npm run test:shared-memory-db`, migration isolation, six P1.1/P1.2 browser tests, `npx tsc --noEmit`, lint, build with `DATABASE_URL` empty, and diff check.
+- Screenshots: `output/playwright/p1.2-memory-mobile.png` and `output/playwright/p1.2-memory-desktop.png`.
+- No production DB access or writes, real wallet transaction, push, or deploy occurred.
+- The local `node_modules/@playwright/test` junction still points to the P1.1 worktree, and `test-results/.last-run.json` remains. The environment blocked their removal, so keep both out of the commit.
+- Review found that a valid BIP39 recovery phrase written as bare words could pass the keyword and hex checks. The service-level detector now closes that gap.
+- Added a lazy-loaded server-side BIP39 checksum detector for create/edit using all ten standard wordlists. The focused test failed before the fix and passed after it. It generates all five valid phrase lengths at runtime and verifies create/edit reject before repository access, plus prose, Unicode spaces, and label/value splitting.
+- Final local code review caught a chain-ID grounding ambiguity: an active draft missing its amount could accept the chain ID as that amount, and an amount matching a chain ID could select that network. Added regressions first, then require explicit chain/network context for numeric chain IDs and always exclude those IDs from amount evidence.
 
 ## Next
-- P1.2 shared memory remains unstarted. Add no memory schema until separately scoped and authorized.
-- Before production migration, obtain and review a complete backup, validate restore in isolation, and document rollback. Do not rerun migration `0007` on the local database.
-- No structured receipt pointer is stored in chat. Existing payment receipts remain in their own ledger and navigation.
+- Commit only P1.2 files locally after confirming the final status. Do not push or deploy.
+- Before any production release, review a Neon backup or branch, verify restore in isolation, and approve a rollback plan. Apply `0008` only with separate authorization. Roll back app code first and retain the additive memory table.
+- Preserve the existing unrelated untracked `.omp/`, `.playwright-cli/`, `bridge/`, `video-demo/`, and P0.2 screenshots.
+- P2 remains out of scope.

@@ -1,0 +1,49 @@
+{
+  "migrationCount": 8,
+  "tables": {
+    "agent_transactions": {
+      "count": 2,
+      "sha256": "3721f165563feb13ee4ee9d26126e8569d0b92897b44258e4a59d132b77e2de6"
+    },
+    "airtime_previews": {
+      "count": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "auth_nonces": {
+      "count": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "auth_rate_counters": {
+      "count": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "auth_revoked_sessions": {
+      "count": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "conversation_messages": {
+      "count": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "conversation_sessions": {
+      "count": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "recipient_address_audits": {
+      "count": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "saved_recipients": {
+      "count": 2,
+      "sha256": "65c66d19a12d89c376330844e43ed00683c3bf971a3128561a42840895204e1d"
+    },
+    "transfer_submissions": {
+      "count": 2,
+      "sha256": "b1db5bf96a1a23113fd7e9efab430177caa7cccd2e45162993ac8c160c3904d2"
+    },
+    "wallet_transfer_intents": {
+      "count": 2,
+      "sha256": "a5947534be29074634db0d058bfaf94899c869bb9c9c07588d5ed06c37c9752c"
+    }
+  }
+}

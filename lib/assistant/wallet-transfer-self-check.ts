@@ -34,6 +34,7 @@ import type {
   PaymentIntent,
   WalletTransferIntent,
 } from "@/lib/assistant/types";
+import type { PromptMemory } from "@/lib/shared-memory/service";
 
 const OWNER_A = "0x21E5Fc03E4305CC8CFb874253c6d66A8bdB0bcDa";
 const OWNER_B = "0x000000000000000000000000000000000000dEaD";
@@ -41,6 +42,7 @@ const DOUGLAS = "0x1111111111111111111111111111111111111111";
 const DOUGLAS_TESTNET = "0x2222222222222222222222222222222222222222";
 const ATTACKER = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 const NEW_ADDR = "0x3333333333333333333333333333333333333333";
+const TEST_PHONE = "08031234567";
 const T0 = "2026-09-19T00:00:00.000Z";
 
 function msg(role: "user" | "assistant", content: string): ConversationMessage {
@@ -85,6 +87,7 @@ async function turn(args: {
   history?: ConversationMessage[];
   activeIntent?: PaymentIntent | null;
   owner?: string | null;
+  memoryContext?: PromptMemory[];
   outputs: string[];
 }): Promise<{ response: Awaited<ReturnType<typeof resolveAssistantTurn>>; stores: Stores }> {
   const stores = freshStores();
@@ -94,6 +97,7 @@ async function turn(args: {
     history: args.history ?? [],
     activeIntent: args.activeIntent ?? null,
     ownerAddress: args.owner === undefined ? OWNER_A : args.owner,
+    memoryContext: args.memoryContext,
   });
   return { response, stores };
 }
@@ -106,6 +110,129 @@ function draftOf(response: Awaited<ReturnType<typeof resolveAssistantTurn>>): Wa
 }
 
 async function run() {
+  // --- 0. Shared memory cannot supply wallet-transfer terms ---
+  {
+    const savedTerms: PromptMemory[] = [
+      { kind: "preference", label: "Usual transfer", value: "Douglas, 2 USDT on BOT Chain" },
+    ];
+    const { response } = await turn({
+      message: "Pay my usual recipient.",
+      memoryContext: savedTerms,
+      outputs: [walletCandidate("I found Douglas.", {
+        recipientLabel: "Douglas",
+        amount: "2",
+        asset: "USDT",
+        chain: "bot",
+      })],
+    });
+    const draft = draftOf(response);
+    assert.equal(draft.recipientLabel, undefined, "Memory cannot provide a recipient label.");
+    assert.equal(draft.amount, undefined, "Memory cannot provide an amount.");
+    assert.equal(draft.asset, undefined, "Memory cannot provide an asset.");
+    assert.equal(draft.chainId, undefined, "Memory cannot provide a network.");
+
+    const { response: chainIdResponse } = await turn({
+      message: "Pay on chain 677.",
+      memoryContext: [{ kind: "fact", label: "Saved terms", value: "Douglas 677 USDT on BOT Chain" }],
+      outputs: [walletCandidate("I found Douglas.", {
+        recipientLabel: "Douglas",
+        amount: "677",
+        asset: "USDT",
+        chain: "bot",
+      })],
+    });
+    const chainIdDraft = draftOf(chainIdResponse);
+    assert.equal(chainIdDraft.amount, undefined, "A network ID cannot be reused as a saved payment amount.");
+    assert.equal(chainIdDraft.chainId, 677, "A chain ID explicitly written by the user may set the network.");
+
+    const { response: amountNamedNetworkResponse } = await turn({
+      message: "Set the network to BOT Chain 677.",
+      activeIntent: {
+        type: "wallet_transfer",
+        recipientLabel: "Douglas",
+        asset: "USDT",
+        chainId: 677,
+        phase: "collecting",
+        missingFields: ["amount"],
+        readyForConfirmation: false,
+      },
+      memoryContext: savedTerms,
+      outputs: [walletCandidate("I kept the network.", {
+        recipientLabel: "Douglas",
+        amount: "677",
+        asset: "USDT",
+        chain: "bot",
+      })],
+    });
+    assert.equal(draftOf(amountNamedNetworkResponse).amount, undefined, "A chain ID cannot fill a missing amount on an active draft.");
+
+    const { response: amountMatchesTestnetIdResponse } = await turn({
+      message: "Pay Douglas 968 USDT.",
+      memoryContext: [{ kind: "preference", label: "Preferred network", value: "BOT Testnet" }],
+      outputs: [walletCandidate("I found Douglas.", {
+        recipientLabel: "Douglas",
+        amount: "968",
+        asset: "USDT",
+        chain: "bot_testnet",
+      })],
+    });
+    assert.equal(draftOf(amountMatchesTestnetIdResponse).chainId, undefined, "An amount matching a chain ID cannot select that network.");
+
+    const { response: spokenAmountResponse } = await turn({
+      message: "Pay Douglas five USDT on BOT Chain.",
+      memoryContext: savedTerms,
+      outputs: [walletCandidate("Got it.", {
+        recipientLabel: "Douglas",
+        amount: "5",
+        asset: "USDT",
+        chain: "bot",
+      })],
+    });
+    assert.equal(draftOf(spokenAmountResponse).amount, "5", "A number spoken in this turn remains available.");
+
+    const { response: statedResponse } = await turn({
+      message: "Pay Douglas 2 USDT on BOT Chain.",
+      memoryContext: savedTerms,
+      outputs: [walletCandidate("Got it.", {
+        recipientLabel: "Douglas",
+        amount: "2",
+        asset: "USDT",
+        chain: "bot",
+      })],
+    });
+    const statedDraft = draftOf(statedResponse);
+    assert.equal(statedDraft.recipientLabel, "Douglas");
+    assert.equal(statedDraft.amount, "2");
+    assert.equal(statedDraft.asset, "USDT");
+    assert.equal(statedDraft.chainId, 677);
+  }
+
+  // --- 0b. Shared memory cannot supply airtime terms either ---
+  {
+    const { response } = await turn({
+      message: "Recharge my usual phone with my usual amount.",
+      memoryContext: [
+        { kind: "preference", label: "Usual airtime", value: `500 NGN to ${TEST_PHONE} on MTN` },
+      ],
+      outputs: [candidateJson("I can prepare that.", {
+        type: "airtime",
+        amountNgn: "500",
+        phone: TEST_PHONE,
+        network: "mtn",
+      })],
+    });
+    assert.equal(response.ok, true);
+    if (!response.ok) throw new Error("unreachable");
+    assert.equal(response.activeIntent?.type, "airtime");
+    if (response.activeIntent?.type === "airtime") {
+      assert.equal(response.activeIntent.amountNgn, undefined);
+      assert.equal(response.activeIntent.phone, undefined);
+      assert.equal(response.activeIntent.network, undefined);
+      assert.equal(response.activeIntent.readyForConfirmation, false);
+    }
+    assert.match(response.turn.message.content, /still need the amount, the phone number, the network/);
+  }
+
   // --- 1. First-time Douglas, no saved recipient ---
   {
     const { response, stores } = await turn({

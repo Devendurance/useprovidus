@@ -57,6 +57,13 @@
       "when": 1794329528424,
       "tag": "0007_conversation_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794340436071,
+      "tag": "0008_shared_memories",
+      "breakpoints": true
     }
   ]
 }

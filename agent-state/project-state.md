@@ -1,5 +1,15 @@
 # Providus — Project State
 
+## P1.2 shared user memory, local implementation, 2026-11-10
+- Added `assistant_memories` with owner-scoped list/create/update/delete, unique normalized labels, idempotent request IDs, and optimistic row versions. Migration `0008_shared_memories` is additive and remains unapplied in production.
+- SIWE claims establish ownership. Memory is separate from conversation sessions/messages, saved recipients, and payment ledgers. Recipient names and addresses stay in `saved_recipients`.
+- Persistent assistant turns receive a bounded set of the authenticated owner's saved facts as untrusted context. Context cannot supply payment terms, select a recipient, restore an intent, or authorize a transfer. Every payment still needs a fresh review and wallet approval.
+- The dashboard memory panel supports explicit save, explanation, edit, delete, conflict recovery, focus trapping/restoration, and mobile layout. Wallet changes clear old drafts, close the old owner's panel, and reject stale responses.
+- Independent review found two privacy issues. The BIP39 gap is fixed with a lazy-loaded checksum detector across all ten wordlists. Payment candidates are filtered against user-authored current-turn evidence and the app-tracked draft whenever memory is present. Final local review caught and fixed numeric chain-ID ambiguity for amount and network fields. `test:all`, both disposable database checks, migration isolation, six Playwright tests, typecheck, lint, build, and diff checks pass.
+- Migration `0008` ran only on disposable Postgres 16 at `127.0.0.1:55432` after `0007`. All 11 existing public table snapshots stayed unchanged. No production database was queried or changed.
+- Final-source verification passes: `test:all`, both disposable local conversation and memory DB checks, migration isolation, the combined six-test P1.1/P1.2 Playwright suite, TypeScript, lint, build with `DATABASE_URL` empty, and diff check. Screenshots: `output/playwright/p1.2-memory-{mobile,desktop}.png`.
+- Production release needs a reviewed Neon backup or branch, tested restore, rollback plan, and separate authorization. Roll back app code first and keep the additive table. Drop it only after a separate data export and recovery review.
+
 ## P0.2 receipts, mobile navigation, and public copy, 2026-11-10
 - P0.2 uses authenticated owner-scoped API reads across existing BOT B5 and Celo `agent_transactions` records. No schema migration or production database write.
 - Added compact searchable/filterable receipt history and a responsive evidence dialog. BOT Verified requires B5 `confirmed` plus `verifiedAt`; Celo retains its source status.
@@ -13,7 +23,7 @@
 - Idempotent session creation, automatic titles, rename/delete, pagination, ordering, retry leases, stale response guards, and wallet-owner cache clearing are implemented. P0 payment, receipt, saved-recipient, and session data remain separate.
 - Disposable Postgres 16 at `127.0.0.1:55432` has migrations `0000` through `0007`. Two synthetic owners' rows and hashes stayed unchanged across four existing ledger tables. Direct SQL and the service self-check reject cross-owner access.
 - `test:all`, `test:conversation-db`, `test:p11-ui` (3 tests), typecheck, lint, build, and diff check passed. Browser routes used mocked wallet/SIWE/payment APIs. No real transactions occurred.
-- Migration has not been applied to production. A reviewed production backup, restore validation, rollback plan, and separate authorization remain release blockers. P1.2 shared memory remains unstarted.
+- Migration `0007` has not been applied to production. A reviewed production backup, restore validation, rollback plan, and separate authorization remain release blockers. P1.2 adds migration `0008` with the same release gate.
 ## P0.1 compact payment UX and public Mainnet activation, 2026-11-10
 - Public BOT Chain Mainnet activation is complete at `7820480` for native BOT and Official USDT. BOT Testnet is hidden and disabled publicly. Existing Celo services remain intact. BOT-funded utilities are not live without independently verified settlement and provider delivery.
 - The evidence-based UX audit and story-driven plan remain in `docs/ux/`. `DESIGN.md` is the current Providus design system.
@@ -21,8 +31,8 @@
 - Success requires B5 `confirmed` plus `verifiedAt`. A submitted hash stays pending. Unknown/failed/expired states keep their truthful recovery or stop state. Native and USDT wallet authorizations remain separate as required.
 - P0.1 did not change B3/B5 execution, contracts, Safe ownership, production payment gates, Celo integrations, schema, migrations, or database data. No real transaction, push, or deploy occurred.
 - Owner-supplied Mainnet transaction hashes remain recorded below. The UI fixture screenshots are synthetic and make no live-transaction claim.
-- At P0.1 completion the remaining gaps included receipt history/modal, absent gas fee storage, no approval ledger, client-held chat, and no general memory. P0.2 now adds owner-scoped receipts. Gas/approval storage, sessions, and memory remain gaps.
-- P0.2 and P1.1 are complete locally. P1.2 shared memory remains unstarted and needs its own owner-scoped design and authorization. P1.1 production migration still requires separate backup/restore review and authorization. See `.fast-build/STATE.md`.
+- At P0.1 completion the remaining gaps included receipt history/modal, absent gas fee storage, no approval ledger, client-held chat, and no general memory. P0.2 added owner-scoped receipts, P1.1 added persistent sessions, and P1.2 added shared memory. Gas fee and approval history remain gaps.
+- P0.2, P1.1, and P1.2 are complete locally. Migrations `0007` and `0008` still need a reviewed backup, tested restore, rollback plan, and separate production authorization. See `.fast-build/STATE.md`.
 - P0.1 checks passed: payment-card view (12 assertions), wallet assistant, web execution, submission, B5 verification, Mainnet policy, assistant, chain registry, wallet/network, Celo attribution, and ERC-20 UI self-checks. Playwright synthetic fixture verified cleanup, receipt link, proof disclosure, keyboard reachability, and no horizontal overflow at 390px. TypeScript, lint, build with `DATABASE_URL` unset, and diff check passed.
 
 ## B9 UX hotfix completed, 2026-11-09

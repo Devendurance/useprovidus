@@ -6,6 +6,24 @@
 - Primary path: Ask, review exact terms, authorize each required wallet action, then inspect verified evidence.
 - Public status: BOT Chain Mainnet native BOT and Official USDT payments are live on chain 677, activation `7820480`. Celo services remain intact. BOT Testnet is hidden from public marketing and blocked from public execution. BOT-funded utility settlement remains unavailable without verified settlement and provider delivery.
 
+## P1.2 shared user memory implemented locally
+- Added separate `assistant_memories` records in additive migration `0008_shared_memories`. Memories remain separate from conversation sessions/messages, saved recipients, and payment ledgers.
+- Users must explicitly add each fact or preference. The SIWE owner scopes every list, create, edit, and delete operation. Per-row versions prevent silent overwrite, and request IDs make create retries idempotent.
+- The assistant receives at most eight saved memories and 1,800 characters as untrusted background context. Memory cannot set payment terms, identify a recipient, restore an intent, approve a transfer, or replace fresh B3 review and wallet authorization.
+- Recipient names and addresses still come only from `saved_recipients` and its confirmation flow. Chat deletion leaves shared memory intact.
+- The memory panel supports add, inspect, edit, delete, conflict recovery, keyboard dismissal, focus trapping/restoration, mobile scrolling, and owner-change cleanup. Wallet changes close the old owner's panel and discard stale requests.
+- The two earlier privacy review findings are addressed in code. Create and edit dynamically load a checksum-based BIP39 detector for all ten standard wordlists before any repository call. The assistant filters payment candidates against current user text and the app-tracked draft, so shared memory cannot fill new terms. Final review also caught and fixed numeric chain IDs being mistaken for amounts or network selection. Regression tests cover BIP39 phrases, wallet/airtime terms, active drafts, and explicit chain-ID context. No key derivation occurs.
+- Migration `0008` was generated and applied only to disposable Postgres 16 at `127.0.0.1:55432`, after `0007`. The isolation check confirmed all 11 existing public tables are unchanged. Production was not queried or changed.
+- Screenshots: `output/playwright/p1.2-memory-mobile.png` and `output/playwright/p1.2-memory-desktop.png`.
+- Production release remains blocked on a reviewed Neon backup, a verified restore in isolation, a rollback plan, and separate authorization. Take a fresh backup or branch, test restore, apply the additive migration, and verify owner isolation before releasing code. Roll back the app first and retain the additive table. Drop it only under a separate reviewed export and recovery plan.
+- No push, deploy, real wallet transaction, or production database write occurred.
+
+## P1.2 verification
+- Final source passed `npm run test:all`, `npm run test:conversation-db`, `npm run test:shared-memory-db`, six P1.1/P1.2 Playwright tests, `npx tsc --noEmit`, `npm run lint`, `npm run build` with `DATABASE_URL` empty, and `git diff --check`.
+- Migration 0008 isolation verification passed against disposable Postgres 16 after migration 0007. All 11 existing public tables were unchanged. Browser tests used mocked wallet/SIWE/API flows. No blockchain broadcast occurred.
+- Typecheck initially found malformed ignored `.next/dev/types/routes.d.ts` generated during browser testing. A fresh local dev server regenerated the route types, then typecheck and production build passed.
+- The six Playwright tests cover memory create/edit/delete, dismissal/focus, mobile/desktop layout, session restoration, and stale-owner response handling. Screenshots: `output/playwright/p1.2-memory-mobile.png` and `output/playwright/p1.2-memory-desktop.png`.
+
 ## P1.1 complete locally
 - Local commits: `75e6310` owner-scoped persistence/API, `674092e` chat history UX, `d5cc0a6` restore race fix, `6f01024` restored desktop screenshot, and `f894a3f` refresh-restoration regression. No push or deployment.
 - Added separate `conversation_sessions` and `conversation_messages` tables in additive migration `0007_conversation_sessions`. The migration was generated and applied only to disposable Postgres 16 at `127.0.0.1:55432`.
@@ -38,7 +56,7 @@
 - No durable token-approval history exists. Adding it needs an additive schema or reviewed chain-discovery design, explicit review, backup/restore planning, and verified wallet isolation.
 - iOS Safari and Android browser-chrome behavior were not established by Chromium emulation.
 - Chat history does not store structured receipt pointers. Payment records and receipt navigation remain separate from informational conversation text.
-- P1.2 shared memory remains unstarted. P2 remains out of scope.
+- P2 remains out of scope. Production migration `0008` needs the backup, restore, rollback review, and separate authorization described above.
 
 ## P1.1 Verification
 - Passed `npm run test:all`, `npm run test:conversation-db` against the explicit disposable local database, `npm run test:p11-ui` (3 browser tests), the focused post-refresh restore test, `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check`.

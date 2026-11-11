@@ -27,6 +27,8 @@ import {
   requireOwnerForMutation,
 } from "@/lib/recipients/routes";
 import { resolveAssistantTurn } from "@/lib/assistant/resolve";
+import { createDrizzleSharedMemoryStore } from "@/lib/shared-memory/repository";
+import { readPromptMemories } from "@/lib/shared-memory/service";
 import { sanitizeIncomingIntent } from "@/lib/assistant/validation";
 import {
   authConfigFromEnv,
@@ -434,11 +436,21 @@ async function persistentTurn(
   }
 
   try {
+    let memoryContext = [] as Awaited<ReturnType<typeof readPromptMemories>>;
+    try {
+      memoryContext = await readPromptMemories(
+        createDrizzleSharedMemoryStore(db),
+        auth.owner,
+      );
+    } catch {
+      console.warn("Saved memory context was unavailable for this assistant turn.");
+    }
     const response = await resolveAssistantTurn({
       message,
       history,
       activeIntent: intentResult.intent,
       ownerAddress: auth.owner,
+      memoryContext,
       signal: request.signal,
     });
     if (!response.ok) {
