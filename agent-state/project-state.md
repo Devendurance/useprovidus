@@ -1,5 +1,13 @@
 # Providus — Project State
 
+## P2 final story-driven polish, 2026-11-11
+- Dashboard copy and hierarchy now lead with the conversational assistant. Compact status rows derive from `EXECUTION_DOMAINS`, and receipt history uses the existing owner-scoped `/receipt` route instead of a hard-coded empty state.
+- SIWE sign-in copy says the message proves wallet ownership and does not approve or send payment. Authentication and wallet behavior did not change.
+- Browser measurements show no horizontal overflow at 320, 375, 390, 768, and 1365px. Contrast measured 4.84:1 for body copy, 6.70:1 for network detail, 7.07:1 for Live status, and 15.56:1 for the receipt action. The receipt action has a 44px target, a 2px focus outline, and no transition under reduced motion.
+- `test:all`, focused payment-card checks, P0.2 receipt/navigation browser tests, P1.1/P1.2 session and memory browser tests, the P2 dashboard browser test, TypeScript, lint, production build, and diff check pass. Browser tests used mocked wallet/API activity.
+- Screenshots: `output/playwright/p2-before-dashboard-viewport-{mobile,desktop}.png` and `p2-after-dashboard-{mobile,desktop}.png`.
+- No contracts, payment services, database schema, production data, or external release state changed. Migrations `0007` and `0008` remain pending separate authorization and a verified backup/restore plan.
+
 ## P1.2 shared user memory, local implementation, 2026-11-10
 - Local commit: `698e4b8 feat: add shared owner-scoped assistant memory`. No push or deployment.
 - Added `assistant_memories` with owner-scoped list/create/update/delete, unique normalized labels, idempotent request IDs, and optimistic row versions. Migration `0008_shared_memories` is additive and remains unapplied in production.

@@ -68,6 +68,16 @@ async function mockAuthenticatedConversationApi(page: import("@playwright/test")
     contentType: "application/json",
     body: JSON.stringify({ ok: true, sessions: [SESSION], nextCursor: null }),
   }));
+  await page.route("**/api/transfers?**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, transfers: [] }),
+  }));
+  await page.route("**/api/transfers", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, transfers: [] }),
+  }));
   await page.route(`**/api/conversations/${SESSION_ID}`, (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -173,6 +183,7 @@ test("authenticated user can restore a saved conversation without restoring paym
   await expect(page.getByText("Connected wallet " + OWNER, { exact: true })).toBeVisible();
   const signIn = page.getByRole("button", { name: "Sign in", exact: true });
   await expect(signIn).toBeVisible();
+  await expect(page.getByText("Your wallet signs a login message to prove ownership. It does not approve or send a payment.", { exact: true })).toBeVisible();
   await signIn.click();
   await expect(page.getByText("Wallet verified", { exact: true })).toBeVisible({ timeout: 20_000 });
 

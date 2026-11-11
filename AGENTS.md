@@ -91,6 +91,7 @@
 - Use any testing tools and libraries available to the project to test your changes.
 - Never assume your changes work; always test.
 - If the project does not have any testing tools, scripts, MCP tools, or similar resources available for testing, ask the user whether testing should be skipped.
+- In authenticated assistant browser fixtures, mock the protected `/api/transfers` read along with SIWE and conversation routes. A stray 401 dispatches `providus-session-expired` and clears the fixture owner's session state.
 
 
 ## UI DESIGN

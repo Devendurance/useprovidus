@@ -106,7 +106,10 @@ function AssistantContent({ className, auth }: AssistantPanelProps & { auth: Wal
           <p className="break-all">Connected wallet {auth.address}</p>
           <p className="mt-1" role="status" aria-live="polite">{auth.statusCopy}</p>
           {auth.status === "authenticated" ? <p className="mt-1 text-xs text-receipt-grey">Payments still need explicit wallet approval in the review card.</p> : null}
-          {(auth.status === "unauthenticated" || auth.status === "reauthentication-required") && !auth.busy ? <button className="mt-2 min-h-11 rounded-lg border border-ledger bg-clear-paper px-4 disabled:opacity-50" onClick={() => void auth.signIn()}>{auth.status === "reauthentication-required" ? "Sign in again" : "Sign in"}</button> : null}
+          {(auth.status === "unauthenticated" || auth.status === "reauthentication-required") && !auth.busy ? <>
+            <p className="mt-2 max-w-prose text-xs leading-relaxed text-receipt-grey">Your wallet signs a login message to prove ownership. It does not approve or send a payment.</p>
+            <button className="mt-2 min-h-11 rounded-lg border border-ledger bg-clear-paper px-4 disabled:opacity-50" onClick={() => void auth.signIn()}>{auth.status === "reauthentication-required" ? "Sign in again" : "Sign in"}</button>
+          </> : null}
         </> : <ConnectWalletButton />}
         {auth.error && <p role="alert" className="mt-2 text-red-700">{auth.error}</p>}
       </div>

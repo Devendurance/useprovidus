@@ -18,6 +18,11 @@
 - Keep mobile modal dismissal reachable through X, Escape, and outside click, with focus restoration and background scroll lock.
 # Providus — Memory (decisions, invariants, lessons)
 
+## P2 dashboard and authenticated browser fixtures, 2026-11-11
+- Keep the dashboard centered on the assistant. Use `EXECUTION_DOMAINS` for live network status and link to the owner-scoped receipt page instead of rendering a static empty-history claim.
+- In authenticated assistant browser fixtures, mock `/api/transfers` reads as well as SIWE and conversation routes. A stray 401 intentionally dispatches `providus-session-expired` and clears the authenticated owner's UI state.
+- The root `playwright` CLI may resolve separately from the `@playwright/test` junction in this workspace. Use one installed package path for both the runner and test imports.
+
 ## P1.1 conversation session invariants, 2026-11-10
 - Keep `conversation_sessions` and `conversation_messages` separate. Derive ownership only from verified SIWE claims, and enforce `(session_id, owner_address)` with the composite foreign key.
 - Persist plain text and safe retry state only. Do not store payment intents, signatures, approvals, receipt ledgers, or wallet secrets in conversation tables.

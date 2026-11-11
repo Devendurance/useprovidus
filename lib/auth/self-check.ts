@@ -59,6 +59,7 @@ async function run() {
     });
     assert.ok(challenge.message.includes("providus.test"));
     assert.ok(challenge.message.includes("Chain ID: 677"));
+    assert.ok(challenge.message.includes("It does not move funds."));
     const parsed = parseSignInMessage(challenge.message);
     assert.equal(parsed.address, ACCOUNT_A.address);
     assert.equal(parsed.chainId, 677);

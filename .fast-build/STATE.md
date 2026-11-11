@@ -6,6 +6,14 @@
 - Primary path: Ask, review exact terms, authorize each required wallet action, then inspect verified evidence.
 - Public status: BOT Chain Mainnet native BOT and Official USDT payments are live on chain 677, activation `7820480`. Celo services remain intact. BOT Testnet is hidden from public marketing and blocked from public execution. BOT-funded utility settlement remains unavailable without verified settlement and provider delivery.
 
+## P2 final story-driven polish complete locally, 2026-11-11
+- Dashboard now puts the assistant first, shows compact live network details from `EXECUTION_DOMAINS`, and links to owner-scoped receipts. Removed repeated explanation cards, an illustrative transaction block, and a false static empty-history claim.
+- Sign-in explains that the wallet message proves ownership and does not approve or send a payment. SIWE wording and payment authorization behavior remain unchanged.
+- Before/after screenshots: `output/playwright/p2-before-dashboard-viewport-{mobile,desktop}.png` and `p2-after-dashboard-{mobile,desktop}.png`.
+- Validation: `test:all`, `test:payment-card-view` (12 assertions), P0.2 production Playwright (4 tests), P1.1/P1.2 Playwright (6 tests), focused dashboard reduced-motion/focus test, TypeScript, lint, production build, and diff check passed. Browser wallet and API behavior was mocked. No transaction was signed or sent.
+- No contracts, payment services, receipt APIs, database schema, or production data changed. No push or deploy occurred.
+- Production release remains blocked on reviewed backup and restore plans plus separate authorization for migrations `0007` and `0008`. Real-device iOS/Android and screen-reader testing remain unverified.
+
 ## P1.2 shared user memory implemented locally
 - Added separate `assistant_memories` records in additive migration `0008_shared_memories`. Memories remain separate from conversation sessions/messages, saved recipients, and payment ledgers.
 - Users must explicitly add each fact or preference. The SIWE owner scopes every list, create, edit, and delete operation. Per-row versions prevent silent overwrite, and request IDs make create retries idempotent.
@@ -58,7 +66,7 @@
 - No durable token-approval history exists. Adding it needs an additive schema or reviewed chain-discovery design, explicit review, backup/restore planning, and verified wallet isolation.
 - iOS Safari and Android browser-chrome behavior were not established by Chromium emulation.
 - Chat history does not store structured receipt pointers. Payment records and receipt navigation remain separate from informational conversation text.
-- P2 remains out of scope. Production migration `0008` needs the backup, restore, rollback review, and separate authorization described above.
+- P2 is complete locally. Production migrations `0007` and `0008` need reviewed backup, tested restore, rollback planning, and separate authorization before release.
 
 ## P1.1 Verification
 - Passed `npm run test:all`, `npm run test:conversation-db` against the explicit disposable local database, `npm run test:p11-ui` (3 browser tests), the focused post-refresh restore test, `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check`.
