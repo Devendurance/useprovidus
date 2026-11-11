@@ -1,6 +1,7 @@
 # Providus — Project State
 
 ## P1.2 shared user memory, local implementation, 2026-11-10
+- Local commit: `698e4b8 feat: add shared owner-scoped assistant memory`. No push or deployment.
 - Added `assistant_memories` with owner-scoped list/create/update/delete, unique normalized labels, idempotent request IDs, and optimistic row versions. Migration `0008_shared_memories` is additive and remains unapplied in production.
 - SIWE claims establish ownership. Memory is separate from conversation sessions/messages, saved recipients, and payment ledgers. Recipient names and addresses stay in `saved_recipients`.
 - Persistent assistant turns receive a bounded set of the authenticated owner's saved facts as untrusted context. Context cannot supply payment terms, select a recipient, restore an intent, or authorize a transfer. Every payment still needs a fresh review and wallet approval.

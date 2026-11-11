@@ -1,7 +1,7 @@
-# Left off: P1.2 local checkpoint
+# Left off: P1.2 complete locally
 
 ## What we are doing
-- P1.2 shared wallet-owner memory is implemented locally. Final verification and local review pass. Commit only P1.2 files locally, then stop without starting P2.
+- P1.2 shared wallet-owner memory is implemented and committed locally as `698e4b8`. Final verification and local review pass. No push, deploy, or production migration occurred.
 
 ## Done
 - Added the separate `assistant_memories` table in additive migration `0008_shared_memories`. Applied it only to disposable Postgres 16 at `127.0.0.1:55432`, after migration `0007`.
@@ -17,7 +17,7 @@
 - Final local code review caught a chain-ID grounding ambiguity: an active draft missing its amount could accept the chain ID as that amount, and an amount matching a chain ID could select that network. Added regressions first, then require explicit chain/network context for numeric chain IDs and always exclude those IDs from amount evidence.
 
 ## Next
-- Commit only P1.2 files locally after confirming the final status. Do not push or deploy.
+- Stop after P1.2. Start a future slice only when authorized. Keep P2 out of this checkpoint.
 - Before any production release, review a Neon backup or branch, verify restore in isolation, and approve a rollback plan. Apply `0008` only with separate authorization. Roll back app code first and retain the additive memory table.
 - Preserve the existing unrelated untracked `.omp/`, `.playwright-cli/`, `bridge/`, `video-demo/`, and P0.2 screenshots.
 - P2 remains out of scope.

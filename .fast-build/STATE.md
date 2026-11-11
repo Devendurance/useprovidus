@@ -15,6 +15,7 @@
 - The two earlier privacy review findings are addressed in code. Create and edit dynamically load a checksum-based BIP39 detector for all ten standard wordlists before any repository call. The assistant filters payment candidates against current user text and the app-tracked draft, so shared memory cannot fill new terms. Final review also caught and fixed numeric chain IDs being mistaken for amounts or network selection. Regression tests cover BIP39 phrases, wallet/airtime terms, active drafts, and explicit chain-ID context. No key derivation occurs.
 - Migration `0008` was generated and applied only to disposable Postgres 16 at `127.0.0.1:55432`, after `0007`. The isolation check confirmed all 11 existing public tables are unchanged. Production was not queried or changed.
 - Screenshots: `output/playwright/p1.2-memory-mobile.png` and `output/playwright/p1.2-memory-desktop.png`.
+- Local checkpoint: `698e4b8 feat: add shared owner-scoped assistant memory`. No remote push or deployment.
 - Production release remains blocked on a reviewed Neon backup, a verified restore in isolation, a rollback plan, and separate authorization. Take a fresh backup or branch, test restore, apply the additive migration, and verify owner isolation before releasing code. Roll back the app first and retain the additive table. Drop it only under a separate reviewed export and recovery plan.
 - No push, deploy, real wallet transaction, or production database write occurred.
 
